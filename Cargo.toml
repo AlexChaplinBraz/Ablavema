@@ -1,12 +1,10 @@
 [package]
-name = "blender_launcher"
+name = "blender-launcher"
 version = "0.1.0"
 authors = ["Alexander Chaplin Braz <contact@alexchaplinbraz.com>"]
 edition = "2018"
 
 [dependencies]
-reqwest = { version = "0.10.8", features = ["blocking"] }
-scraper = "0.12.0"
-select = "0.5.0"
-prettytable-rs = "0.8.0"
-rayon = "1.4.1"
+reqwest = { version = "0.10", features = ["blocking"] }
+select = "0.5"
+tokio = { version = "0.2", features = ["full"] }

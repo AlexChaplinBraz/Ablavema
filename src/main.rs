@@ -1,20 +1,19 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 #![allow(dead_code, unused_imports, unused_variables)]
 use reqwest;
-//use scraper::{Html, Selector};
-use rayon::prelude::*;
 use select::document::Document;
 use select::predicate::{Attr, Class, Name, Predicate};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut releases = Releases::new();
-    releases.fetch_official_releases();
-    releases.fetch_lts_releases();
-    releases.fetch_latest_stable();
-    releases.fetch_latest_daily();
-    releases.fetch_experimental_branches();
+    releases.fetch_official_releases().await;
+    releases.fetch_lts_releases().await;
+    releases.fetch_latest_stable().await;
+    releases.fetch_latest_daily().await;
+    releases.fetch_experimental_branches().await;
     println!("{:#?}", releases);
 }
 
@@ -38,133 +37,151 @@ impl Releases {
         }
     }
 
-    fn fetch_official_releases(&mut self) {
-        let url = "https://download.blender.org/release/";
-        let resp = reqwest::blocking::get(url).unwrap();
+    async fn fetch_official_releases(&mut self) {
+        let url = "https://ftp.nluug.nl/pub/graphics/blender/release/";
+        let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
-        let document = Document::from_read(resp).unwrap();
+        let resp = resp.bytes().await.unwrap();
+        let document = Document::from_read(&resp[..]).unwrap();
 
         let mut versions = Vec::new();
 
         for node in document.find(Name("a")) {
             let url_path = node.attr("href").unwrap();
-            versions.push(url_path);
+            versions.push(url_path.to_string());
         }
 
         versions.retain(|x| x.contains("Blender") && x.ends_with('/') && !x.contains("Benchmark"));
-        versions.push("Blender2.79/latest/");
+        versions.push("Blender2.79/latest/".to_string());
 
-        versions.par_iter().for_each(|ver| {
-            let mut release = Release::new();
+        let mut handles = Vec::new();
+        for ver in versions {
+            let handle = tokio::task::spawn(async move {
+                let mut release = Release::new();
 
-            //TODO: Find some way to get the date from that horrible plain site.
-            release.date = String::from("N/A");
+                //TODO: Find some way to get the date from that horrible plain site.
+                release.date = String::from("N/A");
 
-            release.version = ver.strip_prefix("Blender").unwrap().replace("/", "");
+                release.version = ver.strip_prefix("Blender").unwrap().replace("/", "");
 
-            let url = format!("{}{}", "https://download.blender.org/release/", ver);
+                let url = format!(
+                    "{}{}",
+                    "https://ftp.nluug.nl/pub/graphics/blender/release/", ver
+                );
 
-            let resp = reqwest::blocking::get(url.as_str()).unwrap();
-            assert!(resp.status().is_success());
-            let document = Document::from_read(resp).unwrap();
-            let mut builds = Vec::new();
+                let resp = reqwest::get(url.as_str()).await.unwrap();
+                assert!(resp.status().is_success());
+                let resp = resp.bytes().await.unwrap();
+                let document = Document::from_read(&resp[..]).unwrap();
+                let mut builds = Vec::new();
 
-            for node in document.find(Name("a")) {
-                builds.push(node.attr("href").unwrap());
-            }
+                for node in document.find(Name("a")) {
+                    builds.push(node.attr("href").unwrap());
+                }
 
-            builds.retain(|x| {
-                !x.ends_with('/')
-                    && !x.contains(".msi")
-                    && !x.contains(".md")
-                    && !x.contains(".sha256")
-                    && !x.contains(".msix")
-                    && !x.contains(".exe")
-                    && !x.contains(".txt")
-                    && !x.contains(".rpm")
-                    && !x.contains(".deb")
-                    && !x.contains(".tbz")
-                    && !x.contains("md5sums")
-                    && !x.contains("source")
-                    && !x.contains("demo")
-                    && !x.contains("script")
-                    && !x.contains("manual")
-                    && !x.contains("files")
-                    && !x.contains("beos")
-                    && !x.contains("static")
-                    && !x.contains("irix")
-                    && !x.contains("solaris")
-                    && !x.contains("powerpc")
-                    && !x.contains("-ppc")
-                    && !x.contains("_ppc")
-                    && !x.contains("freebsd")
-                    && !x.contains("FreeBSD")
-                //&& !x.contains("i386")
-                //&& !x.contains("i686")
-                //&& !x.contains("-win32")
-                //&& !x.contains("-windows32")
+                builds.retain(|x| {
+                    !x.ends_with('/')
+                        && !x.contains(".msi")
+                        && !x.contains(".md")
+                        && !x.contains(".sha256")
+                        && !x.contains(".msix")
+                        && !x.contains(".exe")
+                        && !x.contains(".txt")
+                        && !x.contains(".rpm")
+                        && !x.contains(".deb")
+                        && !x.contains(".tbz")
+                        && !x.contains("md5sums")
+                        && !x.contains("source")
+                        && !x.contains("demo")
+                        && !x.contains("script")
+                        && !x.contains("manual")
+                        && !x.contains("files")
+                        && !x.contains("beos")
+                        && !x.contains("static")
+                        && !x.contains("irix")
+                        && !x.contains("solaris")
+                        && !x.contains("powerpc")
+                        && !x.contains("-ppc")
+                        && !x.contains("_ppc")
+                        && !x.contains("freebsd")
+                        && !x.contains("FreeBSD")
+                        && !x.contains("?")
+                    //&& !x.contains("i386")
+                    //&& !x.contains("i686")
+                    //&& !x.contains("-win32")
+                    //&& !x.contains("-windows32")
+                });
+                builds.reverse();
+
+                for name in builds {
+                    let mut package = Package::new();
+
+                    package.name = get_file_stem(name).to_string();
+
+                    package.version = match release.version.as_ref() {
+                        "1.0" => String::from("1.0"),
+                        "1.60" => String::from("1.60"),
+                        "1.73" => String::from("1.73"),
+                        "1.80" => package
+                            .name
+                            .split_terminator("-")
+                            .next()
+                            .unwrap()
+                            .strip_prefix("blender")
+                            .unwrap()
+                            .to_string(),
+                        "2.04" => String::from("2.04"),
+                        "2.39" => {
+                            let v = {
+                                if package.name.contains("alpha1") {
+                                    "alpha1"
+                                } else {
+                                    "alpha2"
+                                }
+                            };
+                            format!("2.40{}", v)
+                        }
+                        "2.79latest" => String::from("2.79latest"),
+                        _ => package
+                            .name
+                            .split_terminator("-")
+                            .skip(1)
+                            .next()
+                            .unwrap()
+                            .to_string(),
+                    };
+
+                    package.date = release.date.clone();
+
+                    package.url = format!("{}{}", url, name);
+
+                    package.os = {
+                        if name.contains("linux") {
+                            Os::Linux
+                        } else if name.contains("win") {
+                            Os::Windows
+                        } else if name.contains("OS") {
+                            Os::MacOs
+                        } else {
+                            unreachable!();
+                        }
+                    };
+
+                    release.packages.push(package);
+                }
+
+                release
             });
-            builds.reverse();
 
-            for name in builds {
-                let mut package = Package::new();
+            handles.push(handle);
+        }
 
-                package.name = get_file_stem(name).to_string();
-
-                package.version = match release.version.as_ref() {
-                    "1.0" => String::from("1.0"),
-                    "1.60" => String::from("1.60"),
-                    "1.73" => String::from("1.73"),
-                    "1.80" => package
-                        .name
-                        .split_terminator("-")
-                        .next()
-                        .unwrap()
-                        .strip_prefix("blender")
-                        .unwrap()
-                        .to_string(),
-                    "2.04" => String::from("2.04"),
-                    "2.39" => {
-                        let v = {
-                            if package.name.contains("alpha1") {
-                                "alpha1"
-                            } else {
-                                "alpha2"
-                            }
-                        };
-                        format!("2.40{}", v)
-                    }
-                    "2.79latest" => String::from("2.79latest"),
-                    _ => package
-                        .name
-                        .split_terminator("-")
-                        .skip(1)
-                        .next()
-                        .unwrap()
-                        .to_string(),
-                };
-
-                package.date = release.date.clone();
-
-                package.url = format!("{}{}", url, name);
-
-                package.os = {
-                    if name.contains("linux") {
-                        Os::Linux
-                    } else if name.contains("win") {
-                        Os::Windows
-                    } else if name.contains("OS") {
-                        Os::MacOs
-                    } else {
-                        unreachable!();
-                    }
-                };
-
-                release.packages.push(package);
-            }
-
-            self.official_releases.lock().unwrap().push(release);
-        });
+        for handle in handles {
+            self.official_releases
+                .lock()
+                .unwrap()
+                .push(handle.await.unwrap());
+        }
 
         self.official_releases
             .lock()
@@ -173,11 +190,12 @@ impl Releases {
         self.official_releases.lock().unwrap().reverse();
     }
 
-    fn fetch_lts_releases(&mut self) {
+    async fn fetch_lts_releases(&mut self) {
         let url = "https://www.blender.org/download/lts/";
-        let resp = reqwest::blocking::get(url).unwrap();
+        let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
-        let document = Document::from_read(resp).unwrap();
+        let resp = resp.bytes().await.unwrap();
+        let document = Document::from_read(&resp[..]).unwrap();
 
         // Can be done so it works off a vector of LTS releases, but by that time the website will
         // probably change anyway so I'll wait until then. Maybe by then it won't require me to do
@@ -231,8 +249,6 @@ impl Releases {
 
                 package.date = release.date.clone();
 
-                // Hardcoded due to the stupid redirect. Could follow it dynamically,
-                // but seems unnecessary.
                 let download_path =
                     "https://ftp.nluug.nl/pub/graphics/blender/release/Blender2.83/";
                 package.url = format!("{}{}", download_path, name);
@@ -276,11 +292,12 @@ impl Releases {
         self.lts_releases.reverse();
     }
 
-    fn fetch_latest_stable(&mut self) {
+    async fn fetch_latest_stable(&mut self) {
         let url = "https://www.blender.org/download/";
-        let resp = reqwest::blocking::get(url).unwrap();
+        let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
-        let document = Document::from_read(resp).unwrap();
+        let resp = resp.bytes().await.unwrap();
+        let document = Document::from_read(&resp[..]).unwrap();
 
         for o in vec!["linux", "windows", "macos"] {
             let node = document.find(Attr("id", o)).next().unwrap();
@@ -333,11 +350,12 @@ impl Releases {
         }
     }
 
-    fn fetch_latest_daily(&mut self) {
+    async fn fetch_latest_daily(&mut self) {
         let url = "https://builder.blender.org/download/";
-        let resp = reqwest::blocking::get(url).unwrap();
+        let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
-        let document = Document::from_read(resp).unwrap();
+        let resp = resp.bytes().await.unwrap();
+        let document = Document::from_read(&resp[..]).unwrap();
 
         for build in document.find(Class("os")) {
             let mut package = Package::new();
@@ -393,11 +411,12 @@ impl Releases {
         }
     }
 
-    fn fetch_experimental_branches(&mut self) {
+    async fn fetch_experimental_branches(&mut self) {
         let url = "https://builder.blender.org/download/branches/";
-        let resp = reqwest::blocking::get(url).unwrap();
+        let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
-        let document = Document::from_read(resp).unwrap();
+        let resp = resp.bytes().await.unwrap();
+        let document = Document::from_read(&resp[..]).unwrap();
 
         for build in document.find(Class("os")) {
             let mut package = Package::new();
