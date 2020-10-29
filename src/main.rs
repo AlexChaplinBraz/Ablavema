@@ -1,7 +1,9 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
 mod releases;
+mod settings;
 pub use crate::releases::Releases;
+pub use crate::settings::Settings;
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand,
 };

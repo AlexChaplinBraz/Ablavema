@@ -10,3 +10,4 @@ reqwest = "0.10"
 select = "0.5"
 tokio = { version = "0.2", features = ["full"] }
 clap = "2.33"
+config = "0.10"
