@@ -1,10 +1,12 @@
 [package]
 name = "blender-launcher"
+description = "Launcher and version manager for Blender"
 version = "0.1.0"
 authors = ["Alexander Chaplin Braz <contact@alexchaplinbraz.com>"]
 edition = "2018"
 
 [dependencies]
-reqwest = { version = "0.10", features = ["blocking"] }
+reqwest = "0.10"
 select = "0.5"
 tokio = { version = "0.2", features = ["full"] }
+clap = "2.33"
