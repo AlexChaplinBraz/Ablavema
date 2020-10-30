@@ -163,8 +163,12 @@ async fn run(releases: &mut Releases) -> Result<(), Box<dyn Error>> {
                 }
             }
         }
-        _ => todo!("Other subcommands"),
+        _ => (), //todo!("Other subcommands"),
     }
+
+    let settings = Settings::new()?;
+
+    println!("{:#?}", settings);
 
     Ok(())
 }
