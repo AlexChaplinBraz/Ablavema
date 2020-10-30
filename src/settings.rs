@@ -1,6 +1,6 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 #![allow(dead_code, unused_imports, unused_variables)]
-use config::{Config, ConfigError, Environment, File};
+use config::{Config, ConfigError, Environment, File, FileFormat};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::prelude::*;
@@ -46,7 +46,7 @@ impl Settings {
 
         let conf = Path::new(&config_path);
         if conf.exists() {
-            settings.merge(File::with_name(&config_path))?;
+            settings.merge(File::new(&config_path, FileFormat::Toml))?;
         } else {
             let default = Settings::default();
             let mut conf_file = std::fs::File::create(conf).unwrap();
@@ -55,7 +55,7 @@ impl Settings {
                 .write_all(toml::to_string(&default).unwrap().as_bytes())
                 .unwrap();
 
-            settings.merge(File::with_name(&config_path))?;
+            settings.merge(File::new(&config_path, FileFormat::Toml))?;
         }
 
         settings.try_into()
