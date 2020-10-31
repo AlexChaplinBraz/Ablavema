@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
-    packages_path: PathBuf,
-    temp_path: PathBuf,
-    interface: Interface,
+    pub packages_dir: PathBuf,
+    pub temp_dir: PathBuf,
+    pub interface: Interface,
 }
 
 impl Settings {
@@ -66,7 +66,7 @@ impl Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            packages_path: PathBuf::from({
+            packages_dir: PathBuf::from({
                 if cfg!(target_os = "linux") {
                     "/otp/BlenderLauncher"
                 } else if cfg!(target_os = "windows") {
@@ -77,7 +77,7 @@ impl Default for Settings {
                     unreachable!("Unsupported OS config");
                 }
             }),
-            temp_path: PathBuf::from({
+            temp_dir: PathBuf::from({
                 if cfg!(target_os = "linux") {
                     "/tmp/BlenderLauncher"
                 } else if cfg!(target_os = "windows") {
@@ -94,7 +94,7 @@ impl Default for Settings {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-enum Interface {
+pub enum Interface {
     GUI,
     TUI,
 }
