@@ -121,6 +121,8 @@ impl Releases {
 
                     package.name = get_file_stem(name).to_string();
 
+                    package.build = String::from("Official Release");
+
                     package.version = match release.version.as_ref() {
                         "1.0" => String::from("1.0"),
                         "1.60" => String::from("1.60"),
@@ -264,6 +266,8 @@ impl Releases {
 
                 package.name = get_file_stem(node.text().as_str()).to_string();
 
+                package.build = String::from("LTS Release");
+
                 package.date = release.date.clone();
 
                 let download_path =
@@ -334,7 +338,8 @@ impl Releases {
             .version
             .retain(|c| c.is_numeric() || c.is_ascii_punctuation());
 
-        package.name = String::from("Latest Stable");
+        // TODO: Think about how to rename this when a new latest stable release is out.
+        package.build = String::from("Latest Stable Release");
 
         package.url = format!(
             "https://ftp.nluug.nl/pub/graphics/blender/release/{}",
@@ -349,6 +354,8 @@ impl Releases {
                 .unwrap()
                 .replace(".msi", ".zip")
         );
+
+        package.name = get_file_stem(&package.url).to_string();
 
         package.date = node
             .find(Class("dl-header-info-platform"))
@@ -400,7 +407,7 @@ impl Releases {
 
             let mut package = Package::new();
 
-            package.name = build.find(Class("build-var")).next().unwrap().text();
+            package.build = build.find(Class("build-var")).next().unwrap().text();
 
             package.version = build
                 .find(Class("name"))
@@ -433,6 +440,8 @@ impl Releases {
                 "https://builder.blender.org{}",
                 build.find(Name("a")).next().unwrap().attr("href").unwrap()
             );
+
+            package.name = get_file_stem(&package.url).to_string();
 
             package.os = {
                 if o.contains("Linux") {
@@ -475,7 +484,7 @@ impl Releases {
 
             let mut package = Package::new();
 
-            package.name = build
+            package.build = build
                 .find(Class("build-var"))
                 .next()
                 .unwrap()
@@ -517,6 +526,8 @@ impl Releases {
                 build.find(Name("a")).next().unwrap().attr("href").unwrap()
             );
 
+            package.name = get_file_stem(&package.url).to_string();
+
             package.os = {
                 if o.contains("Linux") {
                     Os::Linux
@@ -557,6 +568,7 @@ impl Release {
 pub struct Package {
     version: String,
     name: String,
+    build: String,
     date: String,
     commit: String,
     url: String,
@@ -568,6 +580,7 @@ impl Package {
         Package {
             version: String::new(),
             name: String::new(),
+            build: String::new(),
             date: String::new(),
             commit: String::new(),
             url: String::new(),
