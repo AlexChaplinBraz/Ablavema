@@ -8,11 +8,11 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 pub struct Releases {
-    official_releases: Arc<Mutex<Vec<Release>>>,
-    lts_releases: Vec<Release>,
-    experimental_branches: Vec<Package>,
-    latest_daily: Vec<Package>,
-    latest_stable: Vec<Package>,
+    pub official_releases: Arc<Mutex<Vec<Release>>>,
+    pub lts_releases: Vec<Release>,
+    pub experimental_branches: Vec<Package>,
+    pub latest_daily: Vec<Package>,
+    pub latest_stable: Vec<Package>,
 }
 
 impl Releases {
@@ -535,7 +535,7 @@ impl Releases {
 }
 
 #[derive(Debug)]
-struct Release {
+pub struct Release {
     version: String,
     date: String,
     packages: Vec<Package>,
@@ -554,7 +554,7 @@ impl Release {
 }
 
 #[derive(Debug)]
-struct Package {
+pub struct Package {
     version: String,
     name: String,
     date: String,
