@@ -1,8 +1,11 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
+pub use crate::settings::Settings;
 use reqwest;
 use select::document::Document;
 use select::predicate::{Attr, Class, Name};
+use std::fs::File;
+use std::io::copy;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -586,6 +589,87 @@ impl Package {
             url: String::new(),
             os: Os::None,
         }
+    }
+
+    pub async fn download(&self, settings: &Settings) -> Result<(), Box<dyn std::error::Error>> {
+        let response = reqwest::get(&self.url).await?;
+
+        let dest = {
+            let fname = response
+                .url()
+                .path_segments()
+                .and_then(|segments| segments.last())
+                .unwrap();
+
+            std::fs::create_dir_all(&settings.temp_dir)?;
+            settings.temp_dir.join(fname)
+        };
+
+        if !dest.exists() {
+            let mut file = File::create(&dest)?;
+
+            let content = response.bytes().await?;
+            copy(&mut content.as_ref(), &mut file)?;
+        }
+
+        Package::extract(&self, &settings)?;
+
+        Ok(())
+    }
+
+    fn extract(package: &Package, settings: &Settings) -> Result<(), Box<dyn std::error::Error>> {
+        let file = format!(
+            "{}/{}",
+            settings.temp_dir.to_str().unwrap(),
+            package.url.split_terminator('/').last().unwrap()
+        );
+
+        std::fs::create_dir_all(&settings.packages_dir)?;
+
+        let pack = format!(
+            "{}/{}",
+            settings.packages_dir.to_str().unwrap(),
+            package.name
+        );
+
+        let p = Path::new(&pack);
+        if p.exists() {
+            return Ok(());
+        }
+
+        if cfg!(target_os = "linux") {
+            use bzip2::read::BzDecoder;
+            use flate2::read::GzDecoder;
+            use tar::Archive;
+            use xz2::read::XzDecoder;
+
+            if file.ends_with(".xz") {
+                let tar_xz = File::open(file)?;
+                let tar = XzDecoder::new(tar_xz);
+                let mut archive = Archive::new(tar);
+                archive.unpack(&settings.packages_dir)?;
+            } else if file.ends_with(".bz2") {
+                let tar_bz2 = File::open(file)?;
+                let tar = BzDecoder::new(tar_bz2);
+                let mut archive = Archive::new(tar);
+                archive.unpack(&settings.packages_dir)?;
+            } else if file.ends_with(".gz") {
+                let tar_gz = File::open(file)?;
+                let tar = GzDecoder::new(tar_gz);
+                let mut archive = Archive::new(tar);
+                archive.unpack(&settings.packages_dir)?;
+            } else {
+                unreachable!("Unknown compression extension");
+            }
+        } else if cfg!(target_os = "windows") {
+            todo!("windows extraction");
+        } else if cfg!(target_os = "macos") {
+            todo!("macos extraction");
+        } else {
+            unreachable!("Unsupported OS extraction");
+        }
+
+        Ok(())
     }
 }
 
