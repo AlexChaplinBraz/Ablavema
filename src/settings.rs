@@ -45,9 +45,8 @@ impl Settings {
         let mut settings = Config::new();
 
         let conf = Path::new(&config_path);
-        if conf.exists() {
-            settings.merge(File::new(&config_path, FileFormat::Toml))?;
-        } else {
+
+        if !conf.exists() {
             let default = Settings::default();
             std::fs::create_dir_all(conf.parent().unwrap()).unwrap();
             let mut conf_file = std::fs::File::create(conf).unwrap();
@@ -55,9 +54,9 @@ impl Settings {
             conf_file
                 .write_all(toml::to_string(&default).unwrap().as_bytes())
                 .unwrap();
-
-            settings.merge(File::new(&config_path, FileFormat::Toml))?;
         }
+
+        settings.merge(File::new(&config_path, FileFormat::Toml))?;
 
         settings.try_into()
     }
