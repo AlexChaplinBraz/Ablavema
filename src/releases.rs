@@ -103,6 +103,20 @@ impl Releases {
                 builds.reverse();
 
                 for name in builds {
+                    let targ_os = if cfg!(target_os = "linux") {
+                        "linux"
+                    } else if cfg!(target_os = "windows") {
+                        "win"
+                    } else if cfg!(target_os = "macos") {
+                        "OS"
+                    } else {
+                        unreachable!("Unsupported OS config");
+                    };
+
+                    if !name.contains(targ_os) {
+                        continue;
+                    }
+
                     let mut package = Package::new();
 
                     package.name = get_file_stem(name).to_string();
@@ -230,6 +244,20 @@ impl Releases {
                     continue;
                 }
 
+                let targ_os = if cfg!(target_os = "linux") {
+                    "linux"
+                } else if cfg!(target_os = "windows") {
+                    "win"
+                } else if cfg!(target_os = "macos") {
+                    "mac"
+                } else {
+                    unreachable!("Unsupported OS config");
+                };
+
+                if !name.contains(targ_os) {
+                    continue;
+                }
+
                 let mut package = Package::new();
 
                 package.version = release.version.clone();
@@ -288,55 +316,63 @@ impl Releases {
         let resp = resp.bytes().await.unwrap();
         let document = Document::from_read(&resp[..]).unwrap();
 
-        for o in vec!["linux", "windows", "macos"] {
-            let node = document.find(Attr("id", o)).next().unwrap();
-            let mut package = Package::new();
+        let o = if cfg!(target_os = "linux") {
+            "linux"
+        } else if cfg!(target_os = "windows") {
+            "windows"
+        } else if cfg!(target_os = "macos") {
+            "macos"
+        } else {
+            unreachable!("Unsupported OS config");
+        };
 
-            package.version = node.find(Name("a")).next().unwrap().text();
-            package
-                .version
-                .retain(|c| c.is_numeric() || c.is_ascii_punctuation());
+        let node = document.find(Attr("id", o)).next().unwrap();
+        let mut package = Package::new();
 
-            package.name = String::from("Latest Stable");
+        package.version = node.find(Name("a")).next().unwrap().text();
+        package
+            .version
+            .retain(|c| c.is_numeric() || c.is_ascii_punctuation());
 
-            package.url = format!(
-                "https://ftp.nluug.nl/pub/graphics/blender/release/{}",
-                node.find(Name("a"))
-                    .next()
-                    .unwrap()
-                    .attr("href")
-                    .unwrap()
-                    .strip_prefix(&url)
-                    .unwrap()
-                    .strip_suffix("/")
-                    .unwrap()
-                    .replace(".msi", ".zip")
-            );
+        package.name = String::from("Latest Stable");
 
-            package.date = node
-                .find(Class("dl-header-info-platform"))
+        package.url = format!(
+            "https://ftp.nluug.nl/pub/graphics/blender/release/{}",
+            node.find(Name("a"))
                 .next()
                 .unwrap()
-                .find(Name("small"))
-                .next()
+                .attr("href")
                 .unwrap()
-                .text();
-            package.date = package.date.split_off(package.date.find("on").unwrap() + 3);
+                .strip_prefix(&url)
+                .unwrap()
+                .strip_suffix("/")
+                .unwrap()
+                .replace(".msi", ".zip")
+        );
 
-            package.os = {
-                if o == "linux" {
-                    Os::Linux
-                } else if o == "windows" {
-                    Os::Windows
-                } else if o == "macos" {
-                    Os::MacOs
-                } else {
-                    unreachable!();
-                }
-            };
+        package.date = node
+            .find(Class("dl-header-info-platform"))
+            .next()
+            .unwrap()
+            .find(Name("small"))
+            .next()
+            .unwrap()
+            .text();
+        package.date = package.date.split_off(package.date.find("on").unwrap() + 3);
 
-            self.latest_stable.push(package);
-        }
+        package.os = {
+            if o == "linux" {
+                Os::Linux
+            } else if o == "windows" {
+                Os::Windows
+            } else if o == "macos" {
+                Os::MacOs
+            } else {
+                unreachable!();
+            }
+        };
+
+        self.latest_stable.push(package);
     }
 
     pub async fn fetch_latest_daily(&mut self) {
@@ -347,6 +383,21 @@ impl Releases {
         let document = Document::from_read(&resp[..]).unwrap();
 
         for build in document.find(Class("os")) {
+            let targ_os = if cfg!(target_os = "linux") {
+                "Linux"
+            } else if cfg!(target_os = "windows") {
+                "Windows"
+            } else if cfg!(target_os = "macos") {
+                "macOS"
+            } else {
+                unreachable!("Unsupported OS config");
+            };
+
+            let o = build.find(Class("build")).next().unwrap().text();
+            if !o.contains(targ_os) {
+                continue;
+            }
+
             let mut package = Package::new();
 
             package.name = build.find(Class("build-var")).next().unwrap().text();
@@ -384,7 +435,6 @@ impl Releases {
             );
 
             package.os = {
-                let o = build.find(Class("build")).next().unwrap().text();
                 if o.contains("Linux") {
                     Os::Linux
                 } else if o.contains("Windows") {
@@ -408,6 +458,21 @@ impl Releases {
         let document = Document::from_read(&resp[..]).unwrap();
 
         for build in document.find(Class("os")) {
+            let targ_os = if cfg!(target_os = "linux") {
+                "Linux"
+            } else if cfg!(target_os = "windows") {
+                "Windows"
+            } else if cfg!(target_os = "macos") {
+                "macOS"
+            } else {
+                unreachable!("Unsupported OS config");
+            };
+
+            let o = build.find(Class("build")).next().unwrap().text();
+            if !o.contains(targ_os) {
+                continue;
+            }
+
             let mut package = Package::new();
 
             package.name = build
@@ -453,7 +518,6 @@ impl Releases {
             );
 
             package.os = {
-                let o = build.find(Class("build")).next().unwrap().text();
                 if o.contains("Linux") {
                     Os::Linux
                 } else if o.contains("Windows") {
