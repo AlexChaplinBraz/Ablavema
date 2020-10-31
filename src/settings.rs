@@ -49,6 +49,7 @@ impl Settings {
             settings.merge(File::new(&config_path, FileFormat::Toml))?;
         } else {
             let default = Settings::default();
+            std::fs::create_dir_all(conf.parent().unwrap()).unwrap();
             let mut conf_file = std::fs::File::create(conf).unwrap();
 
             conf_file
