@@ -7,11 +7,10 @@ use select::predicate::{Attr, Class, Name};
 use std::fs::File;
 use std::io::copy;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 pub struct Releases {
-    pub official_releases: Arc<Mutex<Vec<Release>>>,
+    pub official_releases: Vec<Release>,
     pub lts_releases: Vec<Release>,
     pub experimental_branches: Vec<Package>,
     pub latest_daily: Vec<Package>,
@@ -21,7 +20,7 @@ pub struct Releases {
 impl Releases {
     pub fn new() -> Releases {
         Releases {
-            official_releases: Arc::new(Mutex::new(Vec::new())),
+            official_releases: Vec::new(),
             lts_releases: Vec::new(),
             experimental_branches: Vec::new(),
             latest_daily: Vec::new(),
@@ -185,17 +184,11 @@ impl Releases {
         }
 
         for handle in handles {
-            self.official_releases
-                .lock()
-                .unwrap()
-                .push(handle.await.unwrap());
+            self.official_releases.push(handle.await.unwrap());
         }
 
-        self.official_releases
-            .lock()
-            .unwrap()
-            .sort_by_key(|x| x.version.clone());
-        self.official_releases.lock().unwrap().reverse();
+        self.official_releases.sort_by_key(|x| x.version.clone());
+        self.official_releases.reverse();
     }
 
     pub async fn fetch_lts_releases(&mut self) {
