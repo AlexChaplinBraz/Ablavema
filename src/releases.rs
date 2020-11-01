@@ -601,10 +601,10 @@ impl Releases {
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Release {
-    version: String,
-    date: String,
-    packages: Vec<Package>,
-    changelog: Vec<Change>,
+    pub version: String,
+    pub date: String,
+    pub packages: Vec<Package>,
+    pub changelog: Vec<Change>,
 }
 
 impl Release {
@@ -620,13 +620,13 @@ impl Release {
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Package {
-    version: String,
-    name: String,
-    build: String,
-    date: String,
-    commit: String,
-    url: String,
-    os: Os,
+    pub version: String,
+    pub name: String,
+    pub build: String,
+    pub date: String,
+    pub commit: String,
+    pub url: String,
+    pub os: Os,
 }
 
 impl Package {
@@ -725,13 +725,13 @@ impl Package {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
-struct Change {
-    text: String,
-    url: String,
+pub struct Change {
+    pub text: String,
+    pub url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
-enum Os {
+pub enum Os {
     Linux,
     Windows,
     MacOs,
