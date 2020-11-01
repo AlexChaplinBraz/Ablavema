@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub packages_dir: PathBuf,
+    pub releases_db: PathBuf,
     pub temp_dir: PathBuf,
     pub interface: Interface,
 }
@@ -67,7 +68,18 @@ impl Default for Settings {
         Self {
             packages_dir: PathBuf::from({
                 if cfg!(target_os = "linux") {
-                    "/otp/BlenderLauncher"
+                    "/home/alex/.config/BlenderLauncher/packages"
+                } else if cfg!(target_os = "windows") {
+                    todo!("windows config");
+                } else if cfg!(target_os = "macos") {
+                    todo!("macos config");
+                } else {
+                    unreachable!("Unsupported OS config");
+                }
+            }),
+            releases_db: PathBuf::from({
+                if cfg!(target_os = "linux") {
+                    "/home/alex/.config/BlenderLauncher/releases_db.bin"
                 } else if cfg!(target_os = "windows") {
                     todo!("windows config");
                 } else if cfg!(target_os = "macos") {

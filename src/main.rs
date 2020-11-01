@@ -11,17 +11,19 @@ use std::{error::Error, process::exit};
 
 #[tokio::main]
 async fn main() {
-    let mut releases = Releases::new();
-
-    if let Err(e) = run(&mut releases).await {
+    if let Err(e) = run().await {
         eprintln!("Error: {}.", e);
         exit(1);
     }
-
-    println!("{:#?}", releases);
 }
 
-async fn run(releases: &mut Releases) -> Result<(), Box<dyn Error>> {
+async fn run() -> Result<(), Box<dyn Error>> {
+    let settings = Settings::new()?;
+
+    let mut releases = Releases::new();
+
+    releases.load(&settings);
+
     let args = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
@@ -136,39 +138,37 @@ async fn run(releases: &mut Releases) -> Result<(), Box<dyn Error>> {
     match args.subcommand() {
         ("fetch", Some(a)) => {
             if a.is_present("all") {
-                releases.fetch_official_releases().await;
-                releases.fetch_lts_releases().await;
-                releases.fetch_latest_stable().await;
-                releases.fetch_latest_daily().await;
-                releases.fetch_experimental_branches().await;
+                releases.fetch_official_releases(&settings).await;
+                releases.fetch_lts_releases(&settings).await;
+                releases.fetch_latest_stable(&settings).await;
+                releases.fetch_latest_daily(&settings).await;
+                releases.fetch_experimental_branches(&settings).await;
             } else {
                 if a.is_present("official") {
-                    releases.fetch_official_releases().await;
+                    releases.fetch_official_releases(&settings).await;
                 }
 
                 if a.is_present("lts") {
-                    releases.fetch_lts_releases().await;
+                    releases.fetch_lts_releases(&settings).await;
                 }
 
                 if a.is_present("stable") {
-                    releases.fetch_latest_stable().await;
+                    releases.fetch_latest_stable(&settings).await;
                 }
 
                 if a.is_present("daily") {
-                    releases.fetch_latest_daily().await;
+                    releases.fetch_latest_daily(&settings).await;
                 }
 
                 if a.is_present("experimental") {
-                    releases.fetch_experimental_branches().await;
+                    releases.fetch_experimental_branches(&settings).await;
                 }
             }
         }
         _ => (), //todo!("Other subcommands"),
     }
 
-    let settings = Settings::new()?;
-
-    println!("{:#?}", settings);
+    println!("{:#?}", releases);
 
     Ok(())
 }

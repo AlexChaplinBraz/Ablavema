@@ -4,17 +4,22 @@ pub use crate::settings::Settings;
 use reqwest;
 use select::document::Document;
 use select::predicate::{Attr, Class, Name};
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::copy;
 use std::path::Path;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Releases {
     pub official_releases: Vec<Release>,
     pub lts_releases: Vec<Release>,
     pub experimental_branches: Vec<Package>,
     pub latest_daily: Vec<Package>,
     pub latest_stable: Vec<Package>,
+    // TODO: Add fields to hold previously downloaded packages:
+    // pub previous_experimental: Vec<Package>,
+    // pub previous_daily: Vec<Package>,
+    // pub previous_stable: Vec<Package>,
 }
 
 impl Releases {
@@ -28,12 +33,27 @@ impl Releases {
         }
     }
 
-    pub async fn fetch_official_releases(&mut self) {
+    pub fn load(&mut self, settings: &Settings) {
+        if settings.releases_db.exists() {
+            let file = File::open(&settings.releases_db).unwrap();
+            let bin: Releases = bincode::deserialize_from(file).unwrap();
+            *self = bin;
+        }
+    }
+
+    pub fn save(&mut self, settings: &Settings) {
+        let file = File::create(&settings.releases_db).unwrap();
+        bincode::serialize_into(file, self).unwrap();
+    }
+
+    pub async fn fetch_official_releases(&mut self, settings: &Settings) {
         let url = "https://ftp.nluug.nl/pub/graphics/blender/release/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
         let resp = resp.bytes().await.unwrap();
         let document = Document::from_read(&resp[..]).unwrap();
+
+        let mut fetched = Releases::new();
 
         let mut versions = Vec::new();
 
@@ -184,19 +204,27 @@ impl Releases {
         }
 
         for handle in handles {
-            self.official_releases.push(handle.await.unwrap());
+            fetched.official_releases.push(handle.await.unwrap());
         }
 
-        self.official_releases.sort_by_key(|x| x.version.clone());
-        self.official_releases.reverse();
+        fetched.official_releases.sort_by_key(|x| x.version.clone());
+        fetched.official_releases.reverse();
+
+        if self.official_releases != fetched.official_releases {
+            self.official_releases = fetched.official_releases;
+
+            self.save(&settings);
+        }
     }
 
-    pub async fn fetch_lts_releases(&mut self) {
+    pub async fn fetch_lts_releases(&mut self, settings: &Settings) {
         let url = "https://www.blender.org/download/lts/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
         let resp = resp.bytes().await.unwrap();
         let document = Document::from_read(&resp[..]).unwrap();
+
+        let mut fetched = Releases::new();
 
         // Can be done so it works off a vector of LTS releases, but by that time the website will
         // probably change anyway so I'll wait until then. Maybe by then it won't require me to do
@@ -303,13 +331,19 @@ impl Releases {
                 release.changelog.push(change);
             }
 
-            self.lts_releases.push(release);
+            fetched.lts_releases.push(release);
         }
 
-        self.lts_releases.reverse();
+        fetched.lts_releases.reverse();
+
+        if self.lts_releases != fetched.lts_releases {
+            self.lts_releases = fetched.lts_releases;
+
+            self.save(&settings);
+        }
     }
 
-    pub async fn fetch_latest_stable(&mut self) {
+    pub async fn fetch_latest_stable(&mut self, settings: &Settings) {
         let url = "https://www.blender.org/download/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -375,15 +409,25 @@ impl Releases {
             }
         };
 
-        self.latest_stable.push(package);
+        let mut fetched = Releases::new();
+
+        fetched.latest_stable.push(package);
+
+        if self.latest_stable != fetched.latest_stable {
+            self.latest_stable = fetched.latest_stable;
+
+            self.save(&settings);
+        }
     }
 
-    pub async fn fetch_latest_daily(&mut self) {
+    pub async fn fetch_latest_daily(&mut self, settings: &Settings) {
         let url = "https://builder.blender.org/download/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
         let resp = resp.bytes().await.unwrap();
         let document = Document::from_read(&resp[..]).unwrap();
+
+        let mut fetched = Releases::new();
 
         for build in document.find(Class("os")) {
             let targ_os = if cfg!(target_os = "linux") {
@@ -451,16 +495,24 @@ impl Releases {
                 }
             };
 
-            self.latest_daily.push(package);
+            fetched.latest_daily.push(package);
+        }
+
+        if self.latest_daily != fetched.latest_daily {
+            self.latest_daily = fetched.latest_daily;
+
+            self.save(&settings);
         }
     }
 
-    pub async fn fetch_experimental_branches(&mut self) {
+    pub async fn fetch_experimental_branches(&mut self, settings: &Settings) {
         let url = "https://builder.blender.org/download/branches/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
         let resp = resp.bytes().await.unwrap();
         let document = Document::from_read(&resp[..]).unwrap();
+
+        let mut fetched = Releases::new();
 
         for build in document.find(Class("os")) {
             let targ_os = if cfg!(target_os = "linux") {
@@ -536,12 +588,18 @@ impl Releases {
                 }
             };
 
-            self.experimental_branches.push(package);
+            fetched.experimental_branches.push(package);
+        }
+
+        if self.experimental_branches != fetched.experimental_branches {
+            self.experimental_branches = fetched.experimental_branches;
+
+            self.save(&settings);
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Release {
     version: String,
     date: String,
@@ -560,7 +618,7 @@ impl Release {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Package {
     version: String,
     name: String,
@@ -666,13 +724,13 @@ impl Package {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 struct Change {
     text: String,
     url: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 enum Os {
     Linux,
     Windows,
