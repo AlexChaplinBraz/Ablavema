@@ -51,11 +51,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 }),
         )
         .subcommand(
-            SubCommand::with_name("download")
+            SubCommand::with_name("install")
                 .setting(AppSettings::ColoredHelp)
                 .version(crate_version!())
                 .author(crate_authors!())
-                .about("Download packages"),
+                .about("Install packages"),
         )
         .subcommand(
             SubCommand::with_name("fetch")
@@ -131,7 +131,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 .setting(AppSettings::ColoredHelp)
                 .version(crate_version!())
                 .author(crate_authors!())
-                .about("Update downloaded packages"),
+                .about("Update installed packages"),
         )
         .get_matches();
 
