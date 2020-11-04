@@ -1,13 +1,16 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
 pub use crate::settings::Settings;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest;
+use reqwest::{header, Client};
 use select::document::Document;
 use select::predicate::{Attr, Class, Name};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::copy;
 use std::path::Path;
+use tokio::{fs, io::AsyncWriteExt};
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Releases {
@@ -640,6 +643,196 @@ impl Package {
             url: String::new(),
             os: Os::None,
         }
+    }
+
+    pub async fn install(
+        &self,
+        settings: &Settings,
+        multi_progress: &MultiProgress,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let download_style = ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:20.cyan/red}] {bytes}/{total_bytes} {bytes_per_sec} ({eta}) => {wide_msg}")
+            .progress_chars("#>-");
+        let extraction_style = ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:20.green/red}] {percent}% => {wide_msg}")
+            .progress_chars("#>-");
+
+        let client = Client::new();
+
+        let total_size = {
+            let resp = client.head(&self.url).send().await.unwrap();
+            if resp.status().is_success() {
+                resp.headers()
+                    .get(header::CONTENT_LENGTH)
+                    .and_then(|ct_len| ct_len.to_str().ok())
+                    .and_then(|ct_len| ct_len.parse().ok())
+                    .unwrap_or(0)
+            } else {
+                let error = format!(
+                    "Couldn't download URL: {}. Error: {:?}",
+                    self.url,
+                    resp.status(),
+                );
+                panic!(error);
+            }
+        };
+
+        let progress_bar = multi_progress.add(ProgressBar::new(total_size));
+        progress_bar.set_style(download_style.clone());
+
+        let msg = format!(
+            "Downloading {}",
+            self.url.split_terminator('/').last().unwrap()
+        );
+        progress_bar.set_message(&msg);
+
+        let url = self.url.clone();
+        let request = client.get(&url);
+
+        let f = format!(
+            "{}/{}",
+            settings.temp_dir.to_str().unwrap(),
+            self.url.split_terminator('/').last().unwrap()
+        );
+        let file = Path::new(&f);
+
+        // TODO: Prompt/option for re-download.
+        if file.exists() {
+            std::fs::remove_file(file).unwrap();
+        }
+
+        let mut source = request.send().await.unwrap();
+        let mut dest = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&file)
+            .await
+            .unwrap();
+
+        let msg = format!(
+            "Downloaded {}",
+            self.url.split_terminator('/').last().unwrap()
+        );
+
+        let download_handle = tokio::task::spawn(async move {
+            while let Some(chunk) = source.chunk().await.unwrap() {
+                dest.write_all(&chunk).await.unwrap();
+                progress_bar.inc(chunk.len() as u64);
+            }
+
+            progress_bar.finish_with_message(&msg);
+        });
+
+        std::fs::create_dir_all(&settings.packages_dir)?;
+
+        // TODO: Prompt/option for re-extraction.
+        let package = format!("{}/{}", settings.packages_dir.to_str().unwrap(), self.name);
+        let path = Path::new(&package);
+        if path.exists() {
+            std::fs::remove_dir_all(path).unwrap();
+        }
+
+        let file = format!(
+            "{}/{}",
+            settings.temp_dir.to_str().unwrap(),
+            self.url.split_terminator('/').last().unwrap()
+        );
+
+        if cfg!(target_os = "linux") {
+            use bzip2::read::BzDecoder;
+            use flate2::read::GzDecoder;
+            use tar::Archive;
+            use xz2::read::XzDecoder;
+
+            let packages_dir = settings.packages_dir.clone();
+
+            // This value is hardcoded because the cost of calculating it is way too high
+            // to justify it (around 4 seconds). Setting it a bit higher so that it's not stuck
+            // at 100%. It'll jump to 100% from around 95% for recent packages,
+            // but it's jumpy throughout the whole process so it doesn't stand out.
+            // It is, however, noticeable with older packages with smaller size.
+            // TODO: Implement a fast way of calculating it.
+            let progress_bar = multi_progress.add(ProgressBar::new(5000));
+            progress_bar.set_style(extraction_style.clone());
+
+            if file.ends_with(".xz") {
+                let _ = tokio::task::spawn(async move {
+                    download_handle.await.unwrap();
+
+                    let msg = format!("Extracting {}", file.split_terminator('/').last().unwrap());
+                    progress_bar.set_message(&msg);
+                    progress_bar.reset_elapsed();
+                    progress_bar.enable_steady_tick(250);
+
+                    let tar_xz = File::open(&file).unwrap();
+                    let tar = XzDecoder::new(tar_xz);
+                    let mut archive = Archive::new(tar);
+
+                    for entry in archive.entries().unwrap() {
+                        progress_bar.inc(1);
+                        let mut file = entry.unwrap();
+                        file.unpack_in(&packages_dir).unwrap();
+                    }
+
+                    let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
+                    progress_bar.finish_with_message(&msg);
+                });
+            } else if file.ends_with(".bz2") {
+                let _ = tokio::task::spawn(async move {
+                    download_handle.await.unwrap();
+
+                    let msg = format!("Extracting {}", file.split_terminator('/').last().unwrap());
+                    progress_bar.set_message(&msg);
+                    progress_bar.reset_elapsed();
+                    progress_bar.enable_steady_tick(250);
+
+                    let tar_bz2 = File::open(&file).unwrap();
+                    let tar = BzDecoder::new(tar_bz2);
+                    let mut archive = Archive::new(tar);
+
+                    for entry in archive.entries().unwrap() {
+                        progress_bar.inc(1);
+                        let mut file = entry.unwrap();
+                        file.unpack_in(&packages_dir).unwrap();
+                    }
+
+                    let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
+                    progress_bar.finish_with_message(&msg);
+                });
+            } else if file.ends_with(".gz") {
+                let _ = tokio::task::spawn(async move {
+                    download_handle.await.unwrap();
+
+                    let msg = format!("Extracting {}", file.split_terminator('/').last().unwrap());
+                    progress_bar.set_message(&msg);
+                    progress_bar.reset_elapsed();
+                    progress_bar.enable_steady_tick(250);
+
+                    let tar_gz = File::open(&file).unwrap();
+                    let tar = GzDecoder::new(tar_gz);
+                    let mut archive = Archive::new(tar);
+
+                    for entry in archive.entries().unwrap() {
+                        progress_bar.inc(1);
+                        let mut file = entry.unwrap();
+                        file.unpack_in(&packages_dir).unwrap();
+                    }
+
+                    let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
+                    progress_bar.finish_with_message(&msg);
+                });
+            } else {
+                unreachable!("Unknown compression extension");
+            }
+        } else if cfg!(target_os = "windows") {
+            todo!("windows extraction");
+        } else if cfg!(target_os = "macos") {
+            todo!("macos extraction");
+        } else {
+            unreachable!("Unsupported OS extraction");
+        }
+
+        Ok(())
     }
 
     pub async fn download(&self, settings: &Settings) -> Result<(), Box<dyn std::error::Error>> {

@@ -2,11 +2,12 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 mod releases;
 mod settings;
-pub use crate::releases::Releases;
-pub use crate::settings::Settings;
+pub use crate::releases::*;
+pub use crate::settings::*;
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand,
 };
+use indicatif::MultiProgress;
 use std::str::FromStr;
 use std::{error::Error, process::exit};
 
@@ -324,16 +325,19 @@ async fn run() -> Result<(), Box<dyn Error>> {
         ("install", Some(a)) => match a.subcommand() {
             ("daily", Some(b)) => {
                 if b.is_present("name") {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         releases
                             .latest_daily
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .download(&settings)
+                            .install(&settings, &multi_progress)
                             .await?;
                     }
+                    multi_progress.join().unwrap();
                 } else {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         releases
                             .latest_daily
@@ -342,23 +346,27 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .download(&settings)
+                            .install(&settings, &multi_progress)
                             .await?;
                     }
+                    multi_progress.join().unwrap();
                 }
             }
             ("exper", Some(b)) => {
                 if b.is_present("name") {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         releases
                             .experimental_branches
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .download(&settings)
+                            .install(&settings, &multi_progress)
                             .await?;
                     }
+                    multi_progress.join().unwrap();
                 } else {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         releases
                             .experimental_branches
@@ -367,23 +375,27 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .download(&settings)
+                            .install(&settings, &multi_progress)
                             .await?;
                     }
+                    multi_progress.join().unwrap();
                 }
             }
             ("stable", Some(b)) => {
                 if b.is_present("name") {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         releases
                             .latest_stable
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .download(&settings)
+                            .install(&settings, &multi_progress)
                             .await?;
                     }
+                    multi_progress.join().unwrap();
                 } else {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         releases
                             .latest_stable
@@ -392,23 +404,27 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .download(&settings)
+                            .install(&settings, &multi_progress)
                             .await?;
                     }
+                    multi_progress.join().unwrap();
                 }
             }
             ("lts", Some(b)) => {
                 if b.is_present("name") {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         for r in &releases.lts_releases {
                             for p in &r.packages {
                                 if p.name == build {
-                                    p.download(&settings).await?;
+                                    p.install(&settings, &multi_progress).await?;
                                 }
                             }
                         }
                     }
+                    multi_progress.join().unwrap();
                 } else {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         for (i, r) in releases.lts_releases.iter().enumerate() {
                             if i == usize::from_str(build).unwrap() {
@@ -416,42 +432,45 @@ async fn run() -> Result<(), Box<dyn Error>> {
                                     .iter()
                                     .next()
                                     .unwrap()
-                                    .download(&settings)
+                                    .install(&settings, &multi_progress)
                                     .await?;
                             }
                         }
                     }
+                    multi_progress.join().unwrap();
                 }
             }
             ("official", Some(b)) => {
                 if b.is_present("name") {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         for r in &releases.official_releases {
                             for p in &r.packages {
                                 if p.name == build {
-                                    p.download(&settings).await?;
+                                    p.install(&settings, &multi_progress).await?;
                                 }
                             }
                         }
                     }
+                    multi_progress.join().unwrap();
                 } else {
+                    let multi_progress = MultiProgress::new();
                     for build in b.values_of("build").unwrap() {
                         for (i, r) in releases.official_releases.iter().enumerate() {
                             for (u, p) in r.packages.iter().enumerate() {
                                 if format!("{}.{}", i, u) == build {
-                                    p.download(&settings).await?;
+                                    p.install(&settings, &multi_progress).await?;
                                 }
                             }
                         }
                     }
+                    multi_progress.join().unwrap();
                 }
             }
             _ => (),
         },
         _ => (), // TODO: Other subcommands.
     }
-
-    println!("{:#?}", releases);
 
     Ok(())
 }
