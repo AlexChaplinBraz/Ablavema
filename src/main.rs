@@ -10,6 +10,7 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand,
 };
 use indicatif::MultiProgress;
+use std::process::Command;
 use std::str::FromStr;
 use std::{error::Error, process::exit};
 
@@ -35,6 +36,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
         .author(crate_authors!())
         .about(crate_description!())
         .setting(AppSettings::ColoredHelp)
+        .setting(AppSettings::ArgsNegateSubcommands)
+        .arg(
+            Arg::with_name("path")
+                .value_name("PATH")
+                .help("Path to .blend file"),
+        )
         .arg(
             Arg::with_name("config")
                 .global(true)
@@ -485,8 +492,30 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 }
             }
             _ => (),
-        },
-        _ => (), // TODO: Other subcommands.
+        }, // TODO: Other subcommands.
+        _ => {
+            if args.is_present("path") {
+                let blender = Command::new({
+                    if cfg!(target_os = "linux") {
+                        format!(
+                            "{}/{}/blender",
+                            settings.packages_dir.to_str().unwrap(),
+                            settings.default_package
+                        )
+                    } else if cfg!(target_os = "windows") {
+                        todo!("windows command");
+                    } else if cfg!(target_os = "macos") {
+                        todo!("macos command");
+                    } else {
+                        unreachable!("Unsupported OS command");
+                    }
+                })
+                .arg(args.value_of("path").unwrap())
+                .status()?;
+            } else {
+                todo!("Launch interface");
+            }
+        }
     }
 
     Ok(())

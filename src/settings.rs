@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
+    pub default_package: String,
     pub packages_dir: PathBuf,
     pub releases_db: PathBuf,
     pub temp_dir: PathBuf,
@@ -66,6 +67,7 @@ impl Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            default_package: String::new(),
             packages_dir: PathBuf::from({
                 if cfg!(target_os = "linux") {
                     "/home/alex/.config/BlenderLauncher/packages"
