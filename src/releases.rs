@@ -1,6 +1,8 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
 pub use crate::settings::Settings;
+use bzip2::read::BzDecoder;
+use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest;
 use reqwest::{header, Client};
@@ -10,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::copy;
 use std::path::Path;
+use tar::Archive;
 use tokio::{fs, io::AsyncWriteExt};
+use xz2::read::XzDecoder;
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Releases {
@@ -621,7 +625,7 @@ impl Release {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
 pub struct Package {
     pub version: String,
     pub name: String,
@@ -738,32 +742,27 @@ impl Package {
             self.url.split_terminator('/').last().unwrap()
         );
 
-        if cfg!(target_os = "linux") {
-            use bzip2::read::BzDecoder;
-            use flate2::read::GzDecoder;
-            use tar::Archive;
-            use xz2::read::XzDecoder;
+        let packages_dir = settings.packages_dir.clone();
 
-            let packages_dir = settings.packages_dir.clone();
+        // This value is hardcoded because the cost of calculating it is way too high
+        // to justify it (around 4 seconds). Setting it a bit higher so that it's not stuck
+        // at 100%. It'll jump to 100% from around 95% for recent packages,
+        // but it's jumpy throughout the whole process so it doesn't stand out.
+        // It is, however, noticeable with older packages with smaller size.
+        // TODO: Implement a fast way of calculating it.
+        let progress_bar = multi_progress.add(ProgressBar::new(5000));
+        progress_bar.set_style(extraction_style.clone());
 
-            // This value is hardcoded because the cost of calculating it is way too high
-            // to justify it (around 4 seconds). Setting it a bit higher so that it's not stuck
-            // at 100%. It'll jump to 100% from around 95% for recent packages,
-            // but it's jumpy throughout the whole process so it doesn't stand out.
-            // It is, however, noticeable with older packages with smaller size.
-            // TODO: Implement a fast way of calculating it.
-            let progress_bar = multi_progress.add(ProgressBar::new(5000));
-            progress_bar.set_style(extraction_style.clone());
+        let extraction_handle = tokio::task::spawn(async move {
+            download_handle.await.unwrap();
 
-            if file.ends_with(".xz") {
-                let _ = tokio::task::spawn(async move {
-                    download_handle.await.unwrap();
+            let msg = format!("Extracting {}", file.split_terminator('/').last().unwrap());
+            progress_bar.set_message(&msg);
+            progress_bar.reset_elapsed();
+            progress_bar.enable_steady_tick(250);
 
-                    let msg = format!("Extracting {}", file.split_terminator('/').last().unwrap());
-                    progress_bar.set_message(&msg);
-                    progress_bar.reset_elapsed();
-                    progress_bar.enable_steady_tick(250);
-
+            if cfg!(target_os = "linux") {
+                if file.ends_with(".xz") {
                     let tar_xz = File::open(&file).unwrap();
                     let tar = XzDecoder::new(tar_xz);
                     let mut archive = Archive::new(tar);
@@ -776,16 +775,7 @@ impl Package {
 
                     let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
                     progress_bar.finish_with_message(&msg);
-                });
-            } else if file.ends_with(".bz2") {
-                let _ = tokio::task::spawn(async move {
-                    download_handle.await.unwrap();
-
-                    let msg = format!("Extracting {}", file.split_terminator('/').last().unwrap());
-                    progress_bar.set_message(&msg);
-                    progress_bar.reset_elapsed();
-                    progress_bar.enable_steady_tick(250);
-
+                } else if file.ends_with(".bz2") {
                     let tar_bz2 = File::open(&file).unwrap();
                     let tar = BzDecoder::new(tar_bz2);
                     let mut archive = Archive::new(tar);
@@ -798,16 +788,7 @@ impl Package {
 
                     let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
                     progress_bar.finish_with_message(&msg);
-                });
-            } else if file.ends_with(".gz") {
-                let _ = tokio::task::spawn(async move {
-                    download_handle.await.unwrap();
-
-                    let msg = format!("Extracting {}", file.split_terminator('/').last().unwrap());
-                    progress_bar.set_message(&msg);
-                    progress_bar.reset_elapsed();
-                    progress_bar.enable_steady_tick(250);
-
+                } else if file.ends_with(".gz") {
                     let tar_gz = File::open(&file).unwrap();
                     let tar = GzDecoder::new(tar_gz);
                     let mut archive = Archive::new(tar);
@@ -820,17 +801,30 @@ impl Package {
 
                     let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
                     progress_bar.finish_with_message(&msg);
-                });
+                } else {
+                    unreachable!("Unknown compression extension");
+                }
+            } else if cfg!(target_os = "windows") {
+                todo!("windows extraction");
+            } else if cfg!(target_os = "macos") {
+                todo!("macos extraction");
             } else {
-                unreachable!("Unknown compression extension");
+                unreachable!("Unsupported OS extraction");
             }
-        } else if cfg!(target_os = "windows") {
-            todo!("windows extraction");
-        } else if cfg!(target_os = "macos") {
-            todo!("macos extraction");
-        } else {
-            unreachable!("Unsupported OS extraction");
-        }
+        });
+
+        // TODO: Wrap them in Arc<Mutex<>> to avoid unnecessary cloning.
+        let package = (*self).clone();
+        let packages_dir = settings.packages_dir.clone();
+
+        let _ = tokio::task::spawn(async move {
+            extraction_handle.await.unwrap();
+
+            let mut path = packages_dir.join(&package.name);
+            path.push("package_info.bin");
+            let file = File::create(&path).unwrap();
+            bincode::serialize_into(file, &package).unwrap();
+        });
 
         Ok(())
     }
@@ -923,7 +917,7 @@ pub struct Change {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
 pub enum Os {
     Linux,
     Windows,

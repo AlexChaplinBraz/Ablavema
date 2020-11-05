@@ -1,7 +1,9 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
+mod installed;
 mod releases;
 mod settings;
+pub use crate::installed::*;
 pub use crate::releases::*;
 pub use crate::settings::*;
 use clap::{
@@ -25,6 +27,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
     let mut releases = Releases::new();
 
     releases.load(&settings);
+
+    let installed = Installed::new(&settings)?;
 
     let args = App::new(crate_name!())
         .version(crate_version!())
@@ -244,6 +248,13 @@ async fn run() -> Result<(), Box<dyn Error>> {
                         .version(crate_version!())
                         .author(crate_authors!())
                         .about("List official packages"),
+                )
+                .subcommand(
+                    SubCommand::with_name("installed")
+                        .setting(AppSettings::ColoredHelp)
+                        .version(crate_version!())
+                        .author(crate_authors!())
+                        .about("List installed packages"),
                 ),
         )
         .subcommand(
@@ -318,6 +329,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
                     for (u, p) in r.packages.iter().enumerate() {
                         println!("{}.{}    {}", i, u, p.name);
                     }
+                }
+            }
+            ("installed", Some(b)) => {
+                println!("ID    Build");
+                for (i, p) in installed.iter().enumerate() {
+                    println!("{}    {}", i, p.name);
                 }
             }
             _ => (),
