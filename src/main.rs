@@ -3,9 +3,9 @@
 mod installed;
 mod releases;
 mod settings;
-pub use crate::installed::*;
-pub use crate::releases::*;
-pub use crate::settings::*;
+use crate::installed::*;
+use crate::releases::*;
+use crate::settings::*;
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
     SubCommand,
@@ -30,7 +30,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     releases.load(&settings);
 
-    let installed = Installed::new(&settings)?;
+    let mut installed = Installed::new(&settings)?;
 
     let args = App::new(crate_name!())
         .version(crate_version!())
@@ -515,7 +515,31 @@ async fn run() -> Result<(), Box<dyn Error>> {
             }
             _ => unreachable!("List subcommand"),
         },
-        ("remove", Some(_a)) => todo!("Remove packages"),
+        ("remove", Some(a)) => {
+            if a.is_present("name") {
+                for build in a.values_of("id").unwrap() {
+                    installed
+                        .iter()
+                        .find(|p| p.name == build)
+                        .unwrap()
+                        .remove(&settings)
+                        .await?;
+                }
+                installed.check(&settings)?;
+            } else {
+                for build in a.values_of("id").unwrap() {
+                    installed
+                        .iter()
+                        .enumerate()
+                        .find(|(i, _)| *i == usize::from_str(build).unwrap())
+                        .unwrap()
+                        .1
+                        .remove(&settings)
+                        .await?;
+                }
+                installed.check(&settings)?;
+            }
+        }
         ("select", Some(_a)) => todo!("Select default package"),
         ("update", Some(_a)) => todo!("Update packages"),
         _ => {

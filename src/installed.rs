@@ -35,6 +35,13 @@ impl Installed {
             }
         }
 
+        self.retain(|package| {
+            let mut package_info = settings.packages_dir.join(&package.name);
+            package_info.push("package_info.bin");
+
+            package_info.exists()
+        });
+
         self.sort_by_key(|x| x.version.clone());
         self.reverse();
 

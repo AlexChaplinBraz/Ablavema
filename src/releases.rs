@@ -1,6 +1,6 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
-pub use crate::settings::Settings;
+use crate::settings::*;
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -9,10 +9,10 @@ use reqwest::{header, Client};
 use select::document::Document;
 use select::predicate::{Attr, Class, Name};
 use serde::{Deserialize, Serialize};
-use std::fs::File;
 use std::path::Path;
+use std::{error::Error, fs::File};
 use tar::Archive;
-use tokio::{fs, io::AsyncWriteExt};
+use tokio::{fs, fs::create_dir_all, fs::remove_dir_all, fs::remove_file, io::AsyncWriteExt};
 use xz2::read::XzDecoder;
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
@@ -652,7 +652,7 @@ impl Package {
         &self,
         settings: &Settings,
         multi_progress: &MultiProgress,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let download_style = ProgressStyle::default_bar()
             .template("[{elapsed_precise}] [{bar:20.cyan/red}] {bytes}/{total_bytes} {bytes_per_sec} ({eta}) => {wide_msg}")
             .progress_chars("#>-");
@@ -701,7 +701,7 @@ impl Package {
 
         // TODO: Prompt/option for re-download.
         if file.exists() {
-            std::fs::remove_file(file).unwrap();
+            remove_file(file).await?;
         }
 
         let mut source = request.send().await.unwrap();
@@ -726,13 +726,13 @@ impl Package {
             progress_bar.finish_with_message(&msg);
         });
 
-        std::fs::create_dir_all(&settings.packages_dir)?;
+        create_dir_all(&settings.packages_dir).await?;
 
         // TODO: Prompt/option for re-extraction.
         let package = format!("{}/{}", settings.packages_dir.to_str().unwrap(), self.name);
         let path = Path::new(&package);
         if path.exists() {
-            std::fs::remove_dir_all(path).unwrap();
+            remove_dir_all(path).await?;
         }
 
         let file = format!(
@@ -824,6 +824,16 @@ impl Package {
             let file = File::create(&path).unwrap();
             bincode::serialize_into(file, &package).unwrap();
         });
+
+        Ok(())
+    }
+
+    pub async fn remove(&self, settings: &Settings) -> Result<(), Box<dyn Error>> {
+        let path = settings.packages_dir.join(&self.name);
+        remove_dir_all(path).await?;
+
+        // TODO: Add this type of reporting to other commands like fetch.
+        println!("Removed {}", self.name);
 
         Ok(())
     }
