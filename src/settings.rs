@@ -2,9 +2,9 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 use config::{Config, ConfigError, Environment, File, FileFormat};
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+use std::{env, error::Error};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
@@ -16,7 +16,8 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new() -> Result<Self, ConfigError> {
+    pub fn new() -> Result<(Self, String), ConfigError> {
+        // TODO: Consider working directly with Config.
         let config_path;
 
         if cfg!(target_os = "linux") {
@@ -60,7 +61,15 @@ impl Settings {
 
         settings.merge(File::new(&config_path, FileFormat::Toml))?;
 
-        settings.try_into()
+        Ok((settings.try_into()?, config_path))
+    }
+
+    pub fn save(&self, config_path: &String) -> Result<(), Box<dyn Error>> {
+        let toml = toml::to_string(self)?;
+        let mut file = std::fs::File::create(config_path)?;
+        file.write_all(toml.as_bytes())?;
+
+        Ok(())
     }
 }
 

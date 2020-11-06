@@ -24,10 +24,9 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Box<dyn Error>> {
-    let settings = Settings::new()?;
+    let (mut settings, config_path) = Settings::new()?;
 
     let mut releases = Releases::new();
-
     releases.load(&settings);
 
     let mut installed = Installed::new(&settings)?;
@@ -540,7 +539,29 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 installed.check(&settings)?;
             }
         }
-        ("select", Some(_a)) => todo!("Select default package"),
+        ("select", Some(a)) => {
+            settings.default_package = {
+                if a.is_present("name") {
+                    installed
+                        .iter()
+                        .find(|p| p.name == a.value_of("id").unwrap())
+                        .unwrap()
+                        .name
+                        .to_string()
+                } else {
+                    installed
+                        .iter()
+                        .enumerate()
+                        .find(|(i, _)| *i == usize::from_str(a.value_of("id").unwrap()).unwrap())
+                        .unwrap()
+                        .1
+                        .name
+                        .to_string()
+                }
+            };
+            settings.save(&config_path)?;
+            println!("Selected {}", settings.default_package);
+        }
         ("update", Some(_a)) => todo!("Update packages"),
         _ => {
             if args.is_present("path") {
