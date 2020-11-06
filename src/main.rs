@@ -7,7 +7,8 @@ pub use crate::installed::*;
 pub use crate::releases::*;
 pub use crate::settings::*;
 use clap::{
-    crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand,
+    crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
+    SubCommand,
 };
 use indicatif::MultiProgress;
 use std::process::Command;
@@ -35,241 +36,262 @@ async fn run() -> Result<(), Box<dyn Error>> {
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
-        .setting(AppSettings::ColoredHelp)
+        .global_setting(AppSettings::ColoredHelp)
+        .global_setting(AppSettings::DisableHelpSubcommand)
+        .global_setting(AppSettings::InferSubcommands)
+        .global_setting(AppSettings::VersionlessSubcommands)
         .setting(AppSettings::ArgsNegateSubcommands)
-        .arg(
-            Arg::with_name("path")
-                .value_name("PATH")
-                .help("Path to .blend file"),
-        )
+        .help_message("Print help and exit")
+        .version_message("Print version and exit")
+        .version_short("v")
         .arg(
             Arg::with_name("config")
                 .global(true)
                 .short("c")
                 .long("config")
                 .value_name("PATH")
-                .help("Set a custom config directory")
-                .takes_value(true)
-                .default_value({
-                    // TODO: Consider EnvVars.
-                    if cfg!(target_os = "linux") {
-                        "~/.config/BlenderLauncher/config.toml"
-                    } else if cfg!(target_os = "windows") {
-                        todo!("Decide Windows path");
-                    } else if cfg!(target_os = "macos") {
-                        todo!("Decide MacOs path");
-                    } else {
-                        unreachable!("Unsupported OS");
-                    }
-                }),
+                .help("Use a different configuration file")
+                .long_help("Use a different configuration file. Must be TOML formatted. Name and extension don't matter.")
+                .takes_value(true),
         )
-        .subcommand(
-            SubCommand::with_name("install")
-                .setting(AppSettings::ColoredHelp)
-                .version(crate_version!())
-                .author(crate_authors!())
-                .about("Install packages")
-                .subcommand(
-                    SubCommand::with_name("daily")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("Install daily packages")
-                        .arg(
-                            Arg::with_name("build")
-                                .value_name("BUILD")
-                                .required(true)
-                                .multiple(true),
-                        )
-                        .arg(
-                            Arg::with_name("name")
-                                .short("n")
-                                .long("name")
-                                .help("Use the name of the build instead of the ID"),
-                        ),
-                )
-                .subcommand(
-                    SubCommand::with_name("exper")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("Install experimental packages")
-                        .arg(
-                            Arg::with_name("build")
-                                .value_name("BUILD")
-                                .required(true)
-                                .multiple(true),
-                        )
-                        .arg(
-                            Arg::with_name("name")
-                                .short("n")
-                                .long("name")
-                                .help("Use the name of the build instead of the ID"),
-                        ),
-                )
-                .subcommand(
-                    SubCommand::with_name("stable")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("Install stable packages")
-                        .arg(
-                            Arg::with_name("build")
-                                .value_name("BUILD")
-                                .required(true)
-                                .multiple(true),
-                        )
-                        .arg(
-                            Arg::with_name("name")
-                                .short("n")
-                                .long("name")
-                                .help("Use the name of the build instead of the ID"),
-                        ),
-                )
-                .subcommand(
-                    SubCommand::with_name("lts")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("Install lts packages")
-                        .arg(
-                            Arg::with_name("build")
-                                .value_name("BUILD")
-                                .required(true)
-                                .multiple(true),
-                        )
-                        .arg(
-                            Arg::with_name("name")
-                                .short("n")
-                                .long("name")
-                                .help("Use the name of the build instead of the ID"),
-                        ),
-                )
-                .subcommand(
-                    SubCommand::with_name("official")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("Install official packages")
-                        .arg(
-                            Arg::with_name("build")
-                                .value_name("BUILD")
-                                .required(true)
-                                .multiple(true),
-                        )
-                        .arg(
-                            Arg::with_name("name")
-                                .short("n")
-                                .long("name")
-                                .help("Use the name of the build instead of the ID"),
-                        ),
-                ),
+        .arg(
+            Arg::with_name("path")
+                .value_name("PATH")
+                .help("Path to .blend file"),
         )
         .subcommand(
             SubCommand::with_name("fetch")
-                .setting(AppSettings::ColoredHelp)
-                .version(crate_version!())
-                .author(crate_authors!())
+                .setting(AppSettings::ArgRequiredElseHelp)
                 .about("Fetch new packages")
+                .help_message("Print help and exit")
                 .arg(
-                    Arg::with_name("lts")
-                        .short("l")
-                        .long("lts")
-                        .help("Fetch LTS releases")
-                        .required_unless_one(&["stable", "daily", "exper", "official", "all"]),
-                )
-                .arg(
-                    Arg::with_name("stable")
-                        .short("s")
-                        .long("stable")
-                        .help("Fetch stable releases")
-                        .required_unless_one(&["lts", "daily", "exper", "official", "all"]),
+                    Arg::with_name("all")
+                        .short("a")
+                        .long("all")
+                        .help("Fetch all packages"),
                 )
                 .arg(
                     Arg::with_name("daily")
                         .short("d")
                         .long("daily")
-                        .help("Fetch daily releases")
-                        .required_unless_one(&["stable", "lts", "exper", "official", "all"]),
+                        .help("Fetch daily packages"),
                 )
                 .arg(
-                    Arg::with_name("exper")
+                    Arg::with_name("experimental")
                         .short("e")
-                        .long("exper")
-                        .help("Fetch experimental releases")
-                        .required_unless_one(&["stable", "daily", "lts", "official", "all"]),
+                        .long("experimental")
+                        .help("Fetch experimental packages"),
+                )
+                .arg(
+                    Arg::with_name("lts")
+                        .short("l")
+                        .long("lts")
+                        .help("Fetch LTS packages"),
                 )
                 .arg(
                     Arg::with_name("official")
                         .short("o")
                         .long("official")
-                        .help("Fetch official releases")
-                        .required_unless_one(&["stable", "daily", "exper", "lts", "all"]),
+                        .help("Fetch official packages"),
                 )
                 .arg(
-                    Arg::with_name("all")
-                        .short("a")
-                        .long("all")
-                        .help("Fetch all releases")
-                        .conflicts_with_all(&["stable", "daily", "exper", "lts", "official"])
-                        .required_unless_one(&["stable", "daily", "exper", "lts", "official"]),
+                    Arg::with_name("stable")
+                        .short("s")
+                        .long("stable")
+                        .help("Fetch stable packages"),
+                )
+                .group(
+                    ArgGroup::with_name("fetch_group")
+                        .args(&["all", "daily", "experimental", "lts", "official", "stable"])
+                        .required(true)
+                        .multiple(true)
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("install")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .about("Install packages")
+                .help_message("Print help and exit")
+                .subcommand(
+                    SubCommand::with_name("daily")
+                        .setting(AppSettings::ArgRequiredElseHelp)
+                        .about("Install daily packages")
+                        .help_message("Print help and exit")
+                        .arg(
+                            Arg::with_name("id")
+                                .value_name("ID")
+                                .required(true)
+                                .multiple(true)
+                                .help("A list of packages to install"),
+                        )
+                        .arg(
+                            Arg::with_name("name")
+                                .short("n")
+                                .long("name")
+                                .help("Use the name of the package instead of the ID")
+                                .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("experimental")
+                        .setting(AppSettings::ArgRequiredElseHelp)
+                        .about("Install experimental packages")
+                        .help_message("Print help and exit")
+                        .arg(
+                            Arg::with_name("id")
+                                .value_name("ID")
+                                .required(true)
+                                .multiple(true)
+                                .help("A list of packages to install"),
+                        )
+                        .arg(
+                            Arg::with_name("name")
+                                .short("n")
+                                .long("name")
+                                .help("Use the name of the package instead of the ID")
+                                .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("lts")
+                        .setting(AppSettings::ArgRequiredElseHelp)
+                        .about("Install LTS packages")
+                        .help_message("Print help and exit")
+                        .arg(
+                            Arg::with_name("id")
+                                .value_name("ID")
+                                .required(true)
+                                .multiple(true)
+                                .help("A list of packages to install"),
+                        )
+                        .arg(
+                            Arg::with_name("name")
+                                .short("n")
+                                .long("name")
+                                .help("Use the name of the package instead of the ID")
+                                .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("official")
+                        .setting(AppSettings::ArgRequiredElseHelp)
+                        .about("Install official packages")
+                        .help_message("Print help and exit")
+                        .arg(
+                            Arg::with_name("id")
+                                .value_name("ID")
+                                .required(true)
+                                .multiple(true)
+                                .help("A list of packages to install"),
+                        )
+                        .arg(
+                            Arg::with_name("name")
+                                .short("n")
+                                .long("name")
+                                .help("Use the name of the package instead of the ID")
+                                .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("stable")
+                        .setting(AppSettings::ArgRequiredElseHelp)
+                        .about("Install stable packages")
+                        .help_message("Print help and exit")
+                        .arg(
+                            Arg::with_name("id")
+                                .value_name("ID")
+                                .required(true)
+                                .multiple(true)
+                                .help("A list of packages to install"),
+                        )
+                        .arg(
+                            Arg::with_name("name")
+                                .short("n")
+                                .long("name")
+                                .help("Use the name of the package instead of the ID")
+                                .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
+                        ),
                 ),
         )
         .subcommand(
             SubCommand::with_name("list")
-                .setting(AppSettings::ColoredHelp)
-                .version(crate_version!())
-                .author(crate_authors!())
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .about("List packages")
+                .help_message("Print help and exit")
                 .subcommand(
                     SubCommand::with_name("daily")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("List daily packages"),
+                        .about("List daily packages")
+                        .help_message("Print help and exit"),
                 )
                 .subcommand(
-                    SubCommand::with_name("exper")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("List experimental packages"),
-                )
-                .subcommand(
-                    SubCommand::with_name("stable")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("List stable packages"),
-                )
-                .subcommand(
-                    SubCommand::with_name("lts")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("List lts packages"),
-                )
-                .subcommand(
-                    SubCommand::with_name("official")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("List official packages"),
+                    SubCommand::with_name("experimental")
+                        .about("List experimental packages")
+                        .help_message("Print help and exit"),
                 )
                 .subcommand(
                     SubCommand::with_name("installed")
-                        .setting(AppSettings::ColoredHelp)
-                        .version(crate_version!())
-                        .author(crate_authors!())
-                        .about("List installed packages"),
+                        .about("List installed packages")
+                        .help_message("Print help and exit"),
+                )
+                .subcommand(
+                    SubCommand::with_name("lts")
+                        .about("List lts packages")
+                        .help_message("Print help and exit"),
+                )
+                .subcommand(
+                    SubCommand::with_name("official")
+                        .about("List official packages")
+                        .help_message("Print help and exit"),
+                )
+                .subcommand(
+                    SubCommand::with_name("stable")
+                        .about("List stable packages")
+                        .help_message("Print help and exit"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("remove")
+                .setting(AppSettings::ArgRequiredElseHelp)
+                .about("Remove packages")
+                .help_message("Print help and exit")
+                .arg(
+                    Arg::with_name("id")
+                        .value_name("ID")
+                        .required(true)
+                        .multiple(true)
+                        .help("A list of packages to remove"),
+                )
+                .arg(
+                    Arg::with_name("name")
+                        .short("n")
+                        .long("name")
+                        .help("Use the name of the package instead of the ID")
+                        .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("select")
+                .setting(AppSettings::ArgRequiredElseHelp)
+                .about("Select default package")
+                .help_message("Print help and exit")
+                .arg(
+                    Arg::with_name("id")
+                        .value_name("ID")
+                        .required(true)
+                        .help("Default package to use for opening .blend files"),
+                )
+                .arg(
+                    Arg::with_name("name")
+                        .short("n")
+                        .long("name")
+                        .help("Use the name of the package instead of the ID")
+                        .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
                 ),
         )
         .subcommand(
             SubCommand::with_name("update")
-                .setting(AppSettings::ColoredHelp)
-                .version(crate_version!())
-                .author(crate_authors!())
-                .about("Update installed packages"),
+                .about("Update installed packages")
+                .help_message("Print help and exit"),
         )
         .get_matches();
 
@@ -278,79 +300,36 @@ async fn run() -> Result<(), Box<dyn Error>> {
             if a.is_present("all") {
                 releases.fetch_official_releases(&settings).await;
                 releases.fetch_lts_releases(&settings).await;
-                releases.fetch_latest_stable(&settings).await;
-                releases.fetch_latest_daily(&settings).await;
                 releases.fetch_experimental_branches(&settings).await;
+                releases.fetch_latest_daily(&settings).await;
+                releases.fetch_latest_stable(&settings).await;
             } else {
-                if a.is_present("official") {
-                    releases.fetch_official_releases(&settings).await;
+                if a.is_present("daily") {
+                    releases.fetch_latest_daily(&settings).await;
+                }
+
+                if a.is_present("experimental") {
+                    releases.fetch_experimental_branches(&settings).await;
                 }
 
                 if a.is_present("lts") {
                     releases.fetch_lts_releases(&settings).await;
                 }
 
+                if a.is_present("official") {
+                    releases.fetch_official_releases(&settings).await;
+                }
+
                 if a.is_present("stable") {
                     releases.fetch_latest_stable(&settings).await;
                 }
-
-                if a.is_present("daily") {
-                    releases.fetch_latest_daily(&settings).await;
-                }
-
-                if a.is_present("exper") {
-                    releases.fetch_experimental_branches(&settings).await;
-                }
             }
         }
-        ("list", Some(a)) => match a.subcommand() {
-            ("daily", Some(b)) => {
-                println!("ID    Build");
-                for (i, p) in releases.latest_daily.iter().enumerate() {
-                    println!("{}    {}", i, p.name);
-                }
-            }
-            ("exper", Some(b)) => {
-                println!("ID    Build");
-                for (i, p) in releases.experimental_branches.iter().enumerate() {
-                    println!("{}    {}", i, p.name);
-                }
-            }
-            ("stable", Some(b)) => {
-                println!("ID    Build");
-                for (i, p) in releases.latest_stable.iter().enumerate() {
-                    println!("{}    {}", i, p.name);
-                }
-            }
-            ("lts", Some(b)) => {
-                println!("ID    Build");
-                for (i, r) in releases.lts_releases.iter().enumerate() {
-                    for p in &r.packages {
-                        println!("{}    {}", i, p.name);
-                    }
-                }
-            }
-            ("official", Some(b)) => {
-                println!("ID    Build");
-                for (i, r) in releases.official_releases.iter().enumerate() {
-                    for (u, p) in r.packages.iter().enumerate() {
-                        println!("{}.{}    {}", i, u, p.name);
-                    }
-                }
-            }
-            ("installed", Some(b)) => {
-                println!("ID    Build");
-                for (i, p) in installed.iter().enumerate() {
-                    println!("{}    {}", i, p.name);
-                }
-            }
-            _ => (),
-        },
         ("install", Some(a)) => match a.subcommand() {
             ("daily", Some(b)) => {
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
+                    for build in b.values_of("id").unwrap() {
                         releases
                             .latest_daily
                             .iter()
@@ -362,7 +341,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                     multi_progress.join().unwrap();
                 } else {
                     let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
+                    for build in b.values_of("id").unwrap() {
                         releases
                             .latest_daily
                             .iter()
@@ -376,10 +355,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
                     multi_progress.join().unwrap();
                 }
             }
-            ("exper", Some(b)) => {
+            ("experimental", Some(b)) => {
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
+                    for build in b.values_of("id").unwrap() {
                         releases
                             .experimental_branches
                             .iter()
@@ -391,38 +370,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
                     multi_progress.join().unwrap();
                 } else {
                     let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
+                    for build in b.values_of("id").unwrap() {
                         releases
                             .experimental_branches
-                            .iter()
-                            .enumerate()
-                            .find(|(i, _)| *i == usize::from_str(build).unwrap())
-                            .unwrap()
-                            .1
-                            .install(&settings, &multi_progress)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                }
-            }
-            ("stable", Some(b)) => {
-                if b.is_present("name") {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
-                        releases
-                            .latest_stable
-                            .iter()
-                            .find(|p| p.name == build)
-                            .unwrap()
-                            .install(&settings, &multi_progress)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                } else {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
-                        releases
-                            .latest_stable
                             .iter()
                             .enumerate()
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
@@ -437,7 +387,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
             ("lts", Some(b)) => {
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
+                    for build in b.values_of("id").unwrap() {
                         for r in &releases.lts_releases {
                             for p in &r.packages {
                                 if p.name == build {
@@ -449,7 +399,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                     multi_progress.join().unwrap();
                 } else {
                     let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
+                    for build in b.values_of("id").unwrap() {
                         for (i, r) in releases.lts_releases.iter().enumerate() {
                             if i == usize::from_str(build).unwrap() {
                                 r.packages
@@ -467,7 +417,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
             ("official", Some(b)) => {
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
+                    for build in b.values_of("id").unwrap() {
                         for r in &releases.official_releases {
                             for p in &r.packages {
                                 if p.name == build {
@@ -479,7 +429,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                     multi_progress.join().unwrap();
                 } else {
                     let multi_progress = MultiProgress::new();
-                    for build in b.values_of("build").unwrap() {
+                    for build in b.values_of("id").unwrap() {
                         for (i, r) in releases.official_releases.iter().enumerate() {
                             for (u, p) in r.packages.iter().enumerate() {
                                 if format!("{}.{}", i, u) == build {
@@ -491,11 +441,86 @@ async fn run() -> Result<(), Box<dyn Error>> {
                     multi_progress.join().unwrap();
                 }
             }
-            _ => (),
-        }, // TODO: Other subcommands.
+            ("stable", Some(b)) => {
+                if b.is_present("name") {
+                    let multi_progress = MultiProgress::new();
+                    for build in b.values_of("id").unwrap() {
+                        releases
+                            .latest_stable
+                            .iter()
+                            .find(|p| p.name == build)
+                            .unwrap()
+                            .install(&settings, &multi_progress)
+                            .await?;
+                    }
+                    multi_progress.join().unwrap();
+                } else {
+                    let multi_progress = MultiProgress::new();
+                    for build in b.values_of("id").unwrap() {
+                        releases
+                            .latest_stable
+                            .iter()
+                            .enumerate()
+                            .find(|(i, _)| *i == usize::from_str(build).unwrap())
+                            .unwrap()
+                            .1
+                            .install(&settings, &multi_progress)
+                            .await?;
+                    }
+                    multi_progress.join().unwrap();
+                }
+            }
+            _ => unreachable!("Install subcommand"),
+        },
+        ("list", Some(a)) => match a.subcommand() {
+            ("daily", Some(_b)) => {
+                println!("ID    Build");
+                for (i, p) in releases.latest_daily.iter().enumerate() {
+                    println!("{}    {}", i, p.name);
+                }
+            }
+            ("experimental", Some(_b)) => {
+                println!("ID    Build");
+                for (i, p) in releases.experimental_branches.iter().enumerate() {
+                    println!("{}    {}", i, p.name);
+                }
+            }
+            ("installed", Some(_b)) => {
+                println!("ID    Build");
+                for (i, p) in installed.iter().enumerate() {
+                    println!("{}    {}", i, p.name);
+                }
+            }
+            ("lts", Some(_b)) => {
+                println!("ID    Build");
+                for (i, r) in releases.lts_releases.iter().enumerate() {
+                    for p in &r.packages {
+                        println!("{}    {}", i, p.name);
+                    }
+                }
+            }
+            ("official", Some(_b)) => {
+                println!("ID    Build");
+                for (i, r) in releases.official_releases.iter().enumerate() {
+                    for (u, p) in r.packages.iter().enumerate() {
+                        println!("{}.{}    {}", i, u, p.name);
+                    }
+                }
+            }
+            ("stable", Some(_b)) => {
+                println!("ID    Build");
+                for (i, p) in releases.latest_stable.iter().enumerate() {
+                    println!("{}    {}", i, p.name);
+                }
+            }
+            _ => unreachable!("List subcommand"),
+        },
+        ("remove", Some(_a)) => todo!("Remove packages"),
+        ("select", Some(_a)) => todo!("Select default package"),
+        ("update", Some(_a)) => todo!("Update packages"),
         _ => {
             if args.is_present("path") {
-                let blender = Command::new({
+                let _blender = Command::new({
                     if cfg!(target_os = "linux") {
                         format!(
                             "{}/{}/blender",
