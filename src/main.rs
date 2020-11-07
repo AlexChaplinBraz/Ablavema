@@ -11,6 +11,7 @@ use clap::{
     SubCommand,
 };
 use indicatif::MultiProgress;
+use prettytable::{cell, format, row, Table};
 use std::process::Command;
 use std::str::FromStr;
 use std::{error::Error, process::exit};
@@ -473,44 +474,72 @@ async fn run() -> Result<(), Box<dyn Error>> {
         },
         ("list", Some(a)) => match a.subcommand() {
             ("daily", Some(_b)) => {
-                println!("ID    Build");
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
                 for (i, p) in releases.latest_daily.iter().enumerate() {
-                    println!("{}    {}", i, p.name);
+                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
+                table.printstd();
             }
             ("experimental", Some(_b)) => {
-                println!("ID    Build");
+                // FIX: This table can be around 160 characters wide, which breaks formatting
+                // on narrow terminals. Could be solved by checking terminal width and truncating
+                // the package name since it holds repeated information. But even the other tables
+                // have a chance of looking weird depending on how small their terminal window is.
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
                 for (i, p) in releases.experimental_branches.iter().enumerate() {
-                    println!("{}    {}", i, p.name);
+                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
+                table.printstd();
             }
             ("installed", Some(_b)) => {
-                println!("ID    Build");
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
                 for (i, p) in installed.iter().enumerate() {
-                    println!("{}    {}", i, p.name);
+                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
+                table.printstd();
             }
             ("lts", Some(_b)) => {
-                println!("ID    Build");
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
                 for (i, r) in releases.lts_releases.iter().enumerate() {
                     for p in &r.packages {
-                        println!("{}    {}", i, p.name);
+                        table.add_row(row![i, p.name, p.version, p.build, p.date]);
                     }
                 }
+                table.printstd();
             }
             ("official", Some(_b)) => {
-                println!("ID    Build");
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
                 for (i, r) in releases.official_releases.iter().enumerate() {
                     for (u, p) in r.packages.iter().enumerate() {
-                        println!("{}.{}    {}", i, u, p.name);
+                        table.add_row(row![
+                            format!("{}.{}", i, u),
+                            p.name,
+                            p.version,
+                            p.build,
+                            p.date
+                        ]);
                     }
                 }
+                table.printstd();
             }
             ("stable", Some(_b)) => {
-                println!("ID    Build");
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
                 for (i, p) in releases.latest_stable.iter().enumerate() {
-                    println!("{}    {}", i, p.name);
+                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
+                table.printstd();
             }
             _ => unreachable!("List subcommand"),
         },
