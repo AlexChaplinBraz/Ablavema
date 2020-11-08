@@ -481,7 +481,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 for (i, p) in releases.latest_daily.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
-                table.printstd();
+                if table.is_empty() {
+                    eprintln!("No daily packages found. Try fetching first.");
+                } else {
+                    table.printstd();
+                }
             }
             ("experimental", Some(_b)) => {
                 // FIX: This table can be around 160 characters wide, which breaks formatting
@@ -494,7 +498,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 for (i, p) in releases.experimental_branches.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
-                table.printstd();
+                if table.is_empty() {
+                    eprintln!("No experimental packages found. Try fetching first.");
+                } else {
+                    table.printstd();
+                }
             }
             ("installed", Some(_b)) => {
                 let mut table = Table::new();
@@ -503,7 +511,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 for (i, p) in installed.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
-                table.printstd();
+                if table.is_empty() {
+                    eprintln!("No installed packages found. Try installing first.");
+                } else {
+                    table.printstd();
+                }
             }
             ("lts", Some(_b)) => {
                 let mut table = Table::new();
@@ -512,7 +524,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 for (i, p) in releases.lts_releases.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
-                table.printstd();
+                if table.is_empty() {
+                    eprintln!("No LTS packages found. Try fetching first.");
+                } else {
+                    table.printstd();
+                }
             }
             ("official", Some(_b)) => {
                 let mut table = Table::new();
@@ -521,7 +537,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 for (i, p) in releases.official_releases.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
-                table.printstd();
+                if table.is_empty() {
+                    eprintln!("No official packages found. Try fetching first.");
+                } else {
+                    table.printstd();
+                }
             }
             ("stable", Some(_b)) => {
                 let mut table = Table::new();
@@ -530,7 +550,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 for (i, p) in releases.latest_stable.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
-                table.printstd();
+                if table.is_empty() {
+                    eprintln!("No stable packages found. Try fetching first.");
+                } else {
+                    table.printstd();
+                }
             }
             _ => unreachable!("List subcommand"),
         },
