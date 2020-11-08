@@ -2,7 +2,10 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 use crate::releases::*;
 use crate::settings::*;
-use std::{error::Error, fs};
+use std::{
+    error::Error,
+    fs::{self, create_dir_all},
+};
 use std::{
     fs::File,
     ops::{Deref, DerefMut},
@@ -21,6 +24,8 @@ impl Installed {
     }
 
     pub fn check(&mut self, settings: &Settings) -> Result<(), Box<dyn Error>> {
+        create_dir_all(&settings.packages_dir).unwrap();
+
         for entry in fs::read_dir(&settings.packages_dir)? {
             let dir = entry?;
             let mut package_info = dir.path();
