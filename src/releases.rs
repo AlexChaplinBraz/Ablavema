@@ -142,7 +142,7 @@ impl Releases {
 
                     package.name = get_file_stem(name).to_string();
 
-                    package.build = String::from("Official Release");
+                    package.build = Build::Official;
 
                     // TODO: Check all packages for alpha and beta versions.
                     // Maybe make a function that checks for alpha/beta+number and adds that.
@@ -316,7 +316,7 @@ impl Releases {
 
                 package.name = get_file_stem(node.text().as_str()).to_string();
 
-                package.build = String::from("LTS Release");
+                package.build = Build::LTS;
 
                 let download_path =
                     "https://ftp.nluug.nl/pub/graphics/blender/release/Blender2.83/";
@@ -390,8 +390,7 @@ impl Releases {
             .version
             .retain(|c| c.is_numeric() || c.is_ascii_punctuation());
 
-        // TODO: Think about how to rename this when a new latest stable release is out.
-        package.build = String::from("Latest Stable Release");
+        package.build = Build::Stable;
 
         package.url = format!(
             "https://ftp.nluug.nl/pub/graphics/blender/release/{}",
@@ -469,7 +468,7 @@ impl Releases {
 
             let mut package = Package::new();
 
-            package.build = build.find(Class("build-var")).next().unwrap().text();
+            package.build = Build::Daily(build.find(Class("build-var")).next().unwrap().text());
 
             package.version = build
                 .find(Class("name"))
@@ -554,15 +553,17 @@ impl Releases {
 
             let mut package = Package::new();
 
-            package.build = build
-                .find(Class("build-var"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .next()
-                .unwrap()
-                .to_string();
+            package.build = Build::Experimental(
+                build
+                    .find(Class("build-var"))
+                    .next()
+                    .unwrap()
+                    .text()
+                    .split_whitespace()
+                    .next()
+                    .unwrap()
+                    .to_string(),
+            );
 
             package.version = build
                 .find(Class("name"))
@@ -625,7 +626,7 @@ impl Releases {
 pub struct Package {
     pub version: String,
     pub name: String,
-    pub build: String,
+    pub build: Build,
     pub date: String,
     pub commit: String,
     pub url: String,
@@ -638,7 +639,7 @@ impl Package {
         Package {
             version: String::new(),
             name: String::new(),
-            build: String::new(),
+            build: Build::None,
             date: String::new(),
             commit: String::new(),
             url: String::new(),
@@ -837,6 +838,29 @@ impl Package {
         println!("Removed {}", self.name);
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
+pub enum Build {
+    Official,
+    Stable,
+    LTS,
+    Daily(String),
+    Experimental(String),
+    None,
+}
+
+impl std::fmt::Display for Build {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let printable = match self {
+            Build::Official => "Official Release",
+            Build::Stable => "Stable Release",
+            Build::LTS => "LTS Release",
+            Build::Daily(s) | Build::Experimental(s) => s,
+            Build::None => unreachable!("Unexpected release type"),
+        };
+        write!(f, "{}", printable)
     }
 }
 
