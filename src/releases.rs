@@ -691,6 +691,8 @@ impl Package {
         let url = self.url.clone();
         let request = client.get(&url);
 
+        create_dir_all(&settings.temp_dir).await.unwrap();
+
         let f = format!(
             "{}/{}",
             settings.temp_dir.to_str().unwrap(),
