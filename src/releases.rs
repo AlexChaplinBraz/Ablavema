@@ -17,15 +17,11 @@ use xz2::read::XzDecoder;
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Releases {
-    pub official_releases: Vec<Release>,
-    pub lts_releases: Vec<Release>,
+    pub official_releases: Vec<Package>,
+    pub lts_releases: Vec<Package>,
     pub experimental_branches: Vec<Package>,
     pub latest_daily: Vec<Package>,
     pub latest_stable: Vec<Package>,
-    // TODO: Add fields to hold previously downloaded packages:
-    // pub previous_experimental: Vec<Package>,
-    // pub previous_daily: Vec<Package>,
-    // pub previous_stable: Vec<Package>,
 }
 
 impl Releases {
@@ -74,12 +70,9 @@ impl Releases {
         let mut handles = Vec::new();
         for ver in versions {
             let handle = tokio::task::spawn(async move {
-                let mut release = Release::new();
+                let mut packages = Vec::new();
 
-                //TODO: Find some way to get the date from that horrible plain site.
-                release.date = String::from("N/A");
-
-                release.version = ver.strip_prefix("Blender").unwrap().replace("/", "");
+                let version = ver.strip_prefix("Blender").unwrap().replace("/", "");
 
                 let url = format!(
                     "{}{}",
@@ -151,19 +144,32 @@ impl Releases {
 
                     package.build = String::from("Official Release");
 
-                    package.version = match release.version.as_ref() {
+                    // TODO: Check all packages for alpha and beta versions.
+                    // Maybe make a function that checks for alpha/beta+number and adds that.
+                    package.version = match version.as_ref() {
                         "1.0" => String::from("1.0"),
                         "1.60" => String::from("1.60"),
                         "1.73" => String::from("1.73"),
-                        "1.80" => package
-                            .name
-                            .split_terminator("-")
-                            .next()
-                            .unwrap()
-                            .strip_prefix("blender")
-                            .unwrap()
-                            .to_string(),
-                        "2.04" => String::from("2.04"),
+                        "1.80" => {
+                            let v = {
+                                if package.name.contains("alpha") {
+                                    "alpha"
+                                } else {
+                                    "a"
+                                }
+                            };
+                            format!("1.80{}", v)
+                        }
+                        "2.04" => {
+                            let v = {
+                                if package.name.contains("alpha") {
+                                    "alpha"
+                                } else {
+                                    ""
+                                }
+                            };
+                            format!("2.04{}", v)
+                        }
                         "2.39" => {
                             let v = {
                                 if package.name.contains("alpha1") {
@@ -174,6 +180,23 @@ impl Releases {
                             };
                             format!("2.40{}", v)
                         }
+                        "2.50alpha" => {
+                            let v = {
+                                if package.name.contains("alpha0") {
+                                    "alpha0"
+                                } else if package.name.contains("alpha1") {
+                                    "alpha1"
+                                } else {
+                                    "alpha2"
+                                }
+                            };
+                            format!("2.50{}", v)
+                        }
+                        "2.53beta" => String::from("2.53beta"),
+                        "2.54beta" => String::from("2.54beta"),
+                        "2.55beta" => String::from("2.55beta"),
+                        "2.56beta" => String::from("2.56beta"),
+                        "2.56abeta" => String::from("2.56abeta"),
                         "2.79latest" => String::from("2.79latest"),
                         _ => package
                             .name
@@ -184,7 +207,8 @@ impl Releases {
                             .to_string(),
                     };
 
-                    package.date = release.date.clone();
+                    // TODO: Find some way to get the date from that horrible plain site.
+                    //package.date = ?
 
                     package.url = format!("{}{}", url, name);
 
@@ -196,21 +220,21 @@ impl Releases {
                         } else if name.contains("OS") {
                             Os::MacOs
                         } else {
-                            unreachable!();
+                            unreachable!("Unexpected OS");
                         }
                     };
 
-                    release.packages.push(package);
+                    packages.push(package);
                 }
 
-                release
+                packages
             });
 
             handles.push(handle);
         }
 
         for handle in handles {
-            fetched.official_releases.push(handle.await.unwrap());
+            fetched.official_releases.append(&mut handle.await.unwrap());
         }
 
         fetched.official_releases.sort_by_key(|x| x.version.clone());
@@ -237,7 +261,7 @@ impl Releases {
         // it so stupidly since the layout is hard to parse.
         let lts = String::from("283");
         for rev in 0.. {
-            let mut release = Release::new();
+            let mut package = Package::new();
 
             let lts_id = format!("lts-release-{}{}", lts, rev);
             let version = match document.find(Attr("id", lts_id.as_str())).next() {
@@ -246,7 +270,7 @@ impl Releases {
             }
             .text();
 
-            release.version = version
+            package.version = version
                 .split_whitespace()
                 .skip(2)
                 .next()
@@ -259,7 +283,7 @@ impl Releases {
                 .next()
                 .unwrap();
 
-            release.date = section
+            package.date = section
                 .find(Name("p"))
                 .next()
                 .unwrap()
@@ -290,15 +314,9 @@ impl Releases {
                     continue;
                 }
 
-                let mut package = Package::new();
-
-                package.version = release.version.clone();
-
                 package.name = get_file_stem(node.text().as_str()).to_string();
 
                 package.build = String::from("LTS Release");
-
-                package.date = release.date.clone();
 
                 let download_path =
                     "https://ftp.nluug.nl/pub/graphics/blender/release/Blender2.83/";
@@ -312,11 +330,9 @@ impl Releases {
                     } else if name.contains("mac") {
                         Os::MacOs
                     } else {
-                        unreachable!();
+                        unreachable!("Unexpected OS");
                     }
                 };
-
-                release.packages.push(package);
             }
 
             let lts_changelog_id = format!("faq-lts-release-{}{}-2", lts, rev);
@@ -334,10 +350,10 @@ impl Releases {
                 };
 
                 let change = Change { text, url };
-                release.changelog.push(change);
+                package.changelog.push(change);
             }
 
-            fetched.lts_releases.push(release);
+            fetched.lts_releases.push(package);
         }
 
         fetched.lts_releases.reverse();
@@ -411,7 +427,7 @@ impl Releases {
             } else if o == "macos" {
                 Os::MacOs
             } else {
-                unreachable!();
+                unreachable!("Unexpected OS");
             }
         };
 
@@ -497,7 +513,7 @@ impl Releases {
                 } else if o.contains("macOS") {
                     Os::MacOs
                 } else {
-                    unreachable!();
+                    unreachable!("Unexpected OS");
                 }
             };
 
@@ -590,7 +606,7 @@ impl Releases {
                 } else if o.contains("macOS") {
                     Os::MacOs
                 } else {
-                    unreachable!();
+                    unreachable!("Unexpected OS");
                 }
             };
 
@@ -605,25 +621,6 @@ impl Releases {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
-pub struct Release {
-    pub version: String,
-    pub date: String,
-    pub packages: Vec<Package>,
-    pub changelog: Vec<Change>,
-}
-
-impl Release {
-    fn new() -> Release {
-        Release {
-            version: String::new(),
-            date: String::new(),
-            packages: Vec::new(),
-            changelog: Vec::new(),
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
 pub struct Package {
     pub version: String,
@@ -633,6 +630,7 @@ pub struct Package {
     pub commit: String,
     pub url: String,
     pub os: Os,
+    pub changelog: Vec<Change>,
 }
 
 impl Package {
@@ -645,6 +643,7 @@ impl Package {
             commit: String::new(),
             url: String::new(),
             os: Os::None,
+            changelog: Vec::new(),
         }
     }
 
@@ -839,7 +838,7 @@ impl Package {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
 pub struct Change {
     pub text: String,
     pub url: String,

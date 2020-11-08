@@ -388,28 +388,27 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
                     for build in b.values_of("id").unwrap() {
-                        for r in &releases.lts_releases {
-                            for p in &r.packages {
-                                if p.name == build {
-                                    p.install(&settings, &multi_progress).await?;
-                                }
-                            }
-                        }
+                        releases
+                            .lts_releases
+                            .iter()
+                            .find(|p| p.name == build)
+                            .unwrap()
+                            .install(&settings, &multi_progress)
+                            .await?;
                     }
                     multi_progress.join().unwrap();
                 } else {
                     let multi_progress = MultiProgress::new();
                     for build in b.values_of("id").unwrap() {
-                        for (i, r) in releases.lts_releases.iter().enumerate() {
-                            if i == usize::from_str(build).unwrap() {
-                                r.packages
-                                    .iter()
-                                    .next()
-                                    .unwrap()
-                                    .install(&settings, &multi_progress)
-                                    .await?;
-                            }
-                        }
+                        releases
+                            .lts_releases
+                            .iter()
+                            .enumerate()
+                            .find(|(i, _)| *i == usize::from_str(build).unwrap())
+                            .unwrap()
+                            .1
+                            .install(&settings, &multi_progress)
+                            .await?;
                     }
                     multi_progress.join().unwrap();
                 }
@@ -418,25 +417,27 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
                     for build in b.values_of("id").unwrap() {
-                        for r in &releases.official_releases {
-                            for p in &r.packages {
-                                if p.name == build {
-                                    p.install(&settings, &multi_progress).await?;
-                                }
-                            }
-                        }
+                        releases
+                            .official_releases
+                            .iter()
+                            .find(|p| p.name == build)
+                            .unwrap()
+                            .install(&settings, &multi_progress)
+                            .await?;
                     }
                     multi_progress.join().unwrap();
                 } else {
                     let multi_progress = MultiProgress::new();
                     for build in b.values_of("id").unwrap() {
-                        for (i, r) in releases.official_releases.iter().enumerate() {
-                            for (u, p) in r.packages.iter().enumerate() {
-                                if format!("{}.{}", i, u) == build {
-                                    p.install(&settings, &multi_progress).await?;
-                                }
-                            }
-                        }
+                        releases
+                            .official_releases
+                            .iter()
+                            .enumerate()
+                            .find(|(i, _)| *i == usize::from_str(build).unwrap())
+                            .unwrap()
+                            .1
+                            .install(&settings, &multi_progress)
+                            .await?;
                     }
                     multi_progress.join().unwrap();
                 }
@@ -508,10 +509,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 let mut table = Table::new();
                 table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
                 table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, r) in releases.lts_releases.iter().enumerate() {
-                    for p in &r.packages {
-                        table.add_row(row![i, p.name, p.version, p.build, p.date]);
-                    }
+                for (i, p) in releases.lts_releases.iter().enumerate() {
+                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
                 table.printstd();
             }
@@ -519,16 +518,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 let mut table = Table::new();
                 table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
                 table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, r) in releases.official_releases.iter().enumerate() {
-                    for (u, p) in r.packages.iter().enumerate() {
-                        table.add_row(row![
-                            format!("{}.{}", i, u),
-                            p.name,
-                            p.version,
-                            p.build,
-                            p.date
-                        ]);
-                    }
+                for (i, p) in releases.official_releases.iter().enumerate() {
+                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
                 table.printstd();
             }
