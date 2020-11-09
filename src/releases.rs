@@ -2,6 +2,7 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 use crate::settings::*;
 use bzip2::read::BzDecoder;
+use chrono::{Date, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest;
@@ -144,8 +145,6 @@ impl Releases {
 
                     package.build = Build::Official;
 
-                    // TODO: Check all packages for alpha and beta versions.
-                    // Maybe make a function that checks for alpha/beta+number and adds that.
                     package.version = match version.as_ref() {
                         "1.0" => String::from("1.0"),
                         "1.60" => String::from("1.60"),
@@ -283,7 +282,7 @@ impl Releases {
                 .next()
                 .unwrap();
 
-            package.date = section
+            let mut date = section
                 .find(Name("p"))
                 .next()
                 .unwrap()
@@ -293,6 +292,8 @@ impl Releases {
                 .strip_suffix(".")
                 .unwrap()
                 .to_string();
+            date.push_str("-00:00:00");
+            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap();
 
             for node in section.find(Name("a")) {
                 let name = node.text();
@@ -408,7 +409,7 @@ impl Releases {
 
         package.name = get_file_stem(&package.url).to_string();
 
-        package.date = node
+        let mut date = node
             .find(Class("dl-header-info-platform"))
             .next()
             .unwrap()
@@ -416,7 +417,9 @@ impl Releases {
             .next()
             .unwrap()
             .text();
-        package.date = package.date.split_off(package.date.find("on").unwrap() + 3);
+        let mut date = date.split_off(date.find("on").unwrap() + 3);
+        date.push_str("-00:00:00");
+        package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap();
 
         package.os = {
             if o == "linux" {
@@ -447,6 +450,9 @@ impl Releases {
         assert!(resp.status().is_success());
         let resp = resp.bytes().await.unwrap();
         let document = Document::from_read(&resp[..]).unwrap();
+
+        let current_year = Utc::today().year();
+        let current_year = format!("-{}", current_year);
 
         let mut fetched = Releases::new();
 
@@ -481,11 +487,10 @@ impl Releases {
                 .unwrap()
                 .to_string();
 
-            package.date = build.find(Name("small")).next().unwrap().text();
-            package.date = package
-                .date
-                .drain(..package.date.find('-').unwrap())
-                .collect();
+            let mut date = build.find(Name("small")).next().unwrap().text();
+            let mut date: String = date.drain(..date.find('-').unwrap()).collect();
+            date.push_str(&current_year);
+            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
 
             package.commit = build
                 .find(Name("small"))
@@ -533,6 +538,9 @@ impl Releases {
         let resp = resp.bytes().await.unwrap();
         let document = Document::from_read(&resp[..]).unwrap();
 
+        let current_year = Utc::today().year();
+        let current_year = format!("-{}", current_year);
+
         let mut fetched = Releases::new();
 
         for build in document.find(Class("os")) {
@@ -576,11 +584,10 @@ impl Releases {
                 .unwrap()
                 .to_string();
 
-            package.date = build.find(Name("small")).next().unwrap().text();
-            package.date = package
-                .date
-                .drain(..package.date.find('-').unwrap())
-                .collect();
+            let mut date = build.find(Name("small")).next().unwrap().text();
+            let mut date: String = date.drain(..date.find('-').unwrap()).collect();
+            date.push_str(&current_year);
+            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
 
             package.commit = build
                 .find(Name("small"))
@@ -627,7 +634,7 @@ pub struct Package {
     pub version: String,
     pub name: String,
     pub build: Build,
-    pub date: String,
+    pub date: NaiveDateTime,
     pub commit: String,
     pub url: String,
     pub os: Os,
@@ -640,7 +647,10 @@ impl Package {
             version: String::new(),
             name: String::new(),
             build: Build::None,
-            date: String::new(),
+            date: NaiveDateTime::new(
+                NaiveDate::from_ymd(1999, 12, 31),
+                NaiveTime::from_hms(23, 59, 59),
+            ),
             commit: String::new(),
             url: String::new(),
             os: Os::None,
