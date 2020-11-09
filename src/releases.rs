@@ -5,6 +5,7 @@ use bzip2::read::BzDecoder;
 use chrono::{Date, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use regex::Regex;
 use reqwest;
 use reqwest::{header, Client};
 use select::document::Document;
@@ -85,6 +86,17 @@ impl Releases {
                 let resp = resp.bytes().await.unwrap();
                 let document = Document::from_read(&resp[..]).unwrap();
                 let mut builds = Vec::new();
+
+                let re = Regex::new(r"\d{2}-\w{3}-\d{4}\s\d{2}:\d{2}").unwrap();
+                let mut dates = Vec::new();
+                for node in document.find(Name("pre")).next().unwrap().children() {
+                    if let Some(text) = node.as_text() {
+                        if let Some(date) = re.find(text) {
+                            dates.push(format!("{}:00", date.as_str()));
+                        }
+                    }
+                }
+                dates.reverse();
 
                 for node in document.find(Name("a")) {
                     builds.push(node.attr("href").unwrap());
@@ -206,8 +218,8 @@ impl Releases {
                             .to_string(),
                     };
 
-                    // TODO: Find some way to get the date from that horrible plain site.
-                    //package.date = ?
+                    let date = dates.pop().unwrap();
+                    package.date = NaiveDateTime::parse_from_str(&date, "%d-%b-%Y %T").unwrap();
 
                     package.url = format!("{}{}", url, name);
 
