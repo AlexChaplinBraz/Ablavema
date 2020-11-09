@@ -153,7 +153,7 @@ impl Releases {
 
                     let mut package = Package::new();
 
-                    package.name = get_file_stem(name).to_string();
+                    package.name = format!("{}-official", get_file_stem(name));
 
                     package.build = Build::Official;
 
@@ -765,7 +765,7 @@ impl Package {
             self.url.split_terminator('/').last().unwrap()
         );
 
-        let packages_dir = settings.packages_dir.clone();
+        let temp_dir = settings.temp_dir.clone();
 
         // This value is hardcoded because the cost of calculating it is way too high
         // to justify it (around 4 seconds). Setting it a bit higher so that it's not stuck
@@ -793,7 +793,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&packages_dir).unwrap();
+                        file.unpack_in(&temp_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
@@ -806,7 +806,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&packages_dir).unwrap();
+                        file.unpack_in(&temp_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
@@ -819,7 +819,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&packages_dir).unwrap();
+                        file.unpack_in(&temp_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
@@ -839,9 +839,26 @@ impl Package {
         // TODO: Wrap them in Arc<Mutex<>> to avoid unnecessary cloning.
         let package = (*self).clone();
         let packages_dir = settings.packages_dir.clone();
+        let temp_dir = settings.temp_dir.clone();
 
         let _ = tokio::task::spawn(async move {
             extraction_handle.await.unwrap();
+
+            // TODO: When handling the possible errors, inform the user if they're
+            // trying to set paths with different filesystems for temp_dir and packages_dir.
+            if package.build == Build::Official {
+                std::fs::rename(
+                    temp_dir.join(&package.name.strip_suffix("-official").unwrap()),
+                    packages_dir.join(&package.name),
+                )
+                .unwrap();
+            } else {
+                std::fs::rename(
+                    temp_dir.join(&package.name),
+                    packages_dir.join(&package.name),
+                )
+                .unwrap();
+            }
 
             let mut path = packages_dir.join(&package.name);
             path.push("package_info.bin");

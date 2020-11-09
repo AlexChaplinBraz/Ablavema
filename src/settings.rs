@@ -101,7 +101,7 @@ impl Default for Settings {
             }),
             temp_dir: PathBuf::from({
                 if cfg!(target_os = "linux") {
-                    "/tmp/BlenderLauncher"
+                    "/home/alex/.cache/BlenderLauncher"
                 } else if cfg!(target_os = "windows") {
                     todo!("windows config");
                 } else if cfg!(target_os = "macos") {
