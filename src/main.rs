@@ -25,7 +25,7 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Box<dyn Error>> {
-    let (mut settings, config_path) = Settings::new()?;
+    let mut settings = Settings::new()?;
 
     let mut releases = Releases::new();
     releases.load(&settings);
@@ -603,14 +603,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
                         .to_string()
                 }
             };
-            settings.save(&config_path)?;
+            settings.save()?;
             println!("Selected: {}", settings.default_package);
         }
-        ("update", Some(_a)) => {
-            installed
-                .update(&mut settings, &config_path, &mut releases)
-                .await?
-        }
+        ("update", Some(_a)) => installed.update(&mut settings, &mut releases).await?,
         _ => {
             if args.is_present("path") {
                 let _blender = Command::new({

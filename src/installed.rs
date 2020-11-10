@@ -55,7 +55,6 @@ impl Installed {
     pub async fn update(
         &mut self,
         settings: &mut Settings,
-        config_path: &String,
         releases: &mut Releases,
     ) -> Result<(), Box<dyn Error>> {
         let mut packages_to_install = Vec::new();
@@ -145,7 +144,7 @@ impl Installed {
                     );
                 } else {
                     settings.default_package = new_default.name.clone();
-                    settings.save(&config_path).unwrap();
+                    settings.save().unwrap();
 
                     println!(
                         "Found an update for the default package, switched from:\n{} | {}\nTo:\n{} | {}",

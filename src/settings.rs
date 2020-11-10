@@ -1,10 +1,41 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 #![allow(dead_code, unused_imports, unused_variables)]
-use config::{Config, ConfigError, Environment, File, FileFormat};
+use config::{Config, ConfigError, Environment, File as ConfigFile, FileFormat};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::{env, error::Error};
+use std::{
+    fs::{create_dir_all, File},
+    io::prelude::*,
+};
+
+lazy_static! {
+    pub static ref CONFIG_PATH: PathBuf = if cfg!(target_os = "linux") {
+        let bl_env = env::var_os("BLENDER_LAUNCHER_CONFIG");
+        let xdg_env = env::var_os("XDG_CONFIG_HOME");
+
+        if bl_env.is_some() {
+            PathBuf::from(bl_env.unwrap().to_str().unwrap().to_string())
+        } else if xdg_env.is_some() {
+            PathBuf::from(format!(
+                "{}/BlenderLauncher/config.toml",
+                xdg_env.unwrap().to_str().unwrap()
+            ))
+        } else {
+            PathBuf::from(format!(
+                "{}/.config/BlenderLauncher/config.toml",
+                env::var("HOME").unwrap()
+            ))
+        }
+    } else if cfg!(target_os = "windows") {
+        todo!("windows config");
+    } else if cfg!(target_os = "macos") {
+        todo!("macos config");
+    } else {
+        unreachable!("Unsupported OS config");
+    };
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
@@ -25,57 +56,31 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new() -> Result<(Self, String), ConfigError> {
+    pub fn new() -> Result<Self, ConfigError> {
         // TODO: Consider working directly with Config.
-        let config_path;
-
-        if cfg!(target_os = "linux") {
-            let bl_env = env::var_os("BLENDER_LAUNCHER_CONFIG");
-            let xdg_env = env::var_os("XDG_CONFIG_HOME");
-
-            if bl_env.is_some() {
-                config_path = bl_env.unwrap().to_str().unwrap().to_string();
-            } else if xdg_env.is_some() {
-                config_path = format!(
-                    "{}/BlenderLauncher/config.toml",
-                    xdg_env.unwrap().to_str().unwrap()
-                );
-            } else {
-                config_path = format!(
-                    "{}/.config/BlenderLauncher/config.toml",
-                    env::var("HOME").unwrap()
-                );
-            }
-        } else if cfg!(target_os = "windows") {
-            todo!("windows config");
-        } else if cfg!(target_os = "macos") {
-            todo!("macos config");
-        } else {
-            unreachable!("Unsupported OS config");
-        }
-
         let mut settings = Config::new();
 
-        let conf = Path::new(&config_path);
-
-        if !conf.exists() {
+        if !CONFIG_PATH.exists() {
             let default = Settings::default();
-            std::fs::create_dir_all(conf.parent().unwrap()).unwrap();
-            let mut conf_file = std::fs::File::create(conf).unwrap();
+            create_dir_all(CONFIG_PATH.parent().unwrap()).unwrap();
+            let mut conf_file = File::create(&*CONFIG_PATH).unwrap();
 
             conf_file
                 .write_all(toml::to_string(&default).unwrap().as_bytes())
                 .unwrap();
         }
 
-        settings.merge(File::new(&config_path, FileFormat::Toml))?;
+        settings.merge(ConfigFile::new(
+            &CONFIG_PATH.to_str().unwrap(),
+            FileFormat::Toml,
+        ))?;
 
-        Ok((settings.try_into()?, config_path))
+        Ok(settings.try_into()?)
     }
 
-    pub fn save(&self, config_path: &String) -> Result<(), Box<dyn Error>> {
+    pub fn save(&self) -> Result<(), Box<dyn Error>> {
         let toml = toml::to_string(self)?;
-        let mut file = std::fs::File::create(config_path)?;
+        let mut file = File::create(&*CONFIG_PATH)?;
         file.write_all(toml.as_bytes())?;
 
         Ok(())
