@@ -604,9 +604,13 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 }
             };
             settings.save(&config_path)?;
-            println!("Selected {}", settings.default_package);
+            println!("Selected: {}", settings.default_package);
         }
-        ("update", Some(_a)) => todo!("Update packages"),
+        ("update", Some(_a)) => {
+            installed
+                .update(&mut settings, &config_path, &mut releases)
+                .await?
+        }
         _ => {
             if args.is_present("path") {
                 let _blender = Command::new({

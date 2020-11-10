@@ -9,9 +9,18 @@ use std::{env, error::Error};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub default_package: String,
+    pub use_latest_as_default: bool,
+    pub update_daily: bool,
+    pub keep_only_latest_daily: bool,
+    pub update_experimental: bool,
+    pub keep_only_latest_experimental: bool,
+    pub update_stable: bool,
+    pub keep_only_latest_stable: bool,
+    pub update_lts: bool,
+    pub keep_only_latest_lts: bool,
     pub packages_dir: PathBuf,
-    pub releases_db: PathBuf,
     pub temp_dir: PathBuf,
+    pub releases_db: PathBuf,
     pub interface: Interface,
 }
 
@@ -77,6 +86,15 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             default_package: String::new(),
+            use_latest_as_default: true,
+            update_daily: true,
+            keep_only_latest_daily: false,
+            update_experimental: true,
+            keep_only_latest_experimental: false,
+            update_stable: true,
+            keep_only_latest_stable: false,
+            update_lts: true,
+            keep_only_latest_lts: false,
             packages_dir: PathBuf::from({
                 if cfg!(target_os = "linux") {
                     "/home/alex/.config/BlenderLauncher/packages"

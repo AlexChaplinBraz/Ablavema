@@ -14,7 +14,10 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::{error::Error, fs::File};
 use tar::Archive;
-use tokio::{fs, fs::create_dir_all, fs::remove_dir_all, fs::remove_file, io::AsyncWriteExt};
+use tokio::{
+    fs, fs::create_dir_all, fs::remove_dir_all, fs::remove_file, io::AsyncWriteExt,
+    task::JoinHandle,
+};
 use xz2::read::XzDecoder;
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
@@ -674,7 +677,7 @@ impl Package {
         &self,
         settings: &Settings,
         multi_progress: &MultiProgress,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<JoinHandle<()>, Box<dyn Error>> {
         let download_style = ProgressStyle::default_bar()
             .template("[{elapsed_precise}] [{bar:20.cyan/red}] {bytes}/{total_bytes} {bytes_per_sec} ({eta}) => {wide_msg}")
             .progress_chars("#>-");
@@ -841,7 +844,7 @@ impl Package {
         let packages_dir = settings.packages_dir.clone();
         let temp_dir = settings.temp_dir.clone();
 
-        let _ = tokio::task::spawn(async move {
+        let final_tasks = tokio::task::spawn(async move {
             extraction_handle.await.unwrap();
 
             // TODO: When handling the possible errors, inform the user if they're
@@ -866,7 +869,7 @@ impl Package {
             bincode::serialize_into(file, &package).unwrap();
         });
 
-        Ok(())
+        Ok(final_tasks)
     }
 
     pub async fn remove(&self, settings: &Settings) -> Result<(), Box<dyn Error>> {
@@ -874,7 +877,7 @@ impl Package {
         remove_dir_all(path).await?;
 
         // TODO: Add this type of reporting to other commands like fetch.
-        println!("Removed {}", self.name);
+        println!("Removed: {}", self.name);
 
         Ok(())
     }
@@ -897,7 +900,7 @@ impl std::fmt::Display for Build {
             Build::Stable => "Stable Release",
             Build::LTS => "LTS Release",
             Build::Daily(s) | Build::Experimental(s) => s,
-            Build::None => unreachable!("Unexpected release type"),
+            Build::None => unreachable!("Unexpected build type"),
         };
         write!(f, "{}", printable)
     }
