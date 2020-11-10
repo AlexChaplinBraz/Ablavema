@@ -94,52 +94,58 @@ impl Releases {
                 let mut dates = Vec::new();
                 for node in document.find(Name("pre")).next().unwrap().children() {
                     if let Some(text) = node.as_text() {
+                        if text.chars().filter(|&c| c == '-').count() > 2 {
+                            continue;
+                        }
+
                         if let Some(date) = re.find(text) {
                             dates.push(format!("{}:00", date.as_str()));
                         }
                     }
                 }
-                dates.reverse();
 
                 for node in document.find(Name("a")) {
                     builds.push(node.attr("href").unwrap());
                 }
 
-                builds.retain(|x| {
-                    !x.ends_with('/')
-                        && !x.contains(".msi")
-                        && !x.contains(".md")
-                        && !x.contains(".sha256")
-                        && !x.contains(".msix")
-                        && !x.contains(".exe")
-                        && !x.contains(".txt")
-                        && !x.contains(".rpm")
-                        && !x.contains(".deb")
-                        && !x.contains(".tbz")
-                        && !x.contains("md5sums")
-                        && !x.contains("source")
-                        && !x.contains("demo")
-                        && !x.contains("script")
-                        && !x.contains("manual")
-                        && !x.contains("files")
-                        && !x.contains("beos")
-                        && !x.contains("static")
-                        && !x.contains("irix")
-                        && !x.contains("solaris")
-                        && !x.contains("powerpc")
-                        && !x.contains("-ppc")
-                        && !x.contains("_ppc")
-                        && !x.contains("freebsd")
-                        && !x.contains("FreeBSD")
-                        && !x.contains("?")
-                    //&& !x.contains("i386")
-                    //&& !x.contains("i686")
-                    //&& !x.contains("-win32")
-                    //&& !x.contains("-windows32")
-                });
+                builds.retain(|x| !x.ends_with('/') && !x.contains("?"));
                 builds.reverse();
 
                 for name in builds {
+                    let date = dates.pop().unwrap();
+
+                    if name.contains(".msi")
+                        || name.contains(".md")
+                        || name.contains(".sha256")
+                        || name.contains(".msix")
+                        || name.contains(".exe")
+                        || name.contains(".txt")
+                        || name.contains(".rpm")
+                        || name.contains(".deb")
+                        || name.contains(".tbz")
+                        || name.contains("md5sums")
+                        || name.contains("source")
+                        || name.contains("demo")
+                        || name.contains("script")
+                        || name.contains("manual")
+                        || name.contains("files")
+                        || name.contains("beos")
+                        || name.contains("static")
+                        || name.contains("irix")
+                        || name.contains("solaris")
+                        || name.contains("powerpc")
+                        || name.contains("-ppc")
+                        || name.contains("_ppc")
+                        || name.contains("freebsd")
+                        || name.contains("FreeBSD")
+                    //|| name.contains("i386")
+                    //|| name.contains("i686")
+                    //|| name.contains("-win32")
+                    //|| name.contains("-windows32")
+                    {
+                        continue;
+                    }
+
                     let targ_os = if cfg!(target_os = "linux") {
                         "linux"
                     } else if cfg!(target_os = "windows") {
@@ -221,7 +227,6 @@ impl Releases {
                             .to_string(),
                     };
 
-                    let date = dates.pop().unwrap();
                     package.date = NaiveDateTime::parse_from_str(&date, "%d-%b-%Y %T").unwrap();
 
                     package.url = format!("{}{}", url, name);
