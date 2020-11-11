@@ -65,7 +65,12 @@ impl Installed {
             releases.fetch_latest_stable().await?;
 
             let latest_stable = releases.latest_stable.iter().next().unwrap();
-            if !self.contains(latest_stable) {
+            if !self.contains(latest_stable)
+                && self
+                    .iter()
+                    .find(|p| p.build == latest_stable.build)
+                    .is_some()
+            {
                 packages_to_install.push(latest_stable.clone());
                 println!("Found: {} | {}", latest_stable.name, latest_stable.date);
             }
@@ -75,7 +80,9 @@ impl Installed {
             releases.fetch_lts_releases().await?;
 
             let latest_lts = releases.lts_releases.iter().next().unwrap();
-            if !self.contains(latest_lts) {
+            if !self.contains(latest_lts)
+                && self.iter().find(|p| p.build == latest_lts.build).is_some()
+            {
                 packages_to_install.push(latest_lts.clone());
                 println!("Found: {} | {}", latest_lts.name, latest_lts.date);
             }
