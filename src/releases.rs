@@ -2,17 +2,21 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 use crate::settings::*;
 use bzip2::read::BzDecoder;
-use chrono::{Date, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
-use reqwest;
-use reqwest::{header, Client};
-use select::document::Document;
-use select::predicate::{Attr, Class, Name};
+use reqwest::{self, header, Client};
+use select::{
+    document::Document,
+    predicate::{Attr, Class, Name},
+};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
-use std::{error::Error, fs::File};
+use std::{
+    error::Error,
+    fs::File,
+    path::{Path, PathBuf},
+};
 use tar::Archive;
 use tokio::{
     fs, fs::create_dir_all, fs::remove_dir_all, fs::remove_file, io::AsyncWriteExt,
@@ -40,20 +44,29 @@ impl Releases {
         }
     }
 
-    pub fn load(&mut self, settings: &Settings) {
-        if settings.releases_db.exists() {
-            let file = File::open(&settings.releases_db).unwrap();
-            let bin: Releases = bincode::deserialize_from(file).unwrap();
+    pub fn load(&mut self) -> Result<(), Box<dyn Error>> {
+        if SETTINGS
+            .read()
+            .unwrap()
+            .get::<PathBuf>("releases_db")?
+            .exists()
+        {
+            let file = File::open(SETTINGS.read().unwrap().get::<PathBuf>("releases_db")?)?;
+            let bin: Releases = bincode::deserialize_from(file)?;
             *self = bin;
         }
+
+        Ok(())
     }
 
-    pub fn save(&mut self, settings: &Settings) {
-        let file = File::create(&settings.releases_db).unwrap();
-        bincode::serialize_into(file, self).unwrap();
+    pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
+        let file = File::create(SETTINGS.read().unwrap().get::<PathBuf>("releases_db")?)?;
+        bincode::serialize_into(file, self)?;
+
+        Ok(())
     }
 
-    pub async fn fetch_official_releases(&mut self, settings: &Settings) {
+    pub async fn fetch_official_releases(&mut self) -> Result<(), Box<dyn Error>> {
         let url = "https://ftp.nluug.nl/pub/graphics/blender/release/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -262,11 +275,13 @@ impl Releases {
         if self.official_releases != fetched.official_releases {
             self.official_releases = fetched.official_releases;
 
-            self.save(&settings);
+            self.save()?;
         }
+
+        Ok(())
     }
 
-    pub async fn fetch_lts_releases(&mut self, settings: &Settings) {
+    pub async fn fetch_lts_releases(&mut self) -> Result<(), Box<dyn Error>> {
         let url = "https://www.blender.org/download/lts/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -382,11 +397,13 @@ impl Releases {
         if self.lts_releases != fetched.lts_releases {
             self.lts_releases = fetched.lts_releases;
 
-            self.save(&settings);
+            self.save()?;
         }
+
+        Ok(())
     }
 
-    pub async fn fetch_latest_stable(&mut self, settings: &Settings) {
+    pub async fn fetch_latest_stable(&mut self) -> Result<(), Box<dyn Error>> {
         let url = "https://www.blender.org/download/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -460,11 +477,13 @@ impl Releases {
         if self.latest_stable != fetched.latest_stable {
             self.latest_stable = fetched.latest_stable;
 
-            self.save(&settings);
+            self.save()?;
         }
+
+        Ok(())
     }
 
-    pub async fn fetch_latest_daily(&mut self, settings: &Settings) {
+    pub async fn fetch_latest_daily(&mut self) -> Result<(), Box<dyn Error>> {
         let url = "https://builder.blender.org/download/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -547,11 +566,13 @@ impl Releases {
         if self.latest_daily != fetched.latest_daily {
             self.latest_daily = fetched.latest_daily;
 
-            self.save(&settings);
+            self.save()?;
         }
+
+        Ok(())
     }
 
-    pub async fn fetch_experimental_branches(&mut self, settings: &Settings) {
+    pub async fn fetch_experimental_branches(&mut self) -> Result<(), Box<dyn Error>> {
         let url = "https://builder.blender.org/download/branches/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -644,8 +665,10 @@ impl Releases {
         if self.experimental_branches != fetched.experimental_branches {
             self.experimental_branches = fetched.experimental_branches;
 
-            self.save(&settings);
+            self.save()?;
         }
+
+        Ok(())
     }
 }
 
@@ -680,7 +703,6 @@ impl Package {
 
     pub async fn install(
         &self,
-        settings: &Settings,
         multi_progress: &MultiProgress,
     ) -> Result<JoinHandle<()>, Box<dyn Error>> {
         let download_style = ProgressStyle::default_bar()
@@ -722,18 +744,14 @@ impl Package {
         let url = self.url.clone();
         let request = client.get(&url);
 
-        create_dir_all(&settings.temp_dir).await.unwrap();
+        let mut file = SETTINGS.read().unwrap().get::<PathBuf>("temp_dir")?;
+        create_dir_all(&file).await.unwrap();
 
-        let f = format!(
-            "{}/{}",
-            settings.temp_dir.to_str().unwrap(),
-            self.url.split_terminator('/').last().unwrap()
-        );
-        let file = Path::new(&f);
+        file.push(self.url.split_terminator('/').last().unwrap());
 
         // TODO: Prompt/option for re-download.
         if file.exists() {
-            remove_file(file).await?;
+            remove_file(&file).await?;
         }
 
         let mut source = request.send().await.unwrap();
@@ -758,22 +776,16 @@ impl Package {
             progress_bar.finish_with_message(&msg);
         });
 
-        create_dir_all(&settings.packages_dir).await?;
+        let mut package = SETTINGS.read().unwrap().get::<PathBuf>("packages_dir")?;
+
+        create_dir_all(&package).await?;
+
+        package.push(&self.name);
 
         // TODO: Prompt/option for re-extraction.
-        let package = format!("{}/{}", settings.packages_dir.to_str().unwrap(), self.name);
-        let path = Path::new(&package);
-        if path.exists() {
-            remove_dir_all(path).await?;
+        if package.exists() {
+            remove_dir_all(&package).await?;
         }
-
-        let file = format!(
-            "{}/{}",
-            settings.temp_dir.to_str().unwrap(),
-            self.url.split_terminator('/').last().unwrap()
-        );
-
-        let temp_dir = settings.temp_dir.clone();
 
         // This value is hardcoded because the cost of calculating it is way too high
         // to justify it (around 4 seconds). Setting it a bit higher so that it's not stuck
@@ -787,13 +799,13 @@ impl Package {
         let extraction_handle = tokio::task::spawn(async move {
             download_handle.await.unwrap();
 
-            let msg = format!("Extracting {}", file.split_terminator('/').last().unwrap());
+            let msg = format!("Extracting {}", file.file_name().unwrap().to_str().unwrap());
             progress_bar.set_message(&msg);
             progress_bar.reset_elapsed();
             progress_bar.enable_steady_tick(250);
 
             if cfg!(target_os = "linux") {
-                if file.ends_with(".xz") {
+                if file.extension().unwrap() == "xz" {
                     let tar_xz = File::open(&file).unwrap();
                     let tar = XzDecoder::new(tar_xz);
                     let mut archive = Archive::new(tar);
@@ -801,12 +813,15 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&temp_dir).unwrap();
+                        file.unpack_in(
+                            SETTINGS.read().unwrap().get::<PathBuf>("temp_dir").unwrap(),
+                        )
+                        .unwrap();
                     }
 
-                    let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
+                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
                     progress_bar.finish_with_message(&msg);
-                } else if file.ends_with(".bz2") {
+                } else if file.extension().unwrap() == "bz2" {
                     let tar_bz2 = File::open(&file).unwrap();
                     let tar = BzDecoder::new(tar_bz2);
                     let mut archive = Archive::new(tar);
@@ -814,12 +829,15 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&temp_dir).unwrap();
+                        file.unpack_in(
+                            SETTINGS.read().unwrap().get::<PathBuf>("temp_dir").unwrap(),
+                        )
+                        .unwrap();
                     }
 
-                    let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
+                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
                     progress_bar.finish_with_message(&msg);
-                } else if file.ends_with(".gz") {
+                } else if file.extension().unwrap() == "gz" {
                     let tar_gz = File::open(&file).unwrap();
                     let tar = GzDecoder::new(tar_gz);
                     let mut archive = Archive::new(tar);
@@ -827,10 +845,13 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&temp_dir).unwrap();
+                        file.unpack_in(
+                            SETTINGS.read().unwrap().get::<PathBuf>("temp_dir").unwrap(),
+                        )
+                        .unwrap();
                     }
 
-                    let msg = format!("Extracted {}", file.split_terminator('/').last().unwrap());
+                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
                     progress_bar.finish_with_message(&msg);
                 } else {
                     unreachable!("Unknown compression extension");
@@ -844,10 +865,7 @@ impl Package {
             }
         });
 
-        // TODO: Wrap them in Arc<Mutex<>> to avoid unnecessary cloning.
         let package = (*self).clone();
-        let packages_dir = settings.packages_dir.clone();
-        let temp_dir = settings.temp_dir.clone();
 
         let final_tasks = tokio::task::spawn(async move {
             extraction_handle.await.unwrap();
@@ -856,19 +874,44 @@ impl Package {
             // trying to set paths with different filesystems for temp_dir and packages_dir.
             if package.build == Build::Official {
                 std::fs::rename(
-                    temp_dir.join(&package.name.strip_suffix("-official").unwrap()),
-                    packages_dir.join(&package.name),
+                    SETTINGS
+                        .read()
+                        .unwrap()
+                        .get::<PathBuf>("temp_dir")
+                        .unwrap()
+                        .join(&package.name.strip_suffix("-official").unwrap()),
+                    SETTINGS
+                        .read()
+                        .unwrap()
+                        .get::<PathBuf>("packages_dir")
+                        .unwrap()
+                        .join(&package.name),
                 )
                 .unwrap();
             } else {
                 std::fs::rename(
-                    temp_dir.join(&package.name),
-                    packages_dir.join(&package.name),
+                    SETTINGS
+                        .read()
+                        .unwrap()
+                        .get::<PathBuf>("temp_dir")
+                        .unwrap()
+                        .join(&package.name),
+                    SETTINGS
+                        .read()
+                        .unwrap()
+                        .get::<PathBuf>("packages_dir")
+                        .unwrap()
+                        .join(&package.name),
                 )
                 .unwrap();
             }
 
-            let mut path = packages_dir.join(&package.name);
+            let mut path = SETTINGS
+                .read()
+                .unwrap()
+                .get::<PathBuf>("packages_dir")
+                .unwrap()
+                .join(&package.name);
             path.push("package_info.bin");
             let file = File::create(&path).unwrap();
             bincode::serialize_into(file, &package).unwrap();
@@ -877,8 +920,13 @@ impl Package {
         Ok(final_tasks)
     }
 
-    pub async fn remove(&self, settings: &Settings) -> Result<(), Box<dyn Error>> {
-        let path = settings.packages_dir.join(&self.name);
+    pub async fn remove(&self) -> Result<(), Box<dyn Error>> {
+        let path = SETTINGS
+            .read()
+            .unwrap()
+            .get::<PathBuf>("packages_dir")?
+            .join(&self.name);
+
         remove_dir_all(path).await?;
 
         // TODO: Add this type of reporting to other commands like fetch.

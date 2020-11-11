@@ -1,13 +1,15 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
-#![allow(dead_code, unused_imports, unused_variables)]
-use config::{Config, ConfigError, Environment, File as ConfigFile, FileFormat};
+//#![allow(dead_code, unused_imports, unused_variables)]
+use config::{Config, ConfigError, File as ConfigFile, FileFormat};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-use std::{env, error::Error};
 use std::{
+    env,
+    error::Error,
     fs::{create_dir_all, File},
     io::prelude::*,
+    path::PathBuf,
+    sync::RwLock,
 };
 
 lazy_static! {
@@ -37,6 +39,10 @@ lazy_static! {
     };
 }
 
+lazy_static! {
+    pub static ref SETTINGS: RwLock<Config> = RwLock::new(Config::default());
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub default_package: String,
@@ -56,10 +62,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new() -> Result<Self, ConfigError> {
-        // TODO: Consider working directly with Config.
-        let mut settings = Config::new();
-
+    pub fn load() -> Result<(), ConfigError> {
         if !CONFIG_PATH.exists() {
             let default = Settings::default();
             create_dir_all(CONFIG_PATH.parent().unwrap()).unwrap();
@@ -70,16 +73,18 @@ impl Settings {
                 .unwrap();
         }
 
-        settings.merge(ConfigFile::new(
+        SETTINGS.write().unwrap().merge(ConfigFile::new(
             &CONFIG_PATH.to_str().unwrap(),
             FileFormat::Toml,
         ))?;
 
-        Ok(settings.try_into()?)
+        Ok(())
     }
 
-    pub fn save(&self) -> Result<(), Box<dyn Error>> {
-        let toml = toml::to_string(self)?;
+    pub fn save() -> Result<(), Box<dyn Error>> {
+        let config = SETTINGS.read().unwrap().clone();
+        let settings: Settings = config.try_into().unwrap();
+        let toml = toml::to_string(&settings)?;
         let mut file = File::create(&*CONFIG_PATH)?;
         file.write_all(toml.as_bytes())?;
 

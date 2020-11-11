@@ -12,9 +12,7 @@ use clap::{
 };
 use indicatif::MultiProgress;
 use prettytable::{cell, format, row, Table};
-use std::process::Command;
-use std::str::FromStr;
-use std::{error::Error, process::exit};
+use std::{error::Error, path::PathBuf, process::exit, process::Command, str::FromStr};
 
 #[tokio::main]
 async fn main() {
@@ -25,12 +23,12 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Box<dyn Error>> {
-    let mut settings = Settings::new()?;
+    Settings::load()?;
 
     let mut releases = Releases::new();
-    releases.load(&settings);
+    releases.load()?;
 
-    let mut installed = Installed::new(&settings)?;
+    let mut installed = Installed::new()?;
 
     let args = App::new(crate_name!())
         .version(crate_version!())
@@ -298,30 +296,30 @@ async fn run() -> Result<(), Box<dyn Error>> {
     match args.subcommand() {
         ("fetch", Some(a)) => {
             if a.is_present("all") {
-                releases.fetch_official_releases(&settings).await;
-                releases.fetch_lts_releases(&settings).await;
-                releases.fetch_experimental_branches(&settings).await;
-                releases.fetch_latest_daily(&settings).await;
-                releases.fetch_latest_stable(&settings).await;
+                releases.fetch_official_releases().await?;
+                releases.fetch_lts_releases().await?;
+                releases.fetch_experimental_branches().await?;
+                releases.fetch_latest_daily().await?;
+                releases.fetch_latest_stable().await?;
             } else {
                 if a.is_present("daily") {
-                    releases.fetch_latest_daily(&settings).await;
+                    releases.fetch_latest_daily().await?;
                 }
 
                 if a.is_present("experimental") {
-                    releases.fetch_experimental_branches(&settings).await;
+                    releases.fetch_experimental_branches().await?;
                 }
 
                 if a.is_present("lts") {
-                    releases.fetch_lts_releases(&settings).await;
+                    releases.fetch_lts_releases().await?;
                 }
 
                 if a.is_present("official") {
-                    releases.fetch_official_releases(&settings).await;
+                    releases.fetch_official_releases().await?;
                 }
 
                 if a.is_present("stable") {
-                    releases.fetch_latest_stable(&settings).await;
+                    releases.fetch_latest_stable().await?;
                 }
             }
         }
@@ -335,7 +333,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -349,7 +347,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -364,7 +362,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -378,7 +376,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -393,7 +391,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -407,7 +405,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -422,7 +420,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -436,7 +434,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -451,7 +449,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -465,7 +463,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&settings, &multi_progress)
+                            .install(&multi_progress)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -565,10 +563,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
                         .iter()
                         .find(|p| p.name == build)
                         .unwrap()
-                        .remove(&settings)
+                        .remove()
                         .await?;
                 }
-                installed.check(&settings)?;
+                installed.check()?;
             } else {
                 for build in a.values_of("id").unwrap() {
                     installed
@@ -577,14 +575,14 @@ async fn run() -> Result<(), Box<dyn Error>> {
                         .find(|(i, _)| *i == usize::from_str(build).unwrap())
                         .unwrap()
                         .1
-                        .remove(&settings)
+                        .remove()
                         .await?;
                 }
-                installed.check(&settings)?;
+                installed.check()?;
             }
         }
         ("select", Some(a)) => {
-            settings.default_package = {
+            SETTINGS.write().unwrap().set("default_package", {
                 if a.is_present("name") {
                     installed
                         .iter()
@@ -602,20 +600,23 @@ async fn run() -> Result<(), Box<dyn Error>> {
                         .name
                         .to_string()
                 }
-            };
-            settings.save()?;
-            println!("Selected: {}", settings.default_package);
+            })?;
+            Settings::save().unwrap();
+            println!(
+                "Selected: {}",
+                SETTINGS.read().unwrap().get_str("default_package")?
+            );
         }
-        ("update", Some(_a)) => installed.update(&mut settings, &mut releases).await?,
+        ("update", Some(_a)) => installed.update(&mut releases).await?,
         _ => {
             if args.is_present("path") {
                 let _blender = Command::new({
                     if cfg!(target_os = "linux") {
-                        format!(
-                            "{}/{}/blender",
-                            settings.packages_dir.to_str().unwrap(),
-                            settings.default_package
-                        )
+                        SETTINGS
+                            .read()
+                            .unwrap()
+                            .get::<PathBuf>("packages_dir")?
+                            .join(SETTINGS.read().unwrap().get_str("default_package")?)
                     } else if cfg!(target_os = "windows") {
                         todo!("windows command");
                     } else if cfg!(target_os = "macos") {

@@ -8,24 +8,25 @@ use std::{
     fs::File,
     fs::{self, create_dir_all},
     ops::{Deref, DerefMut},
+    path::PathBuf,
 };
 
 #[derive(Debug)]
 pub struct Installed(Vec<Package>);
 
 impl Installed {
-    pub fn new(settings: &Settings) -> Result<Self, Box<dyn Error>> {
+    pub fn new() -> Result<Self, Box<dyn Error>> {
         let mut installed = Installed(Vec::new());
 
-        installed.check(&settings)?;
+        installed.check()?;
 
         Ok(installed)
     }
 
-    pub fn check(&mut self, settings: &Settings) -> Result<(), Box<dyn Error>> {
-        create_dir_all(&settings.packages_dir).unwrap();
+    pub fn check(&mut self) -> Result<(), Box<dyn Error>> {
+        create_dir_all(SETTINGS.read().unwrap().get::<PathBuf>("packages_dir")?)?;
 
-        for entry in fs::read_dir(&settings.packages_dir)? {
+        for entry in fs::read_dir(SETTINGS.read().unwrap().get::<PathBuf>("packages_dir")?)? {
             let dir = entry?;
             let mut package_info = dir.path();
             package_info.push("package_info.bin");
@@ -40,7 +41,12 @@ impl Installed {
         }
 
         self.retain(|package| {
-            let mut package_info = settings.packages_dir.join(&package.name);
+            let mut package_info = SETTINGS
+                .read()
+                .unwrap()
+                .get::<PathBuf>("packages_dir")
+                .unwrap()
+                .join(&package.name);
             package_info.push("package_info.bin");
 
             package_info.exists()
@@ -52,15 +58,11 @@ impl Installed {
         Ok(())
     }
 
-    pub async fn update(
-        &mut self,
-        settings: &mut Settings,
-        releases: &mut Releases,
-    ) -> Result<(), Box<dyn Error>> {
+    pub async fn update(&mut self, releases: &mut Releases) -> Result<(), Box<dyn Error>> {
         let mut packages_to_install = Vec::new();
 
-        if settings.update_stable {
-            releases.fetch_latest_stable(&settings).await;
+        if SETTINGS.read().unwrap().get_bool("update_stable")? {
+            releases.fetch_latest_stable().await?;
 
             let latest_stable = releases.latest_stable.iter().next().unwrap();
             if !self.contains(latest_stable) {
@@ -69,8 +71,8 @@ impl Installed {
             }
         }
 
-        if settings.update_lts {
-            releases.fetch_lts_releases(&settings).await;
+        if SETTINGS.read().unwrap().get_bool("update_lts")? {
+            releases.fetch_lts_releases().await?;
 
             let latest_lts = releases.lts_releases.iter().next().unwrap();
             if !self.contains(latest_lts) {
@@ -79,8 +81,8 @@ impl Installed {
             }
         }
 
-        if settings.update_daily {
-            releases.fetch_latest_daily(&settings).await;
+        if SETTINGS.read().unwrap().get_bool("update_daily")? {
+            releases.fetch_latest_daily().await?;
 
             for fetched_package in &releases.latest_daily {
                 if !self.contains(fetched_package)
@@ -95,8 +97,8 @@ impl Installed {
             }
         }
 
-        if settings.update_experimental {
-            releases.fetch_experimental_branches(&settings).await;
+        if SETTINGS.read().unwrap().get_bool("update_experimental")? {
+            releases.fetch_experimental_branches().await?;
 
             for fetched_package in &releases.experimental_branches {
                 if !self.contains(fetched_package)
@@ -117,23 +119,30 @@ impl Installed {
             let multi_progress = MultiProgress::new();
             let mut install_completion = Vec::new();
             for package in packages_to_install {
-                install_completion.push(package.install(&settings, &multi_progress).await.unwrap());
+                install_completion.push(package.install(&multi_progress).await?);
             }
             multi_progress.join().unwrap();
             for handle in install_completion {
                 handle.await.unwrap();
             }
 
-            self.check(&settings).unwrap();
+            self.check()?;
 
-            if settings.default_package.is_empty() {
+            if SETTINGS
+                .read()
+                .unwrap()
+                .get_str("default_package")?
+                .is_empty()
+            {
                 println!(
                     "No default package found, please select a package to open .blend files with."
                 );
-            } else if settings.use_latest_as_default {
+            } else if SETTINGS.read().unwrap().get_bool("use_latest_as_default")? {
                 let old_default = self
                     .iter()
-                    .find(|p| p.name == settings.default_package)
+                    .find(|p| {
+                        p.name == SETTINGS.read().unwrap().get_str("default_package").unwrap()
+                    })
                     .unwrap();
                 let new_default = self.iter().find(|p| p.build == old_default.build).unwrap();
 
@@ -143,8 +152,11 @@ impl Installed {
                         old_default.name, old_default.date
                     );
                 } else {
-                    settings.default_package = new_default.name.clone();
-                    settings.save().unwrap();
+                    SETTINGS
+                        .write()
+                        .unwrap()
+                        .set("default_package", new_default.name.clone())?;
+                    Settings::save()?;
 
                     println!(
                         "Found an update for the default package, switched from:\n{} | {}\nTo:\n{} | {}",
@@ -162,30 +174,43 @@ impl Installed {
                     Build::Official => continue,
                     Build::Stable => {
                         stable_count += 1;
-                        if stable_count > 1 && settings.keep_only_latest_stable {
-                            package.remove(&settings).await?;
+                        if stable_count > 1
+                            && SETTINGS
+                                .read()
+                                .unwrap()
+                                .get_bool("keep_only_latest_stable")?
+                        {
+                            package.remove().await?;
                         }
                     }
                     Build::LTS => {
                         lts_count += 1;
-                        if lts_count > 1 && settings.keep_only_latest_lts {
-                            package.remove(&settings).await?;
+                        if lts_count > 1
+                            && SETTINGS.read().unwrap().get_bool("keep_only_latest_lts")?
+                        {
+                            package.remove().await?;
                         }
                     }
                     Build::Daily(s) => {
                         daily_count.push(s.clone());
                         if daily_count.iter().filter(|&n| n == s).count() > 1
-                            && settings.keep_only_latest_daily
+                            && SETTINGS
+                                .read()
+                                .unwrap()
+                                .get_bool("keep_only_latest_daily")?
                         {
-                            package.remove(&settings).await?;
+                            package.remove().await?;
                         }
                     }
                     Build::Experimental(s) => {
                         experimental_count.push(s.clone());
                         if experimental_count.iter().filter(|&n| n == s).count() > 1
-                            && settings.keep_only_latest_experimental
+                            && SETTINGS
+                                .read()
+                                .unwrap()
+                                .get_bool("keep_only_latest_experimental")?
                         {
-                            package.remove(&settings).await?;
+                            package.remove().await?;
                         }
                     }
                     Build::None => unreachable!("Unexpected build type"),
@@ -197,7 +222,7 @@ impl Installed {
                 || !lts_count == 0
                 || !stable_count == 0
             {
-                self.check(&settings).unwrap();
+                self.check()?;
             }
         }
 
