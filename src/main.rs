@@ -8,7 +8,7 @@ use crate::releases::*;
 use crate::settings::*;
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
-    SubCommand,
+    ArgMatches, SubCommand,
 };
 use indicatif::MultiProgress;
 use prettytable::{cell, format, row, Table};
@@ -30,6 +30,133 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     let mut installed = Installed::new()?;
 
+    // Workaround for 'clap' not supporting colours on Windows,
+    // even though 'indicatif' does display colours on Windows.
+    // It's also a workaround for showing the current values of SETTINGS
+    // without it being named and parsed as "default".
+    let left_ansi_code;
+    let right_ansi_code;
+    if cfg!(target_os = "linux") {
+        left_ansi_code = "\x1b[32m";
+        right_ansi_code = "\x1b[0m";
+    } else if cfg!(target_os = "windows") {
+        left_ansi_code = "";
+        right_ansi_code = "";
+    } else if cfg!(target_os = "macos") {
+        todo!("macos command");
+    } else {
+        unreachable!("Unsupported OS command");
+    }
+
+    let help_default_package = format!(
+        "Select default package to use for opening .blend files [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().get_str("default_package").unwrap(),
+        right_ansi_code
+    );
+    let help_use_latest_as_default = format!(
+        "Change to the latest package of the same build type when updating [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS
+            .read()
+            .unwrap()
+            .get_str("use_latest_as_default")
+            .unwrap(),
+        right_ansi_code
+    );
+    let help_update_daily = format!(
+        "Download the latest daily package [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().get_str("update_daily").unwrap(),
+        right_ansi_code
+    );
+    let help_update_experimental = format!(
+        "Download the latest experimental package [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS
+            .read()
+            .unwrap()
+            .get_str("update_experimental")
+            .unwrap(),
+        right_ansi_code
+    );
+    let help_update_stable = format!(
+        "Download the latest stable package [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().get_str("update_stable").unwrap(),
+        right_ansi_code
+    );
+    let help_update_lts = format!(
+        "Download the latest LTS package [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().get_str("update_lts").unwrap(),
+        right_ansi_code
+    );
+    let help_keep_only_latest_daily = format!(
+        "Remove all daily packages other than the newest [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS
+            .read()
+            .unwrap()
+            .get_str("keep_only_latest_daily")
+            .unwrap(),
+        right_ansi_code
+    );
+    let help_keep_only_latest_experimental = format!(
+        "Remove all experimental packages other than the newest [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS
+            .read()
+            .unwrap()
+            .get_str("keep_only_latest_experimental")
+            .unwrap(),
+        right_ansi_code
+    );
+    let help_keep_only_latest_stable = format!(
+        "Remove all stable packages other than the newest [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS
+            .read()
+            .unwrap()
+            .get_str("keep_only_latest_stable")
+            .unwrap(),
+        right_ansi_code
+    );
+    let help_keep_only_latest_lts = format!(
+        "Remove all LTS packages other than the newest [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS
+            .read()
+            .unwrap()
+            .get_str("keep_only_latest_lts")
+            .unwrap(),
+        right_ansi_code
+    );
+    let help_packages_dir = format!(
+        "Directory that holds all the installed packages [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().get_str("packages_dir").unwrap(),
+        right_ansi_code
+    );
+    let help_temp_dir = format!(
+        "Directory that holds temporary data used while installing [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().get_str("temp_dir").unwrap(),
+        right_ansi_code
+    );
+    let help_releases_db = format!(
+        "Database file with all the fetched packages [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().get_str("releases_db").unwrap(),
+        right_ansi_code
+    );
+    let help_interface = format!(
+        "Interface used for the launcher [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().get_str("interface").unwrap(),
+        right_ansi_code
+    );
+
     let args = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
@@ -43,19 +170,149 @@ async fn run() -> Result<(), Box<dyn Error>> {
         .version_message("Print version and exit")
         .version_short("v")
         .arg(
-            Arg::with_name("config")
-                .global(true)
-                .short("c")
-                .long("config")
-                .value_name("PATH")
-                .help("Use a different configuration file")
-                .long_help("Use a different configuration file. Must be TOML formatted. Name and extension don't matter.")
-                .takes_value(true),
-        )
-        .arg(
             Arg::with_name("path")
                 .value_name("PATH")
                 .help("Path to .blend file"),
+        )
+        .subcommand(
+            SubCommand::with_name("config")
+                .setting(AppSettings::ArgRequiredElseHelp)
+                .setting(AppSettings::NextLineHelp)
+                .about("Set configuration settings")
+                .help_message("Print help and exit")
+                .arg(
+                    Arg::with_name("use_latest_as_default")
+                        .display_order(20)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("u")
+                        .long("use-latest-as-default")
+                        .help(&help_use_latest_as_default),
+                )
+                .arg(
+                    Arg::with_name("update_daily")
+                        .display_order(30)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("d")
+                        .long("update-daily")
+                        .help(&help_update_daily),
+                )
+                .arg(
+                    Arg::with_name("update_experimental")
+                        .display_order(40)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("e")
+                        .long("update-experimental")
+                        .help(&help_update_experimental),
+                )
+                .arg(
+                    Arg::with_name("update_stable")
+                        .display_order(50)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("s")
+                        .long("update-stable")
+                        .help(&help_update_stable),
+                )
+                .arg(
+                    Arg::with_name("update_lts")
+                        .display_order(60)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("l")
+                        .long("update-lts")
+                        .help(&help_update_lts),
+                )
+                .arg(
+                    Arg::with_name("keep_only_latest_daily")
+                        .display_order(70)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("D")
+                        .long("keep_only_latest_daily")
+                        .help(&help_keep_only_latest_daily),
+                )
+                .arg(
+                    Arg::with_name("keep_only_latest_experimental")
+                        .display_order(80)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("E")
+                        .long("keep_only_latest_experimental")
+                        .help(&help_keep_only_latest_experimental),
+                )
+                .arg(
+                    Arg::with_name("keep_only_latest_stable")
+                        .display_order(90)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("S")
+                        .long("keep_only_latest_stable")
+                        .help(&help_keep_only_latest_stable),
+                )
+                .arg(
+                    Arg::with_name("keep_only_latest_lts")
+                        .display_order(100)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("L")
+                        .long("keep_only_latest_lts")
+                        .help(&help_keep_only_latest_lts),
+                )
+                .arg(
+                    Arg::with_name("packages_dir")
+                        .display_order(110)
+                        .takes_value(true)
+                        .value_name("PATH")
+                        .short("P")
+                        .long("packages-dir")
+                        .help(&help_packages_dir),
+                )
+                .arg(
+                    Arg::with_name("temp_dir")
+                        .display_order(120)
+                        .takes_value(true)
+                        .value_name("PATH")
+                        .short("T")
+                        .long("temp-dir")
+                        .help(&help_temp_dir),
+                )
+                .arg(
+                    Arg::with_name("releases_db")
+                        .display_order(130)
+                        .takes_value(true)
+                        .value_name("PATH")
+                        .short("R")
+                        .long("releases-db")
+                        .help(&help_releases_db),
+                )
+                .arg(
+                    Arg::with_name("interface")
+                        .display_order(140)
+                        .takes_value(true)
+                        .value_name("INTERFACE")
+                        .possible_values(&["GUI", "TUI", "CLI"])
+                        .short("i")
+                        .long("interface")
+                        .help(&help_interface),
+                )
+                .group(
+                    ArgGroup::with_name("config_group")
+                        .args(&["use_latest_as_default", "update_daily", "update_experimental", "update_stable", "update_lts", "keep_only_latest_daily", "keep_only_latest_experimental", "keep_only_latest_stable", "keep_only_latest_lts", "packages_dir", "temp_dir", "releases_db", "interface"])
+                        .required(true)
+                        .multiple(true)
+                ),
         )
         .subcommand(
             SubCommand::with_name("fetch")
@@ -271,6 +528,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
             SubCommand::with_name("select")
                 .setting(AppSettings::ArgRequiredElseHelp)
                 .about("Select default package")
+                .long_about(&*help_default_package)
                 .help_message("Print help and exit")
                 .arg(
                     Arg::with_name("id")
@@ -294,6 +552,22 @@ async fn run() -> Result<(), Box<dyn Error>> {
         .get_matches();
 
     match args.subcommand() {
+        ("config", Some(a)) => {
+            process_bool_arg(&a, "use_latest_as_default")?;
+            process_bool_arg(&a, "update_daily")?;
+            process_bool_arg(&a, "update_experimental")?;
+            process_bool_arg(&a, "update_stable")?;
+            process_bool_arg(&a, "update_lts")?;
+            process_bool_arg(&a, "keep_only_latest_daily")?;
+            process_bool_arg(&a, "keep_only_latest_experimental")?;
+            process_bool_arg(&a, "keep_only_latest_stable")?;
+            process_bool_arg(&a, "keep_only_latest_lts")?;
+            process_str_arg(&a, "packages_dir")?;
+            process_str_arg(&a, "temp_dir")?;
+            process_str_arg(&a, "releases_db")?;
+            process_str_arg(&a, "interface")?;
+            Settings::save()?;
+        }
         ("fetch", Some(a)) => {
             if a.is_present("all") {
                 releases.fetch_official_releases().await?;
@@ -634,4 +908,48 @@ async fn run() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn process_str_arg(a: &ArgMatches, name: &str) -> Result<(), Box<dyn Error>> {
+    if a.is_present(name) {
+        let arg_str = a.value_of(name).unwrap();
+        let old_str = SETTINGS.read().unwrap().get_str(name)?;
+
+        if arg_str == old_str {
+            println!("'{}' is unchanged from '{}'.", name, old_str);
+        } else {
+            SETTINGS.write().unwrap().set(name, arg_str)?;
+
+            println!("'{}' changed from '{}' to '{}'.", name, old_str, arg_str);
+        }
+    }
+
+    Ok(())
+}
+
+fn process_bool_arg(a: &ArgMatches, name: &str) -> Result<(), Box<dyn Error>> {
+    if a.is_present(name) {
+        let arg_bool = expand_bool(a.value_of(name).unwrap());
+        let old_bool = SETTINGS.read().unwrap().get_bool(name)?;
+
+        if arg_bool == old_bool {
+            println!("'{}' is unchanged from '{}'.", name, old_bool);
+        } else {
+            SETTINGS.write().unwrap().set(name, arg_bool)?;
+
+            println!("'{}' changed from '{}' to '{}'.", name, old_bool, arg_bool);
+        }
+    }
+
+    Ok(())
+}
+
+fn expand_bool(boolean: &str) -> bool {
+    match boolean {
+        "t" => true,
+        "f" => false,
+        "true" => true,
+        "false" => false,
+        _ => unreachable!("Unexpected boolean value"),
+    }
 }
