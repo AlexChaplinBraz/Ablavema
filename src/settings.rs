@@ -47,6 +47,8 @@ lazy_static! {
 pub struct Settings {
     pub default_package: String,
     pub use_latest_as_default: bool,
+    pub check_updates_at_launch: bool,
+    pub minutes_between_updates: u64,
     pub update_daily: bool,
     pub update_experimental: bool,
     pub update_stable: bool,
@@ -97,6 +99,8 @@ impl Default for Settings {
         Self {
             default_package: String::new(),
             use_latest_as_default: true,
+            check_updates_at_launch: true,
+            minutes_between_updates: 60,
             update_daily: true,
             update_experimental: true,
             update_stable: true,

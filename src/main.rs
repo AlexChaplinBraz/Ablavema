@@ -12,7 +12,10 @@ use clap::{
 };
 use indicatif::MultiProgress;
 use prettytable::{cell, format, row, Table};
-use std::{error::Error, path::PathBuf, process::exit, process::Command, str::FromStr};
+use std::{
+    error::Error, fs::File, path::PathBuf, process::exit, process::Command, str::FromStr,
+    time::SystemTime,
+};
 
 #[tokio::main]
 async fn main() {
@@ -61,6 +64,26 @@ async fn run() -> Result<(), Box<dyn Error>> {
             .read()
             .unwrap()
             .get_str("use_latest_as_default")
+            .unwrap(),
+        right_ansi_code
+    );
+    let help_check_updates_at_launch = format!(
+        "Check for updates at launch [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS
+            .read()
+            .unwrap()
+            .get_str("check_updates_at_launch")
+            .unwrap(),
+        right_ansi_code
+    );
+    let help_minutes_between_updates = format!(
+        "Amount of minutes to wait between update checks [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS
+            .read()
+            .unwrap()
+            .get_str("minutes_between_updates")
             .unwrap(),
         right_ansi_code
     );
@@ -191,6 +214,25 @@ async fn run() -> Result<(), Box<dyn Error>> {
                         .help(&help_use_latest_as_default),
                 )
                 .arg(
+                    Arg::with_name("check_updates_at_launch")
+                        .display_order(23)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("c")
+                        .long("check-updates-at-launch")
+                        .help(&help_check_updates_at_launch),
+                )
+                .arg(
+                    Arg::with_name("minutes_between_updates")
+                        .display_order(27)
+                        .takes_value(true)
+                        .value_name("INT")
+                        .short("m")
+                        .long("minutes-between-updates")
+                        .help(&help_minutes_between_updates),
+                )
+                .arg(
                     Arg::with_name("update_daily")
                         .display_order(30)
                         .takes_value(true)
@@ -309,7 +351,23 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 )
                 .group(
                     ArgGroup::with_name("config_group")
-                        .args(&["use_latest_as_default", "update_daily", "update_experimental", "update_stable", "update_lts", "keep_only_latest_daily", "keep_only_latest_experimental", "keep_only_latest_stable", "keep_only_latest_lts", "packages_dir", "temp_dir", "releases_db", "interface"])
+                        .args(&[
+                            "use_latest_as_default",
+                            "check_updates_at_launch",
+                            "minutes_between_updates",
+                            "update_daily",
+                            "update_experimental",
+                            "update_stable",
+                            "update_lts",
+                            "keep_only_latest_daily",
+                            "keep_only_latest_experimental",
+                            "keep_only_latest_stable",
+                            "keep_only_latest_lts",
+                            "packages_dir",
+                            "temp_dir",
+                            "releases_db",
+                            "interface"
+                        ])
                         .required(true)
                         .multiple(true)
                 ),
@@ -554,6 +612,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
     match args.subcommand() {
         ("config", Some(a)) => {
             process_bool_arg(&a, "use_latest_as_default")?;
+            process_bool_arg(&a, "check_updates_at_launch")?;
+            process_str_arg(&a, "minutes_between_updates")?;
             process_bool_arg(&a, "update_daily")?;
             process_bool_arg(&a, "update_experimental")?;
             process_bool_arg(&a, "update_stable")?;
@@ -883,6 +943,50 @@ async fn run() -> Result<(), Box<dyn Error>> {
         }
         ("update", Some(_a)) => installed.update(&mut releases).await?,
         _ => {
+            if SETTINGS
+                .read()
+                .unwrap()
+                .get_bool("check_updates_at_launch")?
+            {
+                let last_update_time = SETTINGS
+                    .read()
+                    .unwrap()
+                    .get::<PathBuf>("temp_dir")
+                    .unwrap()
+                    .join("last_update_time.bin");
+
+                if last_update_time.exists() {
+                    let file = File::open(&last_update_time)?;
+                    let old_time: SystemTime = bincode::deserialize_from(file)?;
+
+                    if old_time
+                        .elapsed()
+                        .unwrap()
+                        .as_secs()
+                        .checked_div(60)
+                        .unwrap()
+                        >= SETTINGS
+                            .read()
+                            .unwrap()
+                            .get::<u64>("minutes_between_updates")?
+                    {
+                        installed.update(&mut releases).await?;
+
+                        let now = SystemTime::now();
+                        let file = File::create(&last_update_time)?;
+                        bincode::serialize_into(file, &now)?;
+                    } else {
+                        println!("Not yet time to check for updates.");
+                    }
+                } else {
+                    installed.update(&mut releases).await?;
+
+                    let now = SystemTime::now();
+                    let file = File::create(&last_update_time)?;
+                    bincode::serialize_into(file, &now)?;
+                }
+            }
+
             if args.is_present("path") {
                 let _blender = Command::new({
                     if cfg!(target_os = "linux") {

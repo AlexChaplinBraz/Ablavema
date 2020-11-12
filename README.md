@@ -17,8 +17,8 @@ A more or less chronological, non-comprehensive list of finished features and fe
     - [X] [Latest daily release](https://builder.blender.org/download/).
     - [X] [Experimental branches](https://builder.blender.org/download/branches/).
 - [X] Checking for updates and downloading them based on the user's configuration.
-- [ ] Checking for updates at launch time.
-- [ ] Only check for updates after a set amount of time.
+- [X] Checking for updates at launch time.
+- [X] Only check for updates after a set amount of time.
 - [ ] Bypass opening the launcher if a default package is set. In which case, to open the launcher while opening a .blend file you'd hold a configurable modifier key like Shift down.
 - [X] Command line interface.
     - [X] Fetching packages.
