@@ -987,26 +987,62 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 }
             }
 
-            if args.is_present("path") {
-                let _blender = Command::new({
-                    if cfg!(target_os = "linux") {
-                        SETTINGS
-                            .read()
-                            .unwrap()
-                            .get::<PathBuf>("packages_dir")?
-                            .join(SETTINGS.read().unwrap().get_str("default_package")?)
-                    } else if cfg!(target_os = "windows") {
-                        todo!("windows command");
-                    } else if cfg!(target_os = "macos") {
-                        todo!("macos command");
-                    } else {
-                        unreachable!("Unsupported OS command");
-                    }
-                })
-                .arg(args.value_of("path").unwrap())
-                .status()?;
+            if SETTINGS
+                .read()
+                .unwrap()
+                .get_str("default_package")?
+                .is_empty()
+            {
+                match SETTINGS.read().unwrap().get::<Interface>("interface")? {
+                    Interface::GUI => todo!("Launch GUI interface"),
+                    Interface::TUI => todo!("Launch TUI interface"),
+                    Interface::CLI => Err("No default package selected")?,
+                }
             } else {
-                todo!("Launch interface");
+                match SETTINGS.read().unwrap().get::<Interface>("interface")? {
+                    Interface::GUI => todo!("Launch GUI interface"),
+                    Interface::TUI => todo!("Launch TUI interface"),
+                    Interface::CLI => {
+                        if args.is_present("path") {
+                            let _blender = Command::new({
+                                if cfg!(target_os = "linux") {
+                                    SETTINGS
+                                        .read()
+                                        .unwrap()
+                                        .get::<PathBuf>("packages_dir")?
+                                        .join(SETTINGS.read().unwrap().get_str("default_package")?)
+                                        .join("blender")
+                                } else if cfg!(target_os = "windows") {
+                                    todo!("windows command");
+                                } else if cfg!(target_os = "macos") {
+                                    todo!("macos command");
+                                } else {
+                                    unreachable!("Unsupported OS command");
+                                }
+                            })
+                            .arg(args.value_of("path").unwrap())
+                            .status()?;
+                        } else {
+                            let _blender = Command::new({
+                                if cfg!(target_os = "linux") {
+                                    SETTINGS
+                                        .read()
+                                        .unwrap()
+                                        .get::<PathBuf>("packages_dir")?
+                                        .join(SETTINGS.read().unwrap().get_str("default_package")?)
+                                        .join("blender")
+                                } else if cfg!(target_os = "windows") {
+                                    todo!("windows command");
+                                } else if cfg!(target_os = "macos") {
+                                    todo!("macos command");
+                                } else {
+                                    unreachable!("Unsupported OS command");
+                                }
+                            })
+                            .status()?;
+                        }
+                    }
+                }
             }
         }
     }
