@@ -1004,42 +1004,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
                     Interface::TUI => todo!("Launch TUI interface"),
                     Interface::CLI => {
                         if args.is_present("path") {
-                            let _blender = Command::new({
-                                if cfg!(target_os = "linux") {
-                                    SETTINGS
-                                        .read()
-                                        .unwrap()
-                                        .get::<PathBuf>("packages_dir")?
-                                        .join(SETTINGS.read().unwrap().get_str("default_package")?)
-                                        .join("blender")
-                                } else if cfg!(target_os = "windows") {
-                                    todo!("windows command");
-                                } else if cfg!(target_os = "macos") {
-                                    todo!("macos command");
-                                } else {
-                                    unreachable!("Unsupported OS command");
-                                }
-                            })
-                            .arg(args.value_of("path").unwrap())
-                            .status()?;
+                            Installed::open_blender_with_file(args.value_of("path").unwrap())?;
                         } else {
-                            let _blender = Command::new({
-                                if cfg!(target_os = "linux") {
-                                    SETTINGS
-                                        .read()
-                                        .unwrap()
-                                        .get::<PathBuf>("packages_dir")?
-                                        .join(SETTINGS.read().unwrap().get_str("default_package")?)
-                                        .join("blender")
-                                } else if cfg!(target_os = "windows") {
-                                    todo!("windows command");
-                                } else if cfg!(target_os = "macos") {
-                                    todo!("macos command");
-                                } else {
-                                    unreachable!("Unsupported OS command");
-                                }
-                            })
-                            .status()?;
+                            Installed::open_blender()?;
                         }
                     }
                 }

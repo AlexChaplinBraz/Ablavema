@@ -235,6 +235,51 @@ impl Installed {
 
         Ok(())
     }
+
+    pub fn open_blender() -> Result<(), Box<dyn Error>> {
+        let _blender = Command::new({
+            if cfg!(target_os = "linux") {
+                SETTINGS
+                    .read()
+                    .unwrap()
+                    .get::<PathBuf>("packages_dir")?
+                    .join(SETTINGS.read().unwrap().get_str("default_package")?)
+                    .join("blender")
+            } else if cfg!(target_os = "windows") {
+                todo!("windows command");
+            } else if cfg!(target_os = "macos") {
+                todo!("macos command");
+            } else {
+                unreachable!("Unsupported OS command");
+            }
+        })
+        .status()?;
+
+        Ok(())
+    }
+
+    pub fn open_blender_with_file(file: &str) -> Result<(), Box<dyn Error>> {
+        let _blender = Command::new({
+            if cfg!(target_os = "linux") {
+                SETTINGS
+                    .read()
+                    .unwrap()
+                    .get::<PathBuf>("packages_dir")?
+                    .join(SETTINGS.read().unwrap().get_str("default_package")?)
+                    .join("blender")
+            } else if cfg!(target_os = "windows") {
+                todo!("windows command");
+            } else if cfg!(target_os = "macos") {
+                todo!("macos command");
+            } else {
+                unreachable!("Unsupported OS command");
+            }
+        })
+        .arg(file)
+        .status()?;
+
+        Ok(())
+    }
 }
 
 impl Deref for Installed {
