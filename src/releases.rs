@@ -1,5 +1,6 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
+use crate::helpers::*;
 use crate::settings::*;
 use bzip2::read::BzDecoder;
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
@@ -12,11 +13,7 @@ use select::{
     predicate::{Attr, Class, Name},
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    error::Error,
-    fs::File,
-    path::{Path, PathBuf},
-};
+use std::{error::Error, fs::File, path::PathBuf};
 use tar::Archive;
 use tokio::{
     fs, fs::create_dir_all, fs::remove_dir_all, fs::remove_file, io::AsyncWriteExt,
@@ -971,13 +968,4 @@ pub enum Os {
     Windows,
     MacOs,
     None,
-}
-
-fn get_file_stem(filename: &str) -> &str {
-    if filename.contains(".tar.") {
-        let f = Path::new(filename).file_stem().unwrap().to_str().unwrap();
-        Path::new(f).file_stem().unwrap().to_str().unwrap()
-    } else {
-        Path::new(filename).file_stem().unwrap().to_str().unwrap()
-    }
 }

@@ -1,21 +1,20 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
+mod helpers;
 mod installed;
 mod releases;
 mod settings;
+use crate::helpers::*;
 use crate::installed::*;
 use crate::releases::*;
 use crate::settings::*;
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
-    ArgMatches, SubCommand,
+    SubCommand,
 };
 use indicatif::MultiProgress;
 use prettytable::{cell, format, row, Table};
-use std::{
-    error::Error, fs::File, path::PathBuf, process::exit, process::Command, str::FromStr,
-    time::SystemTime,
-};
+use std::{error::Error, fs::File, path::PathBuf, process::exit, str::FromStr, time::SystemTime};
 
 #[tokio::main]
 async fn main() {
@@ -1015,48 +1014,4 @@ async fn run() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
-}
-
-fn process_str_arg(a: &ArgMatches, name: &str) -> Result<(), Box<dyn Error>> {
-    if a.is_present(name) {
-        let arg_str = a.value_of(name).unwrap();
-        let old_str = SETTINGS.read().unwrap().get_str(name)?;
-
-        if arg_str == old_str {
-            println!("'{}' is unchanged from '{}'.", name, old_str);
-        } else {
-            SETTINGS.write().unwrap().set(name, arg_str)?;
-
-            println!("'{}' changed from '{}' to '{}'.", name, old_str, arg_str);
-        }
-    }
-
-    Ok(())
-}
-
-fn process_bool_arg(a: &ArgMatches, name: &str) -> Result<(), Box<dyn Error>> {
-    if a.is_present(name) {
-        let arg_bool = expand_bool(a.value_of(name).unwrap());
-        let old_bool = SETTINGS.read().unwrap().get_bool(name)?;
-
-        if arg_bool == old_bool {
-            println!("'{}' is unchanged from '{}'.", name, old_bool);
-        } else {
-            SETTINGS.write().unwrap().set(name, arg_bool)?;
-
-            println!("'{}' changed from '{}' to '{}'.", name, old_bool, arg_bool);
-        }
-    }
-
-    Ok(())
-}
-
-fn expand_bool(boolean: &str) -> bool {
-    match boolean {
-        "t" => true,
-        "f" => false,
-        "true" => true,
-        "false" => false,
-        _ => unreachable!("Unexpected boolean value"),
-    }
 }
