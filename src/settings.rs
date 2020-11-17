@@ -60,7 +60,6 @@ pub struct Settings {
     pub packages_dir: PathBuf,
     pub temp_dir: PathBuf,
     pub releases_db: PathBuf,
-    pub interface: Interface,
 }
 
 impl Settings {
@@ -142,14 +141,6 @@ impl Default for Settings {
                     unreachable!("Unsupported OS config");
                 }
             }),
-            interface: Interface::CLI,
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Interface {
-    GUI,
-    TUI,
-    CLI,
 }

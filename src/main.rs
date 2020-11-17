@@ -172,12 +172,6 @@ async fn run() -> Result<(), Box<dyn Error>> {
         SETTINGS.read().unwrap().get_str("releases_db").unwrap(),
         right_ansi_code
     );
-    let help_interface = format!(
-        "Interface used for the launcher [current: {}{}{}]",
-        left_ansi_code,
-        SETTINGS.read().unwrap().get_str("interface").unwrap(),
-        right_ansi_code
-    );
 
     let args = App::new(crate_name!())
         .version(crate_version!())
@@ -338,16 +332,6 @@ async fn run() -> Result<(), Box<dyn Error>> {
                         .long("releases-db")
                         .help(&help_releases_db),
                 )
-                .arg(
-                    Arg::with_name("interface")
-                        .display_order(140)
-                        .takes_value(true)
-                        .value_name("INTERFACE")
-                        .possible_values(&["GUI", "TUI", "CLI"])
-                        .short("i")
-                        .long("interface")
-                        .help(&help_interface),
-                )
                 .group(
                     ArgGroup::with_name("config_group")
                         .args(&[
@@ -364,8 +348,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                             "keep_only_latest_lts",
                             "packages_dir",
                             "temp_dir",
-                            "releases_db",
-                            "interface"
+                            "releases_db"
                         ])
                         .required(true)
                         .multiple(true)
@@ -624,7 +607,6 @@ async fn run() -> Result<(), Box<dyn Error>> {
             process_str_arg(&a, "packages_dir")?;
             process_str_arg(&a, "temp_dir")?;
             process_str_arg(&a, "releases_db")?;
-            process_str_arg(&a, "interface")?;
             Settings::save()?;
         }
         ("fetch", Some(a)) => {
@@ -992,22 +974,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 .get_str("default_package")?
                 .is_empty()
             {
-                match SETTINGS.read().unwrap().get::<Interface>("interface")? {
-                    Interface::GUI => todo!("Launch GUI interface"),
-                    Interface::TUI => todo!("Launch TUI interface"),
-                    Interface::CLI => Err("No default package selected")?,
-                }
+                todo!("Launch GUI");
             } else {
-                match SETTINGS.read().unwrap().get::<Interface>("interface")? {
-                    Interface::GUI => todo!("Launch GUI interface"),
-                    Interface::TUI => todo!("Launch TUI interface"),
-                    Interface::CLI => {
-                        if args.is_present("path") {
-                            Installed::open_blender_with_file(args.value_of("path").unwrap())?;
-                        } else {
-                            Installed::open_blender()?;
-                        }
-                    }
+                if args.is_present("path") {
+                    Installed::open_blender_with_file(args.value_of("path").unwrap())?;
+                } else {
+                    Installed::open_blender()?;
                 }
             }
         }
