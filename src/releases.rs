@@ -12,7 +12,7 @@ use select::{
     predicate::{Attr, Class, Name},
 };
 use serde::{Deserialize, Serialize};
-use std::{error::Error, fs::File, path::PathBuf};
+use std::{error::Error, fs::File};
 use tar::Archive;
 use tokio::{fs, fs::remove_dir_all, fs::remove_file, io::AsyncWriteExt, task::JoinHandle};
 use xz2::read::XzDecoder;
@@ -38,13 +38,8 @@ impl Releases {
     }
 
     pub fn load(&mut self) -> Result<(), Box<dyn Error>> {
-        if SETTINGS
-            .read()
-            .unwrap()
-            .get::<PathBuf>("releases_db")?
-            .exists()
-        {
-            let file = File::open(SETTINGS.read().unwrap().get::<PathBuf>("releases_db")?)?;
+        if SETTINGS.read().unwrap().releases_db.exists() {
+            let file = File::open(&SETTINGS.read().unwrap().releases_db)?;
             let bin: Releases = bincode::deserialize_from(file)?;
             *self = bin;
         }
@@ -53,7 +48,7 @@ impl Releases {
     }
 
     pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
-        let file = File::create(SETTINGS.read().unwrap().get::<PathBuf>("releases_db")?)?;
+        let file = File::create(&SETTINGS.read().unwrap().releases_db)?;
         bincode::serialize_into(file, self)?;
 
         Ok(())
@@ -737,8 +732,11 @@ impl Package {
         let url = self.url.clone();
         let request = client.get(&url);
 
-        let mut file = SETTINGS.read().unwrap().get::<PathBuf>("cache_dir")?;
-        file.push(self.url.split_terminator('/').last().unwrap());
+        let file = SETTINGS
+            .read()
+            .unwrap()
+            .cache_dir
+            .join(self.url.split_terminator('/').last().unwrap());
 
         // TODO: Prompt/option for re-download.
         if file.exists() {
@@ -767,8 +765,7 @@ impl Package {
             progress_bar.finish_with_message(&msg);
         });
 
-        let mut package = SETTINGS.read().unwrap().get::<PathBuf>("packages_dir")?;
-        package.push(&self.name);
+        let package = SETTINGS.read().unwrap().packages_dir.join(&self.name);
 
         // TODO: Prompt/option for re-extraction.
         if package.exists() {
@@ -801,14 +798,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(
-                            SETTINGS
-                                .read()
-                                .unwrap()
-                                .get::<PathBuf>("cache_dir")
-                                .unwrap(),
-                        )
-                        .unwrap();
+                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
@@ -821,14 +811,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(
-                            SETTINGS
-                                .read()
-                                .unwrap()
-                                .get::<PathBuf>("cache_dir")
-                                .unwrap(),
-                        )
-                        .unwrap();
+                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
@@ -841,14 +824,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(
-                            SETTINGS
-                                .read()
-                                .unwrap()
-                                .get::<PathBuf>("cache_dir")
-                                .unwrap(),
-                        )
-                        .unwrap();
+                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
@@ -875,41 +851,20 @@ impl Package {
                     SETTINGS
                         .read()
                         .unwrap()
-                        .get::<PathBuf>("cache_dir")
-                        .unwrap()
+                        .cache_dir
                         .join(&package.name.strip_suffix("-official").unwrap()),
-                    SETTINGS
-                        .read()
-                        .unwrap()
-                        .get::<PathBuf>("packages_dir")
-                        .unwrap()
-                        .join(&package.name),
+                    SETTINGS.read().unwrap().packages_dir.join(&package.name),
                 )
                 .unwrap();
             } else {
                 std::fs::rename(
-                    SETTINGS
-                        .read()
-                        .unwrap()
-                        .get::<PathBuf>("cache_dir")
-                        .unwrap()
-                        .join(&package.name),
-                    SETTINGS
-                        .read()
-                        .unwrap()
-                        .get::<PathBuf>("packages_dir")
-                        .unwrap()
-                        .join(&package.name),
+                    SETTINGS.read().unwrap().cache_dir.join(&package.name),
+                    SETTINGS.read().unwrap().packages_dir.join(&package.name),
                 )
                 .unwrap();
             }
 
-            let mut path = SETTINGS
-                .read()
-                .unwrap()
-                .get::<PathBuf>("packages_dir")
-                .unwrap()
-                .join(&package.name);
+            let mut path = SETTINGS.read().unwrap().packages_dir.join(&package.name);
             path.push("package_info.bin");
             let file = File::create(&path).unwrap();
             bincode::serialize_into(file, &package).unwrap();
@@ -919,11 +874,7 @@ impl Package {
     }
 
     pub async fn remove(&self) -> Result<(), Box<dyn Error>> {
-        let path = SETTINGS
-            .read()
-            .unwrap()
-            .get::<PathBuf>("packages_dir")?
-            .join(&self.name);
+        let path = SETTINGS.read().unwrap().packages_dir.join(&self.name);
 
         remove_dir_all(path).await?;
 

@@ -10,9 +10,7 @@ reqwest = "0.10"
 select = "0.5"
 tokio = { version = "0.2", features = ["full"] }
 clap = "2.33"
-config = "0.10"
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.5"
 xz2 = "0.1"
 bzip2 = "0.4"
 flate2 = "1.0"

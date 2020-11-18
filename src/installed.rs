@@ -8,7 +8,6 @@ use std::{
     fs,
     fs::File,
     ops::{Deref, DerefMut},
-    path::PathBuf,
     process::Command,
 };
 
@@ -25,7 +24,7 @@ impl Installed {
     }
 
     pub fn check(&mut self) -> Result<(), Box<dyn Error>> {
-        for entry in fs::read_dir(SETTINGS.read().unwrap().get::<PathBuf>("packages_dir")?)? {
+        for entry in fs::read_dir(&SETTINGS.read().unwrap().packages_dir)? {
             let dir = entry?;
             let mut package_info = dir.path();
             package_info.push("package_info.bin");
@@ -40,12 +39,7 @@ impl Installed {
         }
 
         self.retain(|package| {
-            let mut package_info = SETTINGS
-                .read()
-                .unwrap()
-                .get::<PathBuf>("packages_dir")
-                .unwrap()
-                .join(&package.name);
+            let mut package_info = SETTINGS.read().unwrap().packages_dir.join(&package.name);
             package_info.push("package_info.bin");
 
             package_info.exists()
@@ -60,7 +54,7 @@ impl Installed {
     pub async fn update(&mut self, releases: &mut Releases) -> Result<(), Box<dyn Error>> {
         let mut packages_to_install = Vec::new();
 
-        if SETTINGS.read().unwrap().get_bool("update_stable")? {
+        if SETTINGS.read().unwrap().update_stable {
             releases.fetch_latest_stable().await?;
 
             let latest_stable = releases.latest_stable.iter().next().unwrap();
@@ -75,7 +69,7 @@ impl Installed {
             }
         }
 
-        if SETTINGS.read().unwrap().get_bool("update_lts")? {
+        if SETTINGS.read().unwrap().update_lts {
             releases.fetch_lts_releases().await?;
 
             let latest_lts = releases.lts_releases.iter().next().unwrap();
@@ -87,7 +81,7 @@ impl Installed {
             }
         }
 
-        if SETTINGS.read().unwrap().get_bool("update_daily")? {
+        if SETTINGS.read().unwrap().update_daily {
             releases.fetch_latest_daily().await?;
 
             for fetched_package in &releases.latest_daily {
@@ -103,7 +97,7 @@ impl Installed {
             }
         }
 
-        if SETTINGS.read().unwrap().get_bool("update_experimental")? {
+        if SETTINGS.read().unwrap().update_experimental {
             releases.fetch_experimental_branches().await?;
 
             for fetched_package in &releases.experimental_branches {
@@ -134,21 +128,14 @@ impl Installed {
 
             self.check()?;
 
-            if SETTINGS
-                .read()
-                .unwrap()
-                .get_str("default_package")?
-                .is_empty()
-            {
+            if SETTINGS.read().unwrap().default_package.is_empty() {
                 println!(
                     "No default package found, please select a package to open .blend files with."
                 );
-            } else if SETTINGS.read().unwrap().get_bool("use_latest_as_default")? {
+            } else if SETTINGS.read().unwrap().use_latest_as_default {
                 let old_default = self
                     .iter()
-                    .find(|p| {
-                        p.name == SETTINGS.read().unwrap().get_str("default_package").unwrap()
-                    })
+                    .find(|p| p.name == SETTINGS.read().unwrap().default_package)
                     .unwrap();
                 let new_default = self.iter().find(|p| p.build == old_default.build).unwrap();
 
@@ -158,11 +145,8 @@ impl Installed {
                         old_default.name, old_default.date
                     );
                 } else {
-                    SETTINGS
-                        .write()
-                        .unwrap()
-                        .set("default_package", new_default.name.clone())?;
-                    Settings::save()?;
+                    SETTINGS.write().unwrap().default_package = new_default.name.clone();
+                    SETTINGS.read().unwrap().save();
 
                     println!(
                         "Found an update for the default package, switched from:\n{} | {}\nTo:\n{} | {}",
@@ -180,30 +164,20 @@ impl Installed {
                     Build::Official => continue,
                     Build::Stable => {
                         stable_count += 1;
-                        if stable_count > 1
-                            && SETTINGS
-                                .read()
-                                .unwrap()
-                                .get_bool("keep_only_latest_stable")?
-                        {
+                        if stable_count > 1 && SETTINGS.read().unwrap().keep_only_latest_stable {
                             package.remove().await?;
                         }
                     }
                     Build::LTS => {
                         lts_count += 1;
-                        if lts_count > 1
-                            && SETTINGS.read().unwrap().get_bool("keep_only_latest_lts")?
-                        {
+                        if lts_count > 1 && SETTINGS.read().unwrap().keep_only_latest_lts {
                             package.remove().await?;
                         }
                     }
                     Build::Daily(s) => {
                         daily_count.push(s.clone());
                         if daily_count.iter().filter(|&n| n == s).count() > 1
-                            && SETTINGS
-                                .read()
-                                .unwrap()
-                                .get_bool("keep_only_latest_daily")?
+                            && SETTINGS.read().unwrap().keep_only_latest_daily
                         {
                             package.remove().await?;
                         }
@@ -211,10 +185,7 @@ impl Installed {
                     Build::Experimental(s) => {
                         experimental_count.push(s.clone());
                         if experimental_count.iter().filter(|&n| n == s).count() > 1
-                            && SETTINGS
-                                .read()
-                                .unwrap()
-                                .get_bool("keep_only_latest_experimental")?
+                            && SETTINGS.read().unwrap().keep_only_latest_experimental
                         {
                             package.remove().await?;
                         }
@@ -241,8 +212,8 @@ impl Installed {
                 SETTINGS
                     .read()
                     .unwrap()
-                    .get::<PathBuf>("packages_dir")?
-                    .join(SETTINGS.read().unwrap().get_str("default_package")?)
+                    .packages_dir
+                    .join(&SETTINGS.read().unwrap().default_package)
                     .join("blender")
             } else if cfg!(target_os = "windows") {
                 todo!("windows command");
@@ -263,8 +234,8 @@ impl Installed {
                 SETTINGS
                     .read()
                     .unwrap()
-                    .get::<PathBuf>("packages_dir")?
-                    .join(SETTINGS.read().unwrap().get_str("default_package")?)
+                    .packages_dir
+                    .join(&SETTINGS.read().unwrap().default_package)
                     .join("blender")
             } else if cfg!(target_os = "windows") {
                 todo!("windows command");

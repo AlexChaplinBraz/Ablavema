@@ -7,7 +7,7 @@ mod installed;
 mod releases;
 mod settings;
 use crate::{cli::*, installed::*, settings::*};
-use std::{error::Error, fs::File, path::PathBuf, process::exit, time::SystemTime};
+use std::{error::Error, fs::File, process::exit, time::SystemTime};
 
 #[tokio::main]
 async fn main() {
@@ -18,22 +18,15 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Box<dyn Error>> {
-    Settings::load()?;
-
     let mut gui_args = run_cli().await?;
 
     if gui_args.launch_gui {
         // TODO: Move all this logic into the GUI.
-        if SETTINGS
-            .read()
-            .unwrap()
-            .get_bool("check_updates_at_launch")?
-        {
+        if SETTINGS.read().unwrap().check_updates_at_launch {
             let last_update_time = SETTINGS
                 .read()
                 .unwrap()
-                .get::<PathBuf>("cache_dir")
-                .unwrap()
+                .cache_dir
                 .join("last_update_time.bin");
 
             if last_update_time.exists() {
@@ -46,10 +39,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
                     .as_secs()
                     .checked_div(60)
                     .unwrap()
-                    >= SETTINGS
-                        .read()
-                        .unwrap()
-                        .get::<u64>("minutes_between_updates")?
+                    >= SETTINGS.read().unwrap().minutes_between_updates
                 {
                     gui_args.installed.update(&mut gui_args.releases).await?;
 
@@ -68,12 +58,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        if SETTINGS
-            .read()
-            .unwrap()
-            .get_str("default_package")?
-            .is_empty()
-        {
+        if SETTINGS.read().unwrap().default_package.is_empty() {
             todo!("Launch GUI");
         } else {
             if gui_args.file_path.is_empty() {

@@ -36,105 +36,73 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
     let help_default_package = format!(
         "Select default package to use for opening .blend files [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().get_str("default_package").unwrap(),
+        SETTINGS.read().unwrap().default_package,
         right_ansi_code
     );
     let help_use_latest_as_default = format!(
         "Change to the latest package of the same build type when updating [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS
-            .read()
-            .unwrap()
-            .get_str("use_latest_as_default")
-            .unwrap(),
+        SETTINGS.read().unwrap().use_latest_as_default,
         right_ansi_code
     );
     let help_check_updates_at_launch = format!(
         "Check for updates at launch [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS
-            .read()
-            .unwrap()
-            .get_str("check_updates_at_launch")
-            .unwrap(),
+        SETTINGS.read().unwrap().check_updates_at_launch,
         right_ansi_code
     );
     let help_minutes_between_updates = format!(
         "Amount of minutes to wait between update checks [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS
-            .read()
-            .unwrap()
-            .get_str("minutes_between_updates")
-            .unwrap(),
+        SETTINGS.read().unwrap().minutes_between_updates,
         right_ansi_code
     );
     let help_update_daily = format!(
         "Download the latest daily package [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().get_str("update_daily").unwrap(),
+        SETTINGS.read().unwrap().update_daily,
         right_ansi_code
     );
     let help_update_experimental = format!(
         "Download the latest experimental package [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS
-            .read()
-            .unwrap()
-            .get_str("update_experimental")
-            .unwrap(),
+        SETTINGS.read().unwrap().update_experimental,
         right_ansi_code
     );
     let help_update_stable = format!(
         "Download the latest stable package [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().get_str("update_stable").unwrap(),
+        SETTINGS.read().unwrap().update_stable,
         right_ansi_code
     );
     let help_update_lts = format!(
         "Download the latest LTS package [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().get_str("update_lts").unwrap(),
+        SETTINGS.read().unwrap().update_lts,
         right_ansi_code
     );
     let help_keep_only_latest_daily = format!(
         "Remove all daily packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS
-            .read()
-            .unwrap()
-            .get_str("keep_only_latest_daily")
-            .unwrap(),
+        SETTINGS.read().unwrap().keep_only_latest_daily,
         right_ansi_code
     );
     let help_keep_only_latest_experimental = format!(
         "Remove all experimental packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS
-            .read()
-            .unwrap()
-            .get_str("keep_only_latest_experimental")
-            .unwrap(),
+        SETTINGS.read().unwrap().keep_only_latest_experimental,
         right_ansi_code
     );
     let help_keep_only_latest_stable = format!(
         "Remove all stable packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS
-            .read()
-            .unwrap()
-            .get_str("keep_only_latest_stable")
-            .unwrap(),
+        SETTINGS.read().unwrap().keep_only_latest_stable,
         right_ansi_code
     );
     let help_keep_only_latest_lts = format!(
         "Remove all LTS packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS
-            .read()
-            .unwrap()
-            .get_str("keep_only_latest_lts")
-            .unwrap(),
+        SETTINGS.read().unwrap().keep_only_latest_lts,
         right_ansi_code
     );
 
@@ -531,7 +499,27 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         ("config", Some(a)) => {
             process_bool_arg(&a, "use_latest_as_default")?;
             process_bool_arg(&a, "check_updates_at_launch")?;
-            process_str_arg(&a, "minutes_between_updates")?;
+
+            if a.is_present("minutes_between_updates") {
+                let new_arg =
+                    u64::from_str(a.value_of("minutes_between_updates").unwrap()).unwrap();
+                let old_arg = SETTINGS.read().unwrap().minutes_between_updates;
+
+                if new_arg == old_arg {
+                    println!(
+                        "'{}' is unchanged from '{}'.",
+                        "minutes_between_updates", old_arg
+                    );
+                } else {
+                    SETTINGS.write().unwrap().minutes_between_updates = new_arg;
+
+                    println!(
+                        "'{}' changed from '{}' to '{}'.",
+                        "minutes_between_updates", old_arg, new_arg
+                    );
+                }
+            }
+
             process_bool_arg(&a, "update_daily")?;
             process_bool_arg(&a, "update_experimental")?;
             process_bool_arg(&a, "update_stable")?;
@@ -540,7 +528,8 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             process_bool_arg(&a, "keep_only_latest_experimental")?;
             process_bool_arg(&a, "keep_only_latest_stable")?;
             process_bool_arg(&a, "keep_only_latest_lts")?;
-            Settings::save()?;
+
+            SETTINGS.read().unwrap().save();
         }
         ("fetch", Some(a)) => {
             if a.is_present("all") {
@@ -830,7 +819,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             }
         }
         ("select", Some(a)) => {
-            SETTINGS.write().unwrap().set("default_package", {
+            SETTINGS.write().unwrap().default_package = {
                 if a.is_present("name") {
                     installed
                         .iter()
@@ -848,12 +837,9 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .name
                         .to_string()
                 }
-            })?;
-            Settings::save().unwrap();
-            println!(
-                "Selected: {}",
-                SETTINGS.read().unwrap().get_str("default_package")?
-            );
+            };
+            SETTINGS.read().unwrap().save();
+            println!("Selected: {}", SETTINGS.read().unwrap().default_package);
         }
         ("update", Some(_a)) => installed.update(&mut releases).await?,
         _ => {

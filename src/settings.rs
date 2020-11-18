@@ -1,28 +1,19 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
-use config::{Config, ConfigError, File as ConfigFile, FileFormat};
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
     env::current_exe,
-    error::Error,
     fs::{create_dir_all, File},
-    io::prelude::*,
     path::PathBuf,
     sync::RwLock,
 };
 
-// TODO: Consider locking down the entire config into a binary so the user can't change it
-// from outside the program. This would eliminate a good amount of potential user errors.
-
-const CONFIG_NAME: &str = "config.toml";
+const CONFIG_NAME: &str = "config.bin";
 
 lazy_static! {
     static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "BlenderLauncher").unwrap();
-}
-
-lazy_static! {
     static ref CONFIG_PATH: PathBuf = {
         let current_exe = current_exe().unwrap();
         let portable_path = current_exe.parent().unwrap().to_path_buf();
@@ -37,10 +28,7 @@ lazy_static! {
             config_path
         }
     };
-}
-
-lazy_static! {
-    pub static ref SETTINGS: RwLock<Config> = RwLock::new(Config::default());
+    pub static ref SETTINGS: RwLock<Settings> = RwLock::new(Settings::init());
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,32 +51,22 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn load() -> Result<(), ConfigError> {
+    pub fn init() -> Self {
         if !CONFIG_PATH.exists() {
             let default = Settings::default();
-            let mut conf_file = File::create(&*CONFIG_PATH).unwrap();
-
-            conf_file
-                .write_all(toml::to_string(&default).unwrap().as_bytes())
-                .unwrap();
+            let conf_file = File::create(&*CONFIG_PATH).unwrap();
+            bincode::serialize_into(conf_file, &default).unwrap();
+            default
+        } else {
+            let conf_file = File::open(&*CONFIG_PATH).unwrap();
+            let settings: Settings = bincode::deserialize_from(conf_file).unwrap();
+            settings
         }
-
-        SETTINGS.write().unwrap().merge(ConfigFile::new(
-            &CONFIG_PATH.to_str().unwrap(),
-            FileFormat::Toml,
-        ))?;
-
-        Ok(())
     }
 
-    pub fn save() -> Result<(), Box<dyn Error>> {
-        let config = SETTINGS.read().unwrap().clone();
-        let settings: Settings = config.try_into().unwrap();
-        let toml = toml::to_string(&settings)?;
-        let mut file = File::create(&*CONFIG_PATH)?;
-        file.write_all(toml.as_bytes())?;
-
-        Ok(())
+    pub fn save(&self) {
+        let conf_file = File::create(&*CONFIG_PATH).unwrap();
+        bincode::serialize_into(conf_file, self).unwrap();
     }
 }
 
