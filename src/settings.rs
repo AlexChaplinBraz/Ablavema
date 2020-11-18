@@ -59,7 +59,12 @@ impl Settings {
             default
         } else {
             let conf_file = File::open(&*CONFIG_PATH).unwrap();
-            let settings: Settings = bincode::deserialize_from(conf_file).unwrap();
+            let settings: Settings = bincode::deserialize_from(conf_file).unwrap_or_else(|_| {
+                let default = Settings::default();
+                let conf_file = File::create(&*CONFIG_PATH).unwrap();
+                bincode::serialize_into(conf_file, &default).unwrap();
+                default
+            });
             settings
         }
     }
