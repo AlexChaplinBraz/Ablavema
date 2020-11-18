@@ -1,7 +1,6 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
-use crate::helpers::*;
-use crate::settings::*;
+use crate::{helpers::*, settings::*};
 use bzip2::read::BzDecoder;
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use flate2::read::GzDecoder;
@@ -15,10 +14,7 @@ use select::{
 use serde::{Deserialize, Serialize};
 use std::{error::Error, fs::File, path::PathBuf};
 use tar::Archive;
-use tokio::{
-    fs, fs::create_dir_all, fs::remove_dir_all, fs::remove_file, io::AsyncWriteExt,
-    task::JoinHandle,
-};
+use tokio::{fs, fs::remove_dir_all, fs::remove_file, io::AsyncWriteExt, task::JoinHandle};
 use xz2::read::XzDecoder;
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
@@ -742,8 +738,6 @@ impl Package {
         let request = client.get(&url);
 
         let mut file = SETTINGS.read().unwrap().get::<PathBuf>("temp_dir")?;
-        create_dir_all(&file).await.unwrap();
-
         file.push(self.url.split_terminator('/').last().unwrap());
 
         // TODO: Prompt/option for re-download.
@@ -774,9 +768,6 @@ impl Package {
         });
 
         let mut package = SETTINGS.read().unwrap().get::<PathBuf>("packages_dir")?;
-
-        create_dir_all(&package).await?;
-
         package.push(&self.name);
 
         // TODO: Prompt/option for re-extraction.

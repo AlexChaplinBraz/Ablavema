@@ -6,12 +6,7 @@ mod helpers;
 mod installed;
 mod releases;
 mod settings;
-use crate::cli::*;
-use crate::gui::*;
-use crate::helpers::*;
-use crate::installed::*;
-use crate::releases::*;
-use crate::settings::*;
+use crate::{cli::*, installed::*, settings::*};
 use std::{error::Error, fs::File, path::PathBuf, process::exit, time::SystemTime};
 
 #[tokio::main]

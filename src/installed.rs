@@ -5,8 +5,8 @@ use crate::settings::*;
 use indicatif::MultiProgress;
 use std::{
     error::Error,
+    fs,
     fs::File,
-    fs::{self, create_dir_all},
     ops::{Deref, DerefMut},
     path::PathBuf,
     process::Command,
@@ -25,8 +25,6 @@ impl Installed {
     }
 
     pub fn check(&mut self) -> Result<(), Box<dyn Error>> {
-        create_dir_all(SETTINGS.read().unwrap().get::<PathBuf>("packages_dir")?)?;
-
         for entry in fs::read_dir(SETTINGS.read().unwrap().get::<PathBuf>("packages_dir")?)? {
             let dir = entry?;
             let mut package_info = dir.path();

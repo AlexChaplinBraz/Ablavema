@@ -1,10 +1,6 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
-use crate::gui::*;
-use crate::helpers::*;
-use crate::installed::*;
-use crate::releases::*;
-use crate::settings::*;
+use crate::{gui::*, helpers::*, installed::*, releases::*, settings::*};
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
     SubCommand,
@@ -182,6 +178,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 .setting(AppSettings::ArgRequiredElseHelp)
                 .setting(AppSettings::NextLineHelp)
                 .about("Set configuration settings")
+                .long_about("Set configuration settings. It's possible to make the program portable by creating an empty file named 'portable' in the same directory as the executable, which will make it store everything together.")
                 .help_message("Print help and exit")
                 .arg(
                     Arg::with_name("use_latest_as_default")

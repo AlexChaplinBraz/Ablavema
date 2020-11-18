@@ -23,3 +23,4 @@ prettytable-rs = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.4"
 lazy_static = "1.4"
+directories = "3.0"

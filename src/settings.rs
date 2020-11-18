@@ -1,10 +1,11 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
 use config::{Config, ConfigError, File as ConfigFile, FileFormat};
+use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
-    env,
+    env::current_exe,
     error::Error,
     fs::{create_dir_all, File},
     io::prelude::*,
@@ -12,30 +13,31 @@ use std::{
     sync::RwLock,
 };
 
-lazy_static! {
-    pub static ref CONFIG_PATH: PathBuf = if cfg!(target_os = "linux") {
-        let bl_env = env::var_os("BLENDER_LAUNCHER_CONFIG");
-        let xdg_env = env::var_os("XDG_CONFIG_HOME");
+// TODO: Consider not letting the user change any of the paths. This would
+// eliminate some potential IO errors if the user sets them into weird places.
+// TODO: Consider locking down the entire config into a binary so the user can't change it
+// from outside the program. This would eliminate a good amount of potential user errors.
 
-        if bl_env.is_some() {
-            PathBuf::from(bl_env.unwrap().to_str().unwrap().to_string())
-        } else if xdg_env.is_some() {
-            PathBuf::from(format!(
-                "{}/BlenderLauncher/config.toml",
-                xdg_env.unwrap().to_str().unwrap()
-            ))
+const CONFIG_NAME: &str = "config.toml";
+
+lazy_static! {
+    static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "BlenderLauncher").unwrap();
+}
+
+lazy_static! {
+    static ref CONFIG_PATH: PathBuf = {
+        let current_exe = current_exe().unwrap();
+        let portable_path = current_exe.parent().unwrap().to_path_buf();
+        let portable_file = portable_path.join("portable");
+
+        if portable_file.exists() {
+            portable_path.join(CONFIG_NAME)
         } else {
-            PathBuf::from(format!(
-                "{}/.config/BlenderLauncher/config.toml",
-                env::var("HOME").unwrap()
-            ))
+            let mut config_path = PROJECT_DIRS.config_dir().to_path_buf();
+            create_dir_all(&config_path).unwrap();
+            config_path.push(CONFIG_NAME);
+            config_path
         }
-    } else if cfg!(target_os = "windows") {
-        PathBuf::from("config.toml")
-    } else if cfg!(target_os = "macos") {
-        todo!("macos config");
-    } else {
-        unreachable!("Unsupported OS config");
     };
 }
 
@@ -66,7 +68,6 @@ impl Settings {
     pub fn load() -> Result<(), ConfigError> {
         if !CONFIG_PATH.exists() {
             let default = Settings::default();
-            create_dir_all(CONFIG_PATH.parent().unwrap()).unwrap();
             let mut conf_file = File::create(&*CONFIG_PATH).unwrap();
 
             conf_file
@@ -108,39 +109,50 @@ impl Default for Settings {
             keep_only_latest_experimental: false,
             keep_only_latest_stable: false,
             keep_only_latest_lts: false,
-            packages_dir: PathBuf::from({
-                if cfg!(target_os = "linux") {
-                    "/home/alex/.config/BlenderLauncher/packages"
-                } else if cfg!(target_os = "windows") {
-                    "packages"
-                } else if cfg!(target_os = "macos") {
-                    todo!("macos config");
+            packages_dir: {
+                let current_exe = current_exe().unwrap();
+                let mut portable_path = current_exe.parent().unwrap().to_path_buf();
+                let portable_file = portable_path.join("portable");
+
+                if portable_file.exists() {
+                    portable_path.push("packages");
+                    create_dir_all(&portable_path).unwrap();
+                    portable_path
                 } else {
-                    unreachable!("Unsupported OS config");
+                    let data_path = PROJECT_DIRS.data_dir().to_path_buf();
+                    create_dir_all(&data_path).unwrap();
+                    data_path
                 }
-            }),
-            releases_db: PathBuf::from({
-                if cfg!(target_os = "linux") {
-                    "/home/alex/.config/BlenderLauncher/releases_db.bin"
-                } else if cfg!(target_os = "windows") {
-                    "releases_db.bin"
-                } else if cfg!(target_os = "macos") {
-                    todo!("macos config");
+            },
+            releases_db: {
+                let current_exe = current_exe().unwrap();
+                let portable_path = current_exe.parent().unwrap().to_path_buf();
+                let portable_file = portable_path.join("portable");
+
+                if portable_file.exists() {
+                    portable_path.join("releases_db.bin")
                 } else {
-                    unreachable!("Unsupported OS config");
+                    let mut releases_db_path = PROJECT_DIRS.config_dir().to_path_buf();
+                    create_dir_all(&releases_db_path).unwrap();
+                    releases_db_path.push("releases_db.bin");
+                    releases_db_path
                 }
-            }),
-            temp_dir: PathBuf::from({
-                if cfg!(target_os = "linux") {
-                    "/home/alex/.cache/BlenderLauncher"
-                } else if cfg!(target_os = "windows") {
-                    "temp_dir"
-                } else if cfg!(target_os = "macos") {
-                    todo!("macos config");
+            },
+            temp_dir: {
+                let current_exe = current_exe().unwrap();
+                let mut portable_path = current_exe.parent().unwrap().to_path_buf();
+                let portable_file = portable_path.join("portable");
+
+                if portable_file.exists() {
+                    portable_path.push("cache");
+                    create_dir_all(&portable_path).unwrap();
+                    portable_path
                 } else {
-                    unreachable!("Unsupported OS config");
+                    let temp_dir_path = PROJECT_DIRS.cache_dir().to_path_buf();
+                    create_dir_all(&temp_dir_path).unwrap();
+                    temp_dir_path
                 }
-            }),
+            },
         }
     }
 }
