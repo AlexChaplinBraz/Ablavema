@@ -13,8 +13,6 @@ use std::{
     sync::RwLock,
 };
 
-// TODO: Consider not letting the user change any of the paths. This would
-// eliminate some potential IO errors if the user sets them into weird places.
 // TODO: Consider locking down the entire config into a binary so the user can't change it
 // from outside the program. This would eliminate a good amount of potential user errors.
 

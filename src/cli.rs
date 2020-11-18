@@ -137,24 +137,6 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             .unwrap(),
         right_ansi_code
     );
-    let help_packages_dir = format!(
-        "Directory that holds all the installed packages [current: {}{}{}]",
-        left_ansi_code,
-        SETTINGS.read().unwrap().get_str("packages_dir").unwrap(),
-        right_ansi_code
-    );
-    let help_cache_dir = format!(
-        "Directory that holds temporary data used while installing [current: {}{}{}]",
-        left_ansi_code,
-        SETTINGS.read().unwrap().get_str("cache_dir").unwrap(),
-        right_ansi_code
-    );
-    let help_releases_db = format!(
-        "Database file with all the fetched packages [current: {}{}{}]",
-        left_ansi_code,
-        SETTINGS.read().unwrap().get_str("releases_db").unwrap(),
-        right_ansi_code
-    );
 
     let args = App::new(crate_name!())
         .version(crate_version!())
@@ -289,33 +271,6 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .long("keep_only_latest_lts")
                         .help(&help_keep_only_latest_lts),
                 )
-                .arg(
-                    Arg::with_name("packages_dir")
-                        .display_order(110)
-                        .takes_value(true)
-                        .value_name("PATH")
-                        .short("P")
-                        .long("packages-dir")
-                        .help(&help_packages_dir),
-                )
-                .arg(
-                    Arg::with_name("cache_dir")
-                        .display_order(120)
-                        .takes_value(true)
-                        .value_name("PATH")
-                        .short("T")
-                        .long("cache-dir")
-                        .help(&help_cache_dir),
-                )
-                .arg(
-                    Arg::with_name("releases_db")
-                        .display_order(130)
-                        .takes_value(true)
-                        .value_name("PATH")
-                        .short("R")
-                        .long("releases-db")
-                        .help(&help_releases_db),
-                )
                 .group(
                     ArgGroup::with_name("config_group")
                         .args(&[
@@ -329,10 +284,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             "keep_only_latest_daily",
                             "keep_only_latest_experimental",
                             "keep_only_latest_stable",
-                            "keep_only_latest_lts",
-                            "packages_dir",
-                            "cache_dir",
-                            "releases_db"
+                            "keep_only_latest_lts"
                         ])
                         .required(true)
                         .multiple(true)
@@ -588,9 +540,6 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             process_bool_arg(&a, "keep_only_latest_experimental")?;
             process_bool_arg(&a, "keep_only_latest_stable")?;
             process_bool_arg(&a, "keep_only_latest_lts")?;
-            process_str_arg(&a, "packages_dir")?;
-            process_str_arg(&a, "cache_dir")?;
-            process_str_arg(&a, "releases_db")?;
             Settings::save()?;
         }
         ("fetch", Some(a)) => {

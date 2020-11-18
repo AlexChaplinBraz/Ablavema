@@ -870,8 +870,6 @@ impl Package {
         let final_tasks = tokio::task::spawn(async move {
             extraction_handle.await.unwrap();
 
-            // TODO: When handling the possible errors, inform the user if they're
-            // trying to set paths with different filesystems for cache_dir and packages_dir.
             if package.build == Build::Official {
                 std::fs::rename(
                     SETTINGS
