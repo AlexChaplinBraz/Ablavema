@@ -8,6 +8,8 @@ use std::{
     fs::{create_dir_all, File},
     path::PathBuf,
     sync::RwLock,
+    time::Duration,
+    time::SystemTime,
 };
 
 const CONFIG_NAME: &str = "config.bin";
@@ -48,6 +50,7 @@ pub struct Settings {
     pub packages_dir: PathBuf,
     pub cache_dir: PathBuf,
     pub releases_db: PathBuf,
+    pub last_update_time: SystemTime,
 }
 
 impl Settings {
@@ -77,11 +80,13 @@ impl Settings {
 
 impl Default for Settings {
     fn default() -> Self {
+        let minutes_between_updates = 60;
+
         Self {
             default_package: String::new(),
             use_latest_as_default: true,
             check_updates_at_launch: true,
-            minutes_between_updates: 60,
+            minutes_between_updates,
             update_daily: true,
             update_experimental: true,
             update_stable: true,
@@ -134,6 +139,9 @@ impl Default for Settings {
                     cache_dir_path
                 }
             },
+            last_update_time: SystemTime::now()
+                .checked_sub(Duration::from_secs(minutes_between_updates * 60))
+                .unwrap_or_else(|| SystemTime::now()),
         }
     }
 }

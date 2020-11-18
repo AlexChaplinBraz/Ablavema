@@ -71,3 +71,21 @@ pub fn get_file_stem(filename: &str) -> &str {
         Path::new(filename).file_stem().unwrap().to_str().unwrap()
     }
 }
+
+pub fn is_time_to_update() -> bool {
+    if SETTINGS
+        .read()
+        .unwrap()
+        .last_update_time
+        .elapsed()
+        .unwrap()
+        .as_secs()
+        .checked_div(60)
+        .unwrap()
+        >= SETTINGS.read().unwrap().minutes_between_updates
+    {
+        true
+    } else {
+        false
+    }
+}

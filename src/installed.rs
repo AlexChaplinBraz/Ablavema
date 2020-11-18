@@ -9,6 +9,7 @@ use std::{
     fs::File,
     ops::{Deref, DerefMut},
     process::Command,
+    time::SystemTime,
 };
 
 #[derive(Debug)]
@@ -202,6 +203,9 @@ impl Installed {
                 self.check()?;
             }
         }
+
+        SETTINGS.write().unwrap().last_update_time = SystemTime::now();
+        SETTINGS.read().unwrap().save();
 
         Ok(())
     }

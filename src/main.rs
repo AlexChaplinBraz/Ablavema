@@ -6,8 +6,8 @@ mod helpers;
 mod installed;
 mod releases;
 mod settings;
-use crate::{cli::*, installed::*, settings::*};
-use std::{error::Error, fs::File, process::exit, time::SystemTime};
+use crate::{cli::*, helpers::*, installed::*, settings::*};
+use std::{error::Error, process::exit};
 
 #[tokio::main]
 async fn main() {
@@ -23,38 +23,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
     if gui_args.launch_gui {
         // TODO: Move all this logic into the GUI.
         if SETTINGS.read().unwrap().check_updates_at_launch {
-            let last_update_time = SETTINGS
-                .read()
-                .unwrap()
-                .cache_dir
-                .join("last_update_time.bin");
-
-            if last_update_time.exists() {
-                let file = File::open(&last_update_time)?;
-                let old_time: SystemTime = bincode::deserialize_from(file)?;
-
-                if old_time
-                    .elapsed()
-                    .unwrap()
-                    .as_secs()
-                    .checked_div(60)
-                    .unwrap()
-                    >= SETTINGS.read().unwrap().minutes_between_updates
-                {
-                    gui_args.installed.update(&mut gui_args.releases).await?;
-
-                    let now = SystemTime::now();
-                    let file = File::create(&last_update_time)?;
-                    bincode::serialize_into(file, &now)?;
-                } else {
-                    println!("Not yet time to check for updates.");
-                }
-            } else {
+            if is_time_to_update() {
                 gui_args.installed.update(&mut gui_args.releases).await?;
-
-                let now = SystemTime::now();
-                let file = File::create(&last_update_time)?;
-                bincode::serialize_into(file, &now)?;
+            } else {
+                println!("Not yet time to check for updates.");
             }
         }
 
