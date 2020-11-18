@@ -143,10 +143,10 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         SETTINGS.read().unwrap().get_str("packages_dir").unwrap(),
         right_ansi_code
     );
-    let help_temp_dir = format!(
+    let help_cache_dir = format!(
         "Directory that holds temporary data used while installing [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().get_str("temp_dir").unwrap(),
+        SETTINGS.read().unwrap().get_str("cache_dir").unwrap(),
         right_ansi_code
     );
     let help_releases_db = format!(
@@ -299,13 +299,13 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help(&help_packages_dir),
                 )
                 .arg(
-                    Arg::with_name("temp_dir")
+                    Arg::with_name("cache_dir")
                         .display_order(120)
                         .takes_value(true)
                         .value_name("PATH")
                         .short("T")
-                        .long("temp-dir")
-                        .help(&help_temp_dir),
+                        .long("cache-dir")
+                        .help(&help_cache_dir),
                 )
                 .arg(
                     Arg::with_name("releases_db")
@@ -331,7 +331,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             "keep_only_latest_stable",
                             "keep_only_latest_lts",
                             "packages_dir",
-                            "temp_dir",
+                            "cache_dir",
                             "releases_db"
                         ])
                         .required(true)
@@ -589,7 +589,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             process_bool_arg(&a, "keep_only_latest_stable")?;
             process_bool_arg(&a, "keep_only_latest_lts")?;
             process_str_arg(&a, "packages_dir")?;
-            process_str_arg(&a, "temp_dir")?;
+            process_str_arg(&a, "cache_dir")?;
             process_str_arg(&a, "releases_db")?;
             Settings::save()?;
         }

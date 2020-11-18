@@ -60,7 +60,7 @@ pub struct Settings {
     pub keep_only_latest_stable: bool,
     pub keep_only_latest_lts: bool,
     pub packages_dir: PathBuf,
-    pub temp_dir: PathBuf,
+    pub cache_dir: PathBuf,
     pub releases_db: PathBuf,
 }
 
@@ -138,7 +138,7 @@ impl Default for Settings {
                     releases_db_path
                 }
             },
-            temp_dir: {
+            cache_dir: {
                 let current_exe = current_exe().unwrap();
                 let mut portable_path = current_exe.parent().unwrap().to_path_buf();
                 let portable_file = portable_path.join("portable");
@@ -148,9 +148,9 @@ impl Default for Settings {
                     create_dir_all(&portable_path).unwrap();
                     portable_path
                 } else {
-                    let temp_dir_path = PROJECT_DIRS.cache_dir().to_path_buf();
-                    create_dir_all(&temp_dir_path).unwrap();
-                    temp_dir_path
+                    let cache_dir_path = PROJECT_DIRS.cache_dir().to_path_buf();
+                    create_dir_all(&cache_dir_path).unwrap();
+                    cache_dir_path
                 }
             },
         }

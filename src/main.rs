@@ -32,7 +32,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
             let last_update_time = SETTINGS
                 .read()
                 .unwrap()
-                .get::<PathBuf>("temp_dir")
+                .get::<PathBuf>("cache_dir")
                 .unwrap()
                 .join("last_update_time.bin");
 

@@ -737,7 +737,7 @@ impl Package {
         let url = self.url.clone();
         let request = client.get(&url);
 
-        let mut file = SETTINGS.read().unwrap().get::<PathBuf>("temp_dir")?;
+        let mut file = SETTINGS.read().unwrap().get::<PathBuf>("cache_dir")?;
         file.push(self.url.split_terminator('/').last().unwrap());
 
         // TODO: Prompt/option for re-download.
@@ -802,7 +802,11 @@ impl Package {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
                         file.unpack_in(
-                            SETTINGS.read().unwrap().get::<PathBuf>("temp_dir").unwrap(),
+                            SETTINGS
+                                .read()
+                                .unwrap()
+                                .get::<PathBuf>("cache_dir")
+                                .unwrap(),
                         )
                         .unwrap();
                     }
@@ -818,7 +822,11 @@ impl Package {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
                         file.unpack_in(
-                            SETTINGS.read().unwrap().get::<PathBuf>("temp_dir").unwrap(),
+                            SETTINGS
+                                .read()
+                                .unwrap()
+                                .get::<PathBuf>("cache_dir")
+                                .unwrap(),
                         )
                         .unwrap();
                     }
@@ -834,7 +842,11 @@ impl Package {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
                         file.unpack_in(
-                            SETTINGS.read().unwrap().get::<PathBuf>("temp_dir").unwrap(),
+                            SETTINGS
+                                .read()
+                                .unwrap()
+                                .get::<PathBuf>("cache_dir")
+                                .unwrap(),
                         )
                         .unwrap();
                     }
@@ -859,13 +871,13 @@ impl Package {
             extraction_handle.await.unwrap();
 
             // TODO: When handling the possible errors, inform the user if they're
-            // trying to set paths with different filesystems for temp_dir and packages_dir.
+            // trying to set paths with different filesystems for cache_dir and packages_dir.
             if package.build == Build::Official {
                 std::fs::rename(
                     SETTINGS
                         .read()
                         .unwrap()
-                        .get::<PathBuf>("temp_dir")
+                        .get::<PathBuf>("cache_dir")
                         .unwrap()
                         .join(&package.name.strip_suffix("-official").unwrap()),
                     SETTINGS
@@ -881,7 +893,7 @@ impl Package {
                     SETTINGS
                         .read()
                         .unwrap()
-                        .get::<PathBuf>("temp_dir")
+                        .get::<PathBuf>("cache_dir")
                         .unwrap()
                         .join(&package.name),
                     SETTINGS
