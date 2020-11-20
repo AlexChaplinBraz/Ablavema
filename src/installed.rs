@@ -53,6 +53,9 @@ impl Installed {
     }
 
     pub async fn update(&mut self, releases: &mut Releases) -> Result<(), Box<dyn Error>> {
+        SETTINGS.write().unwrap().last_update_time = SystemTime::now();
+        SETTINGS.read().unwrap().save();
+
         let mut packages_to_install = Vec::new();
 
         if SETTINGS.read().unwrap().update_stable {
@@ -203,9 +206,6 @@ impl Installed {
                 self.check()?;
             }
         }
-
-        SETTINGS.write().unwrap().last_update_time = SystemTime::now();
-        SETTINGS.read().unwrap().save();
 
         Ok(())
     }
