@@ -28,9 +28,9 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         left_ansi_code = "";
         right_ansi_code = "";
     } else if cfg!(target_os = "macos") {
-        todo!("macos command");
+        todo!("macos ansi codes");
     } else {
-        unreachable!("Unsupported OS command");
+        unreachable!("Unsupported OS");
     }
 
     let help_default_package = format!(

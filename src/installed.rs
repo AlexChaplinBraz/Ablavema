@@ -211,44 +211,48 @@ impl Installed {
     }
 
     pub fn open_blender() -> Result<(), Box<dyn Error>> {
-        let _blender = Command::new({
-            if cfg!(target_os = "linux") {
-                SETTINGS
-                    .read()
-                    .unwrap()
-                    .packages_dir
-                    .join(&SETTINGS.read().unwrap().default_package)
-                    .join("blender")
-            } else if cfg!(target_os = "windows") {
-                todo!("windows command");
-            } else if cfg!(target_os = "macos") {
-                todo!("macos command");
-            } else {
-                unreachable!("Unsupported OS command");
-            }
-        })
+        Command::new(
+            SETTINGS
+                .read()
+                .unwrap()
+                .packages_dir
+                .join(&SETTINGS.read().unwrap().default_package)
+                .join({
+                    if cfg!(target_os = "linux") {
+                        "blender"
+                    } else if cfg!(target_os = "windows") {
+                        "blender.exe"
+                    } else if cfg!(target_os = "macos") {
+                        todo!("macos executable");
+                    } else {
+                        unreachable!("Unsupported OS");
+                    }
+                }),
+        )
         .status()?;
 
         Ok(())
     }
 
     pub fn open_blender_with_file(file: &str) -> Result<(), Box<dyn Error>> {
-        let _blender = Command::new({
-            if cfg!(target_os = "linux") {
-                SETTINGS
-                    .read()
-                    .unwrap()
-                    .packages_dir
-                    .join(&SETTINGS.read().unwrap().default_package)
-                    .join("blender")
-            } else if cfg!(target_os = "windows") {
-                todo!("windows command");
-            } else if cfg!(target_os = "macos") {
-                todo!("macos command");
-            } else {
-                unreachable!("Unsupported OS command");
-            }
-        })
+        Command::new(
+            SETTINGS
+                .read()
+                .unwrap()
+                .packages_dir
+                .join(&SETTINGS.read().unwrap().default_package)
+                .join({
+                    if cfg!(target_os = "linux") {
+                        "blender"
+                    } else if cfg!(target_os = "windows") {
+                        "blender.exe"
+                    } else if cfg!(target_os = "macos") {
+                        todo!("macos executable");
+                    } else {
+                        unreachable!("Unsupported OS");
+                    }
+                }),
+        )
         .arg(file)
         .status()?;
 
