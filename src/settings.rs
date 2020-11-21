@@ -7,12 +7,14 @@ use std::{
     env::current_exe,
     fs::{create_dir_all, File},
     path::PathBuf,
-    sync::RwLock,
+    sync::{atomic::AtomicBool, RwLock},
     time::Duration,
     time::SystemTime,
 };
 
 const CONFIG_NAME: &str = "config.bin";
+
+pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
     static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "BlenderLauncher").unwrap();

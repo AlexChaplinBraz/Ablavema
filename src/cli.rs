@@ -7,7 +7,7 @@ use clap::{
 };
 use indicatif::MultiProgress;
 use prettytable::{cell, format, row, Table};
-use std::{error::Error, str::FromStr};
+use std::{error::Error, str::FromStr, sync::atomic::Ordering};
 
 pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
     let mut releases = Releases::new();
@@ -855,18 +855,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         }
         ("update", Some(_a)) => installed.update(&mut releases).await?,
         _ => {
-            return Ok(GuiArgs {
-                releases,
-                installed,
-                file_path: {
-                    if args.is_present("path") {
-                        String::from(args.value_of("path").unwrap())
-                    } else {
-                        String::new()
-                    }
-                },
-                launch_gui: true,
-            });
+            LAUNCH_GUI.store(true, Ordering::Relaxed);
         }
     }
 
@@ -880,6 +869,5 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 String::new()
             }
         },
-        launch_gui: false,
     })
 }

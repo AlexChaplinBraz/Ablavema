@@ -7,7 +7,7 @@ mod installed;
 mod releases;
 mod settings;
 use crate::{cli::*, helpers::*, installed::*, settings::*};
-use std::{error::Error, process::exit};
+use std::{error::Error, process::exit, sync::atomic::Ordering};
 
 #[tokio::main]
 async fn main() {
@@ -20,7 +20,7 @@ async fn main() {
 async fn run() -> Result<(), Box<dyn Error>> {
     let mut gui_args = run_cli().await?;
 
-    if gui_args.launch_gui {
+    if LAUNCH_GUI.load(Ordering::Relaxed) {
         // TODO: Move all this logic into the GUI.
         if SETTINGS.read().unwrap().check_updates_at_launch {
             if is_time_to_update() {
