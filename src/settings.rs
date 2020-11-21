@@ -55,7 +55,7 @@ pub struct Settings {
 
 impl Settings {
     pub fn init() -> Self {
-        if !CONFIG_PATH.exists() {
+        let settings = if !CONFIG_PATH.exists() {
             let default = Settings::default();
             let conf_file = File::create(&*CONFIG_PATH).unwrap();
             bincode::serialize_into(conf_file, &default).unwrap();
@@ -69,7 +69,13 @@ impl Settings {
                 default
             });
             settings
-        }
+        };
+
+        create_dir_all(&settings.packages_dir).unwrap();
+        create_dir_all(&settings.releases_db.parent().unwrap()).unwrap();
+        create_dir_all(&settings.cache_dir).unwrap();
+
+        settings
     }
 
     pub fn save(&self) {
@@ -81,6 +87,10 @@ impl Settings {
 impl Default for Settings {
     fn default() -> Self {
         let minutes_between_updates = 60;
+
+        let current_exe = current_exe().unwrap();
+        let portable_path = current_exe.parent().unwrap().to_path_buf();
+        let portable_file = portable_path.join("portable");
 
         Self {
             default_package: String::new(),
@@ -96,47 +106,24 @@ impl Default for Settings {
             keep_only_latest_stable: false,
             keep_only_latest_lts: false,
             packages_dir: {
-                let current_exe = current_exe().unwrap();
-                let mut portable_path = current_exe.parent().unwrap().to_path_buf();
-                let portable_file = portable_path.join("portable");
-
                 if portable_file.exists() {
-                    portable_path.push("packages");
-                    create_dir_all(&portable_path).unwrap();
-                    portable_path
+                    portable_path.join("packages")
                 } else {
-                    let data_path = PROJECT_DIRS.data_dir().to_path_buf();
-                    create_dir_all(&data_path).unwrap();
-                    data_path
+                    PROJECT_DIRS.data_dir().to_path_buf()
                 }
             },
             releases_db: {
-                let current_exe = current_exe().unwrap();
-                let portable_path = current_exe.parent().unwrap().to_path_buf();
-                let portable_file = portable_path.join("portable");
-
                 if portable_file.exists() {
                     portable_path.join("releases_db.bin")
                 } else {
-                    let mut releases_db_path = PROJECT_DIRS.config_dir().to_path_buf();
-                    create_dir_all(&releases_db_path).unwrap();
-                    releases_db_path.push("releases_db.bin");
-                    releases_db_path
+                    PROJECT_DIRS.config_dir().join("releases_db.bin")
                 }
             },
             cache_dir: {
-                let current_exe = current_exe().unwrap();
-                let mut portable_path = current_exe.parent().unwrap().to_path_buf();
-                let portable_file = portable_path.join("portable");
-
                 if portable_file.exists() {
-                    portable_path.push("cache");
-                    create_dir_all(&portable_path).unwrap();
-                    portable_path
+                    portable_path.join("cache")
                 } else {
-                    let cache_dir_path = PROJECT_DIRS.cache_dir().to_path_buf();
-                    create_dir_all(&cache_dir_path).unwrap();
-                    cache_dir_path
+                    PROJECT_DIRS.cache_dir().to_path_buf()
                 }
             },
             last_update_time: SystemTime::now()
