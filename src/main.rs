@@ -13,6 +13,9 @@ use std::{error::Error, process::exit, sync::atomic::Ordering};
 async fn main() {
     if let Err(e) = run().await {
         eprintln!("Error: {}.", e);
+        if LAUNCH_GUI.load(Ordering::Relaxed) {
+            msgbox::create("BlenderLauncher", &e.to_string(), msgbox::IconType::Error).unwrap();
+        }
         exit(1);
     }
 }
