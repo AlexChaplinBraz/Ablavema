@@ -12,10 +12,19 @@ use select::{
     predicate::{Attr, Class, Name},
 };
 use serde::{Deserialize, Serialize};
-use std::{error::Error, fs::File};
+use std::{
+    error::Error,
+    fs::{create_dir_all, File},
+    io::{Read, Write},
+};
 use tar::Archive;
-use tokio::{fs, fs::remove_dir_all, fs::remove_file, io::AsyncWriteExt, task::JoinHandle};
+use tokio::{
+    fs::{self, remove_dir_all, remove_file},
+    io::AsyncWriteExt,
+    task::JoinHandle,
+};
 use xz2::read::XzDecoder;
+use zip::{read::ZipFile, ZipArchive};
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Releases {
@@ -124,6 +133,7 @@ impl Releases {
                         || name.contains(".rpm")
                         || name.contains(".deb")
                         || name.contains(".tbz")
+                        || name.contains(".7z")
                         || name.contains("md5sums")
                         || name.contains("source")
                         || name.contains("demo")
@@ -789,55 +799,100 @@ impl Package {
             progress_bar.reset_elapsed();
             progress_bar.enable_steady_tick(250);
 
-            if cfg!(target_os = "linux") {
-                if file.extension().unwrap() == "xz" {
-                    let tar_xz = File::open(&file).unwrap();
-                    let tar = XzDecoder::new(tar_xz);
-                    let mut archive = Archive::new(tar);
+            if file.extension().unwrap() == "xz" {
+                let tar_xz = File::open(&file).unwrap();
+                let tar = XzDecoder::new(tar_xz);
+                let mut archive = Archive::new(tar);
 
-                    for entry in archive.entries().unwrap() {
-                        progress_bar.inc(1);
-                        let mut file = entry.unwrap();
-                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
-                    }
-
-                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
-                    progress_bar.finish_with_message(&msg);
-                } else if file.extension().unwrap() == "bz2" {
-                    let tar_bz2 = File::open(&file).unwrap();
-                    let tar = BzDecoder::new(tar_bz2);
-                    let mut archive = Archive::new(tar);
-
-                    for entry in archive.entries().unwrap() {
-                        progress_bar.inc(1);
-                        let mut file = entry.unwrap();
-                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
-                    }
-
-                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
-                    progress_bar.finish_with_message(&msg);
-                } else if file.extension().unwrap() == "gz" {
-                    let tar_gz = File::open(&file).unwrap();
-                    let tar = GzDecoder::new(tar_gz);
-                    let mut archive = Archive::new(tar);
-
-                    for entry in archive.entries().unwrap() {
-                        progress_bar.inc(1);
-                        let mut file = entry.unwrap();
-                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
-                    }
-
-                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
-                    progress_bar.finish_with_message(&msg);
-                } else {
-                    unreachable!("Unknown compression extension");
+                for entry in archive.entries().unwrap() {
+                    progress_bar.inc(1);
+                    let mut file = entry.unwrap();
+                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
                 }
-            } else if cfg!(target_os = "windows") {
-                todo!("windows extraction");
-            } else if cfg!(target_os = "macos") {
+
+                let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
+                progress_bar.finish_with_message(&msg);
+            } else if file.extension().unwrap() == "bz2" {
+                let tar_bz2 = File::open(&file).unwrap();
+                let tar = BzDecoder::new(tar_bz2);
+                let mut archive = Archive::new(tar);
+
+                for entry in archive.entries().unwrap() {
+                    progress_bar.inc(1);
+                    let mut file = entry.unwrap();
+                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                }
+
+                let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
+                progress_bar.finish_with_message(&msg);
+            } else if file.extension().unwrap() == "gz" {
+                let tar_gz = File::open(&file).unwrap();
+                let tar = GzDecoder::new(tar_gz);
+                let mut archive = Archive::new(tar);
+
+                for entry in archive.entries().unwrap() {
+                    progress_bar.inc(1);
+                    let mut file = entry.unwrap();
+                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                }
+
+                let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
+                progress_bar.finish_with_message(&msg);
+            } else if file.extension().unwrap() == "zip" {
+                // TODO: Improve extraction speed. The slowness is caused by Windows Defender
+                // and adding the program to the exclusions makes it extract around 6 times faster.
+                // Tried spawning threads for each file and it sped up by around 3 times,
+                // but it makes the progress bar meaningless. Possible clues for improvements here:
+                // https://github.com/rust-lang/rustup/pull/1850
+                let zip = File::open(&file).unwrap();
+                let mut archive = ZipArchive::new(zip).unwrap();
+
+                progress_bar.set_length(archive.len() as u64);
+
+                // This handles some archives that don't have an inner directory.
+                let extraction_dir = match file.file_name().unwrap().to_str().unwrap() {
+                    "blender-2.49-win64.zip" => SETTINGS
+                        .read()
+                        .unwrap()
+                        .cache_dir
+                        .join("blender-2.49-win64"),
+                    "blender-2.49a-win64-python26.zip" => SETTINGS
+                        .read()
+                        .unwrap()
+                        .cache_dir
+                        .join("blender-2.49a-win64-python26"),
+                    "blender-2.49b-win64-python26.zip" => SETTINGS
+                        .read()
+                        .unwrap()
+                        .cache_dir
+                        .join("blender-2.49b-win64-python26"),
+                    _ => SETTINGS.read().unwrap().cache_dir.clone(),
+                };
+
+                for file_index in 0..archive.len() {
+                    progress_bar.inc(1);
+                    let mut entry: ZipFile = archive.by_index(file_index).unwrap();
+                    let name = entry.name().to_owned();
+
+                    if entry.is_dir() {
+                        let extracted_dir_path = extraction_dir.join(name);
+                        create_dir_all(extracted_dir_path).unwrap();
+                    } else if entry.is_file() {
+                        let mut buffer: Vec<u8> = Vec::new();
+                        let _bytes_read = entry.read_to_end(&mut buffer).unwrap();
+                        let extracted_file_path = extraction_dir.join(name);
+                        create_dir_all(extracted_file_path.parent().unwrap()).unwrap();
+                        let mut file = File::create(extracted_file_path).unwrap();
+                        file.write(&buffer).unwrap();
+                    }
+                }
+
+                let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
+                progress_bar.finish_with_message(&msg);
+            } else if file.extension().unwrap() == "dmg" {
                 todo!("macos extraction");
             } else {
-                unreachable!("Unsupported OS extraction");
+                panic!("Unknown archive extension");
             }
         });
 
@@ -846,27 +901,34 @@ impl Package {
         let final_tasks = tokio::task::spawn(async move {
             extraction_handle.await.unwrap();
 
-            if package.build == Build::Official {
-                std::fs::rename(
-                    SETTINGS
-                        .read()
-                        .unwrap()
-                        .cache_dir
-                        .join(&package.name.strip_suffix("-official").unwrap()),
-                    SETTINGS.read().unwrap().packages_dir.join(&package.name),
-                )
-                .unwrap();
-            } else {
-                std::fs::rename(
-                    SETTINGS.read().unwrap().cache_dir.join(&package.name),
-                    SETTINGS.read().unwrap().packages_dir.join(&package.name),
-                )
-                .unwrap();
-            }
+            // This handles cases where the extracted directory isn't named the same
+            // as the downloaded archive from which the name of the package is taken.
+            let extracted_name = match package.name.as_ref() {
+                "blender-2.27.NewPy1-windows-official" => "blender-2.27-windows",
+                "blender-2.47-windows-law-official" => "blender-2.47-windows",
+                "blender-2.48-windows64-official" => "Blender248",
+                "blender-2.48a-windows64-official" => "Blender248a",
+                "blender-2.5-alpha1-win64-official" => "blender25-win64-26982",
+                "blender-2.5-alpha2-win64-official" => "Release",
+                "blender-2.79-e045fe53f1b0-win64-official" => {
+                    "blender-2.79.0-git.e045fe53f1b0-windows64"
+                }
+                "blender-2.79-e045fe53f1b0-win32-official" => {
+                    "blender-2.79.0-git.e045fe53f1b0-windows32"
+                }
+                _ => &package.name,
+            };
 
-            let mut path = SETTINGS.read().unwrap().packages_dir.join(&package.name);
-            path.push("package_info.bin");
-            let file = File::create(&path).unwrap();
+            let mut package_path = SETTINGS.read().unwrap().packages_dir.join(&package.name);
+
+            std::fs::rename(
+                SETTINGS.read().unwrap().cache_dir.join(extracted_name),
+                &package_path,
+            )
+            .unwrap();
+
+            package_path.push("package_info.bin");
+            let file = File::create(&package_path).unwrap();
             bincode::serialize_into(file, &package).unwrap();
         });
 
