@@ -803,7 +803,6 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .remove()
                         .await?;
                 }
-                installed.check()?;
             } else {
                 for build in a.values_of("id").unwrap() {
                     installed
@@ -815,7 +814,20 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .remove()
                         .await?;
                 }
-                installed.check()?;
+            }
+
+            installed.check()?;
+
+            let old_default = SETTINGS.read().unwrap().default_package.clone();
+
+            if installed.iter().find(|p| p.name == old_default).is_none() {
+                SETTINGS.write().unwrap().default_package = String::new();
+                SETTINGS.read().unwrap().save();
+
+                println!(
+                    "Default package '{}' was removed. Please select a new package.",
+                    old_default
+                );
             }
         }
         ("select", Some(a)) => {
