@@ -816,18 +816,20 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 }
             }
 
-            installed.check()?;
+            if !SETTINGS.read().unwrap().default_package.is_empty() {
+                installed.check()?;
 
-            let old_default = SETTINGS.read().unwrap().default_package.clone();
+                let old_default = SETTINGS.read().unwrap().default_package.clone();
 
-            if installed.iter().find(|p| p.name == old_default).is_none() {
-                SETTINGS.write().unwrap().default_package = String::new();
-                SETTINGS.read().unwrap().save();
+                if installed.iter().find(|p| p.name == old_default).is_none() {
+                    SETTINGS.write().unwrap().default_package = String::new();
+                    SETTINGS.read().unwrap().save();
 
-                println!(
-                    "Default package '{}' was removed. Please select a new package.",
-                    old_default
-                );
+                    println!(
+                        "Default package '{}' was removed. Please select a new package.",
+                        old_default
+                    );
+                }
             }
         }
         ("select", Some(a)) => {
