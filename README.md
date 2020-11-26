@@ -26,7 +26,7 @@ A more or less chronological, non-comprehensive list of finished features and fe
     - [X] Fetch packages.
     - [X] List packages.
     - [X] Install packages.
-    - [X] Remove packages.
+    - [X] Remove installed packages and cached files.
     - [X] Update installed packages.
     - [X] Select package to open .blend files with.
     - [X] Open a .blend file with the selected default Blender package.

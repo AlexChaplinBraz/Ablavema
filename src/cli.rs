@@ -8,6 +8,7 @@ use clap::{
 use indicatif::MultiProgress;
 use prettytable::{cell, format, row, Table};
 use std::{error::Error, str::FromStr, sync::atomic::Ordering};
+use tokio::fs::remove_dir_all;
 
 pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
     let mut releases = Releases::new();
@@ -451,12 +452,11 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         .subcommand(
             SubCommand::with_name("remove")
                 .setting(AppSettings::ArgRequiredElseHelp)
-                .about("Remove packages")
+                .about("Remove packages and cached files")
                 .help_message("Print help and exit")
                 .arg(
                     Arg::with_name("id")
                         .value_name("ID")
-                        .required(true)
                         .multiple(true)
                         .help("A list of packages to remove"),
                 )
@@ -466,6 +466,24 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .long("name")
                         .help("Use the name of the package instead of the ID")
                         .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
+                )
+                .arg(
+                    Arg::with_name("cache")
+                        .short("c")
+                        .long("cache")
+                        .help("Remove all cache files"),
+                )
+                .arg(
+                    Arg::with_name("packages")
+                        .short("p")
+                        .long("packages")
+                        .help("Remove all packages"),
+                )
+                .group(
+                    ArgGroup::with_name("remove_group")
+                        .args(&["id", "cache", "packages"])
+                        .required(true)
+                        .multiple(true)
                 ),
         )
         .subcommand(
@@ -794,41 +812,65 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             _ => unreachable!("List subcommand"),
         },
         ("remove", Some(a)) => {
-            if a.is_present("name") {
-                for build in a.values_of("id").unwrap() {
-                    installed
-                        .iter()
-                        .find(|p| p.name == build)
-                        .unwrap()
-                        .remove()
-                        .await?;
+            if a.is_present("cache") || a.is_present("packages") {
+                if a.is_present("cache") {
+                    remove_dir_all(SETTINGS.read().unwrap().cache_dir.clone()).await?;
+
+                    println!("Removed all cache files.");
+                }
+
+                if a.is_present("packages") {
+                    remove_dir_all(SETTINGS.read().unwrap().packages_dir.clone()).await?;
+
+                    println!("Removed all packages.");
+
+                    if !SETTINGS.read().unwrap().default_package.is_empty() {
+                        SETTINGS.write().unwrap().default_package = String::new();
+                        SETTINGS.read().unwrap().save();
+
+                        println!("All packages removed. Please install and select a new package.");
+                    }
                 }
             } else {
-                for build in a.values_of("id").unwrap() {
-                    installed
-                        .iter()
-                        .enumerate()
-                        .find(|(i, _)| *i == usize::from_str(build).unwrap())
-                        .unwrap()
-                        .1
-                        .remove()
-                        .await?;
+                if a.is_present("name") {
+                    for build in a.values_of("id").unwrap() {
+                        installed
+                            .iter()
+                            .find(|p| p.name == build)
+                            .unwrap()
+                            .remove()
+                            .await?;
+                    }
+                } else {
+                    for build in a.values_of("id").unwrap() {
+                        let build = usize::from_str(build)?;
+                        installed
+                            .iter()
+                            .enumerate()
+                            .find(|(i, _)| *i == build)
+                            .unwrap()
+                            .1
+                            .remove()
+                            .await?;
+                    }
                 }
-            }
 
-            if !SETTINGS.read().unwrap().default_package.is_empty() {
-                installed.check()?;
+                if !SETTINGS.read().unwrap().default_package.is_empty() {
+                    println!("out");
+                    installed.check()?;
+                    println!("in");
 
-                let old_default = SETTINGS.read().unwrap().default_package.clone();
+                    let old_default = SETTINGS.read().unwrap().default_package.clone();
 
-                if installed.iter().find(|p| p.name == old_default).is_none() {
-                    SETTINGS.write().unwrap().default_package = String::new();
-                    SETTINGS.read().unwrap().save();
+                    if installed.iter().find(|p| p.name == old_default).is_none() {
+                        SETTINGS.write().unwrap().default_package = String::new();
+                        SETTINGS.read().unwrap().save();
 
-                    println!(
-                        "Default package '{}' was removed. Please select a new package.",
-                        old_default
-                    );
+                        println!(
+                            "Default package '{}' was removed. Please select a new package.",
+                            old_default
+                        );
+                    }
                 }
             }
         }
