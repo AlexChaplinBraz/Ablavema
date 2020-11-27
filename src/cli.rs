@@ -5,7 +5,6 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
     SubCommand,
 };
-use indicatif::MultiProgress;
 use prettytable::{cell, format, row, Table};
 use std::{error::Error, str::FromStr, sync::atomic::Ordering};
 use tokio::fs::remove_dir_all;
@@ -529,8 +528,8 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
 
     match args.subcommand() {
         ("config", Some(a)) => {
-            process_bool_arg(&a, "use_latest_as_default")?;
-            process_bool_arg(&a, "check_updates_at_launch")?;
+            process_bool_arg(a, "use_latest_as_default")?;
+            process_bool_arg(a, "check_updates_at_launch")?;
 
             if a.is_present("minutes_between_updates") {
                 let new_arg =
@@ -552,14 +551,14 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 }
             }
 
-            process_bool_arg(&a, "update_daily")?;
-            process_bool_arg(&a, "update_experimental")?;
-            process_bool_arg(&a, "update_stable")?;
-            process_bool_arg(&a, "update_lts")?;
-            process_bool_arg(&a, "keep_only_latest_daily")?;
-            process_bool_arg(&a, "keep_only_latest_experimental")?;
-            process_bool_arg(&a, "keep_only_latest_stable")?;
-            process_bool_arg(&a, "keep_only_latest_lts")?;
+            process_bool_arg(a, "update_daily")?;
+            process_bool_arg(a, "update_experimental")?;
+            process_bool_arg(a, "update_stable")?;
+            process_bool_arg(a, "update_lts")?;
+            process_bool_arg(a, "keep_only_latest_daily")?;
+            process_bool_arg(a, "keep_only_latest_experimental")?;
+            process_bool_arg(a, "keep_only_latest_stable")?;
+            process_bool_arg(a, "keep_only_latest_lts")?;
 
             SETTINGS.read().unwrap().save();
         }
@@ -593,161 +592,15 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             }
         }
         ("install", Some(a)) => match a.subcommand() {
-            ("daily", Some(b)) => {
-                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
-
-                if b.is_present("name") {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .latest_daily
-                            .iter()
-                            .find(|p| p.name == build)
-                            .unwrap()
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                } else {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .latest_daily
-                            .iter()
-                            .enumerate()
-                            .find(|(i, _)| *i == usize::from_str(build).unwrap())
-                            .unwrap()
-                            .1
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                }
-            }
+            ("daily", Some(b)) => cli_install(b, &releases.latest_daily, "daily").await?,
             ("experimental", Some(b)) => {
-                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
-
-                if b.is_present("name") {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .experimental_branches
-                            .iter()
-                            .find(|p| p.name == build)
-                            .unwrap()
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                } else {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .experimental_branches
-                            .iter()
-                            .enumerate()
-                            .find(|(i, _)| *i == usize::from_str(build).unwrap())
-                            .unwrap()
-                            .1
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                }
+                cli_install(b, &releases.experimental_branches, "experimental").await?
             }
-            ("lts", Some(b)) => {
-                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
-
-                if b.is_present("name") {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .lts_releases
-                            .iter()
-                            .find(|p| p.name == build)
-                            .unwrap()
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                } else {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .lts_releases
-                            .iter()
-                            .enumerate()
-                            .find(|(i, _)| *i == usize::from_str(build).unwrap())
-                            .unwrap()
-                            .1
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                }
-            }
+            ("lts", Some(b)) => cli_install(b, &releases.lts_releases, "LTS").await?,
             ("official", Some(b)) => {
-                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
-
-                if b.is_present("name") {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .official_releases
-                            .iter()
-                            .find(|p| p.name == build)
-                            .unwrap()
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                } else {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .official_releases
-                            .iter()
-                            .enumerate()
-                            .find(|(i, _)| *i == usize::from_str(build).unwrap())
-                            .unwrap()
-                            .1
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                }
+                cli_install(b, &releases.official_releases, "official").await?
             }
-            ("stable", Some(b)) => {
-                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
-
-                if b.is_present("name") {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .latest_stable
-                            .iter()
-                            .find(|p| p.name == build)
-                            .unwrap()
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                } else {
-                    let multi_progress = MultiProgress::new();
-                    for build in b.values_of("id").unwrap() {
-                        releases
-                            .latest_stable
-                            .iter()
-                            .enumerate()
-                            .find(|(i, _)| *i == usize::from_str(build).unwrap())
-                            .unwrap()
-                            .1
-                            .install(&multi_progress, &flags)
-                            .await?;
-                    }
-                    multi_progress.join().unwrap();
-                }
-            }
+            ("stable", Some(b)) => cli_install(b, &releases.latest_stable, "stable").await?,
             _ => unreachable!("Install subcommand"),
         },
         ("list", Some(a)) => match a.subcommand() {

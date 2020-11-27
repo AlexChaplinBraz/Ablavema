@@ -1,8 +1,9 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables, unused_macros)]
-use crate::settings::*;
+use crate::{releases::*, settings::*};
 use clap::ArgMatches;
-use std::{error::Error, path::Path};
+use indicatif::MultiProgress;
+use std::{error::Error, path::Path, str::FromStr};
 
 pub fn process_bool_arg(arg: &ArgMatches, name: &str) -> Result<(), Box<dyn Error>> {
     if arg.is_present(name) {
@@ -88,4 +89,49 @@ pub fn is_time_to_update() -> bool {
     } else {
         false
     }
+}
+
+pub async fn cli_install(
+    args: &ArgMatches<'_>,
+    packages: &Vec<Package>,
+    name: &str,
+) -> Result<(), Box<dyn Error>> {
+    let multi_progress = MultiProgress::new();
+    let flags = (args.is_present("reinstall"), args.is_present("redownload"));
+    let mut values = Vec::new();
+
+    for build in args.values_of("id").unwrap() {
+        if values.contains(&build.to_string()) {
+            continue;
+        }
+        values.push(build.to_string());
+
+        if args.is_present("name") {
+            match packages.iter().find(|p| p.name == build) {
+                Some(a) => a,
+                None => {
+                    println!("No {} package named '{}' found.", name, build);
+                    continue;
+                }
+            }
+            .install(&multi_progress, &flags)
+            .await?;
+        } else {
+            let build = usize::from_str(build)?;
+
+            match packages.iter().enumerate().find(|(i, _)| *i == build) {
+                Some(a) => a.1,
+                None => {
+                    println!("No {} package with ID '{}' found.", name, build);
+                    continue;
+                }
+            }
+            .install(&multi_progress, &flags)
+            .await?;
+        }
+    }
+
+    multi_progress.join().unwrap();
+
+    Ok(())
 }
