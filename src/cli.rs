@@ -718,41 +718,30 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             if a.is_present("id") && !a.is_present("packages") {
                 let mut values = Vec::new();
 
-                if a.is_present("name") {
-                    for build in a.values_of("id").unwrap() {
-                        if values.contains(&build.to_string()) {
-                            continue;
-                        }
-                        values.push(build.to_string());
+                for build in a.values_of("id").unwrap() {
+                    if values.contains(&build.to_string()) {
+                        continue;
+                    }
+                    values.push(build.to_string());
 
+                    if a.is_present("name") {
                         match installed.iter().find(|p| p.name == build) {
-                            Some(a) => a,
+                            Some(a) => a.remove().await?,
                             None => {
                                 println!("No installed package named '{}' found.", build);
                                 continue;
                             }
-                        }
-                        .remove()
-                        .await?;
-                    }
-                } else {
-                    for build in a.values_of("id").unwrap() {
-                        if values.contains(&build.to_string()) {
-                            continue;
-                        }
-                        values.push(build.to_string());
-
+                        };
+                    } else {
                         let build = usize::from_str(build)?;
 
                         match installed.iter().enumerate().find(|(i, _)| *i == build) {
-                            Some(a) => a.1,
+                            Some(a) => a.1.remove().await?,
                             None => {
                                 println!("No installed package with ID '{}' found.", build);
                                 continue;
                             }
-                        }
-                        .remove()
-                        .await?;
+                        };
                     }
                 }
 
