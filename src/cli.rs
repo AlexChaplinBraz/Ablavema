@@ -508,8 +508,15 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 .arg(
                     Arg::with_name("id")
                         .value_name("ID")
-                        .required(true)
+                        .required_unless("unset")
                         .help("Default package to use for opening .blend files"),
+                )
+                .arg(
+                    Arg::with_name("unset")
+                        .conflicts_with("id")
+                        .short("u")
+                        .long("unset")
+                        .help("Unset the default package"),
                 )
                 .arg(
                     Arg::with_name("name")
@@ -763,27 +770,33 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             }
         }
         ("select", Some(a)) => {
-            SETTINGS.write().unwrap().default_package = {
-                if a.is_present("name") {
-                    match installed
-                        .iter()
-                        .find(|p| p.name == a.value_of("id").unwrap())
-                    {
-                        Some(a) => a.name.clone(),
-                        None => Err("No installed package with this name found")?,
-                    }
-                } else {
-                    let id = usize::from_str(a.value_of("id").unwrap())?;
+            if a.is_present("unset") {
+                SETTINGS.write().unwrap().default_package = String::new();
+                SETTINGS.read().unwrap().save();
+                println!("Default package was unset.");
+            } else {
+                SETTINGS.write().unwrap().default_package = {
+                    if a.is_present("name") {
+                        match installed
+                            .iter()
+                            .find(|p| p.name == a.value_of("id").unwrap())
+                        {
+                            Some(a) => a.name.clone(),
+                            None => Err("No installed package with this name found")?,
+                        }
+                    } else {
+                        let id = usize::from_str(a.value_of("id").unwrap())?;
 
-                    match installed.iter().enumerate().find(|(i, _)| *i == id) {
-                        Some(a) => a.1.name.clone(),
-                        None => Err("No installed package with this ID found")?,
+                        match installed.iter().enumerate().find(|(i, _)| *i == id) {
+                            Some(a) => a.1.name.clone(),
+                            None => Err("No installed package with this ID found")?,
+                        }
                     }
-                }
-            };
+                };
 
-            SETTINGS.read().unwrap().save();
-            println!("Selected: {}", SETTINGS.read().unwrap().default_package);
+                SETTINGS.read().unwrap().save();
+                println!("Selected: {}", SETTINGS.read().unwrap().default_package);
+            }
         }
         ("update", Some(_a)) => installed.update(&mut releases).await?,
         _ => {
