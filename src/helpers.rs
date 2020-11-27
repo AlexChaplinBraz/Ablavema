@@ -108,27 +108,23 @@ pub async fn cli_install(
 
         if args.is_present("name") {
             match packages.iter().find(|p| p.name == build) {
-                Some(a) => a,
+                Some(a) => a.install(&multi_progress, &flags).await?,
                 None => {
                     println!("No {} package named '{}' found.", name, build);
                     continue;
                 }
             }
-            .install(&multi_progress, &flags)
-            .await?;
         } else {
             let build = usize::from_str(build)?;
 
             match packages.iter().enumerate().find(|(i, _)| *i == build) {
-                Some(a) => a.1,
+                Some(a) => a.1.install(&multi_progress, &flags).await?,
                 None => {
                     println!("No {} package with ID '{}' found.", name, build);
                     continue;
                 }
             }
-            .install(&multi_progress, &flags)
-            .await?;
-        }
+        };
     }
 
     multi_progress.join().unwrap();
