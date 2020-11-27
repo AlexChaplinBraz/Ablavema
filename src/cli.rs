@@ -741,7 +741,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 }
             }
             ("experimental", Some(_b)) => {
-                // FIX: This table can be around 160 characters wide, which breaks formatting
+                // TODO: This table can be around 160 characters wide, which breaks formatting
                 // on narrow terminals. Could be solved by checking terminal width and truncating
                 // the package name since it holds repeated information. But even the other tables
                 // have a chance of looking weird depending on how small their terminal window is.
@@ -812,53 +812,68 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             _ => unreachable!("List subcommand"),
         },
         ("remove", Some(a)) => {
-            if a.is_present("cache") || a.is_present("packages") {
-                if a.is_present("cache") {
-                    remove_dir_all(SETTINGS.read().unwrap().cache_dir.clone()).await?;
+            if a.is_present("cache") {
+                remove_dir_all(SETTINGS.read().unwrap().cache_dir.clone()).await?;
 
-                    println!("Removed all cache files.");
+                println!("Removed all cache files.");
+            }
+
+            if a.is_present("packages") {
+                remove_dir_all(SETTINGS.read().unwrap().packages_dir.clone()).await?;
+
+                println!("Removed all packages.");
+
+                if !SETTINGS.read().unwrap().default_package.is_empty() {
+                    SETTINGS.write().unwrap().default_package = String::new();
+                    SETTINGS.read().unwrap().save();
+
+                    println!("All packages removed. Please install and select a new package.");
                 }
+            }
 
-                if a.is_present("packages") {
-                    remove_dir_all(SETTINGS.read().unwrap().packages_dir.clone()).await?;
+            if a.is_present("id") && !a.is_present("packages") {
+                let mut values = Vec::new();
 
-                    println!("Removed all packages.");
-
-                    if !SETTINGS.read().unwrap().default_package.is_empty() {
-                        SETTINGS.write().unwrap().default_package = String::new();
-                        SETTINGS.read().unwrap().save();
-
-                        println!("All packages removed. Please install and select a new package.");
-                    }
-                }
-            } else {
                 if a.is_present("name") {
                     for build in a.values_of("id").unwrap() {
-                        installed
-                            .iter()
-                            .find(|p| p.name == build)
-                            .unwrap()
-                            .remove()
-                            .await?;
+                        if values.contains(&build.to_string()) {
+                            continue;
+                        }
+                        values.push(build.to_string());
+
+                        match installed.iter().find(|p| p.name == build) {
+                            Some(a) => a,
+                            None => {
+                                println!("No installed package named '{}' found.", build);
+                                continue;
+                            }
+                        }
+                        .remove()
+                        .await?;
                     }
                 } else {
                     for build in a.values_of("id").unwrap() {
+                        if values.contains(&build.to_string()) {
+                            continue;
+                        }
+                        values.push(build.to_string());
+
                         let build = usize::from_str(build)?;
-                        installed
-                            .iter()
-                            .enumerate()
-                            .find(|(i, _)| *i == build)
-                            .unwrap()
-                            .1
-                            .remove()
-                            .await?;
+
+                        match installed.iter().enumerate().find(|(i, _)| *i == build) {
+                            Some(a) => a.1,
+                            None => {
+                                println!("No installed package with ID '{}' found.", build);
+                                continue;
+                            }
+                        }
+                        .remove()
+                        .await?;
                     }
                 }
 
                 if !SETTINGS.read().unwrap().default_package.is_empty() {
-                    println!("out");
                     installed.check()?;
-                    println!("in");
 
                     let old_default = SETTINGS.read().unwrap().default_package.clone();
 
