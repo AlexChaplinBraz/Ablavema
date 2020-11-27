@@ -702,7 +702,11 @@ impl Package {
     pub async fn install(
         &self,
         multi_progress: &MultiProgress,
-    ) -> Result<JoinHandle<()>, Box<dyn Error>> {
+        flags: &(bool, bool),
+    ) -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
+        let information_style = ProgressStyle::default_bar()
+            .template("{wide_msg}")
+            .progress_chars("---");
         let download_style = ProgressStyle::default_bar()
             .template("[{elapsed_precise}] [{bar:20.cyan/red}] {bytes}/{total_bytes} {bytes_per_sec} ({eta}) => {wide_msg}")
             .progress_chars("#>-");
@@ -710,37 +714,21 @@ impl Package {
             .template("[{elapsed_precise}] [{bar:20.green/red}] {percent}% => {wide_msg}")
             .progress_chars("#>-");
 
-        let client = Client::new();
+        let package = SETTINGS.read().unwrap().packages_dir.join(&self.name);
 
-        let total_size = {
-            let resp = client.head(&self.url).send().await.unwrap();
-            if resp.status().is_success() {
-                resp.headers()
-                    .get(header::CONTENT_LENGTH)
-                    .and_then(|ct_len| ct_len.to_str().ok())
-                    .and_then(|ct_len| ct_len.parse().ok())
-                    .unwrap_or(0)
-            } else {
-                let error = format!(
-                    "Couldn't download URL: {}. Error: {:?}",
-                    self.url,
-                    resp.status(),
-                );
-                panic!(error);
-            }
-        };
+        if package.exists() && !flags.0 {
+            let progress_bar = multi_progress.add(ProgressBar::new(0));
+            progress_bar.set_style(information_style.clone());
 
-        let progress_bar = multi_progress.add(ProgressBar::new(total_size));
-        progress_bar.set_style(download_style.clone());
+            let msg = format!("Package '{}' is already installed.", self.name);
+            progress_bar.finish_with_message(&msg);
 
-        let msg = format!(
-            "Downloading {}",
-            self.url.split_terminator('/').last().unwrap()
-        );
-        progress_bar.set_message(&msg);
+            return Ok(None);
+        } else if package.exists() && flags.0 {
+            remove_dir_all(&package).await?;
+        }
 
-        let url = self.url.clone();
-        let request = client.get(&url);
+        let download_handle;
 
         let file = SETTINGS
             .read()
@@ -748,38 +736,75 @@ impl Package {
             .cache_dir
             .join(self.url.split_terminator('/').last().unwrap());
 
-        // TODO: Prompt/option for re-download.
-        if file.exists() {
-            remove_file(&file).await?;
-        }
+        if file.exists() && !flags.1 {
+            let progress_bar = multi_progress.add(ProgressBar::new(0));
+            progress_bar.set_style(information_style.clone());
 
-        let mut source = request.send().await.unwrap();
-        let mut dest = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&file)
-            .await
-            .unwrap();
+            let msg = format!(
+                "Found downloaded archive '{}'.",
+                self.url.split_terminator('/').last().unwrap()
+            );
+            progress_bar.finish_with_message(&msg);
 
-        let msg = format!(
-            "Downloaded {}",
-            self.url.split_terminator('/').last().unwrap()
-        );
-
-        let download_handle = tokio::task::spawn(async move {
-            while let Some(chunk) = source.chunk().await.unwrap() {
-                dest.write_all(&chunk).await.unwrap();
-                progress_bar.inc(chunk.len() as u64);
+            download_handle = Option::None;
+        } else {
+            if file.exists() {
+                remove_file(&file).await?;
             }
 
-            progress_bar.finish_with_message(&msg);
-        });
+            let client = Client::new();
 
-        let package = SETTINGS.read().unwrap().packages_dir.join(&self.name);
+            let total_size = {
+                let resp = client.head(&self.url).send().await.unwrap();
+                if resp.status().is_success() {
+                    resp.headers()
+                        .get(header::CONTENT_LENGTH)
+                        .and_then(|ct_len| ct_len.to_str().ok())
+                        .and_then(|ct_len| ct_len.parse().ok())
+                        .unwrap_or(0)
+                } else {
+                    let error = format!(
+                        "Couldn't download URL: {}. Error: {:?}",
+                        self.url,
+                        resp.status(),
+                    );
+                    panic!(error);
+                }
+            };
 
-        // TODO: Prompt/option for re-extraction.
-        if package.exists() {
-            remove_dir_all(&package).await?;
+            let progress_bar = multi_progress.add(ProgressBar::new(total_size));
+            progress_bar.set_style(download_style.clone());
+
+            let msg = format!(
+                "Downloading {}",
+                self.url.split_terminator('/').last().unwrap()
+            );
+            progress_bar.set_message(&msg);
+
+            let url = self.url.clone();
+            let request = client.get(&url);
+
+            let mut source = request.send().await.unwrap();
+            let mut dest = fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&file)
+                .await
+                .unwrap();
+
+            let msg = format!(
+                "Downloaded {}",
+                self.url.split_terminator('/').last().unwrap()
+            );
+
+            download_handle = Some(tokio::task::spawn(async move {
+                while let Some(chunk) = source.chunk().await.unwrap() {
+                    dest.write_all(&chunk).await.unwrap();
+                    progress_bar.inc(chunk.len() as u64);
+                }
+
+                progress_bar.finish_with_message(&msg);
+            }));
         }
 
         // This value is hardcoded because the cost of calculating it is way too high
@@ -792,7 +817,9 @@ impl Package {
         progress_bar.set_style(extraction_style.clone());
 
         let extraction_handle = tokio::task::spawn(async move {
-            download_handle.await.unwrap();
+            if let Some(handle) = download_handle {
+                handle.await.unwrap();
+            }
 
             let msg = format!("Extracting {}", file.file_name().unwrap().to_str().unwrap());
             progress_bar.set_message(&msg);
@@ -932,7 +959,7 @@ impl Package {
             bincode::serialize_into(file, &package).unwrap();
         });
 
-        Ok(final_tasks)
+        Ok(Some(final_tasks))
     }
 
     pub async fn remove(&self) -> Result<(), Box<dyn Error>> {

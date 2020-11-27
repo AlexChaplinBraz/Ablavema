@@ -123,11 +123,11 @@ impl Installed {
             let multi_progress = MultiProgress::new();
             let mut install_completion = Vec::new();
             for package in packages_to_install {
-                install_completion.push(package.install(&multi_progress).await?);
+                install_completion.push(package.install(&multi_progress, &(true, true)).await?);
             }
             multi_progress.join().unwrap();
             for handle in install_completion {
-                handle.await.unwrap();
+                handle.unwrap().await.unwrap();
             }
 
             self.check()?;

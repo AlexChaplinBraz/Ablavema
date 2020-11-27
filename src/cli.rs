@@ -312,6 +312,20 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .about("Install packages")
                 .help_message("Print help and exit")
+                .arg(
+                    Arg::with_name("redownload")
+                        .global(true)
+                        .short("D")
+                        .long("redownload")
+                        .help("Redownload packages even if already cached"),
+                )
+                .arg(
+                    Arg::with_name("reinstall")
+                        .global(true)
+                        .short("I")
+                        .long("reinstall")
+                        .help("Reinstall packages even if already installed"),
+                )
                 .subcommand(
                     SubCommand::with_name("daily")
                         .setting(AppSettings::ArgRequiredElseHelp)
@@ -580,6 +594,8 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         }
         ("install", Some(a)) => match a.subcommand() {
             ("daily", Some(b)) => {
+                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
+
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
                     for build in b.values_of("id").unwrap() {
@@ -588,7 +604,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -602,13 +618,15 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
                 }
             }
             ("experimental", Some(b)) => {
+                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
+
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
                     for build in b.values_of("id").unwrap() {
@@ -617,7 +635,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -631,13 +649,15 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
                 }
             }
             ("lts", Some(b)) => {
+                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
+
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
                     for build in b.values_of("id").unwrap() {
@@ -646,7 +666,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -660,13 +680,15 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
                 }
             }
             ("official", Some(b)) => {
+                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
+
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
                     for build in b.values_of("id").unwrap() {
@@ -675,7 +697,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -689,13 +711,15 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
                 }
             }
             ("stable", Some(b)) => {
+                let flags = (b.is_present("reinstall"), b.is_present("redownload"));
+
                 if b.is_present("name") {
                     let multi_progress = MultiProgress::new();
                     for build in b.values_of("id").unwrap() {
@@ -704,7 +728,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .iter()
                             .find(|p| p.name == build)
                             .unwrap()
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
@@ -718,7 +742,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             .find(|(i, _)| *i == usize::from_str(build).unwrap())
                             .unwrap()
                             .1
-                            .install(&multi_progress)
+                            .install(&multi_progress, &flags)
                             .await?;
                     }
                     multi_progress.join().unwrap();
