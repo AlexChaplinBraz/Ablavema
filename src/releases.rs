@@ -28,21 +28,21 @@ use zip::{read::ZipFile, ZipArchive};
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Releases {
-    pub official_releases: Vec<Package>,
-    pub lts_releases: Vec<Package>,
-    pub experimental_branches: Vec<Package>,
-    pub latest_daily: Vec<Package>,
-    pub latest_stable: Vec<Package>,
+    pub daily: Vec<Package>,
+    pub experimental: Vec<Package>,
+    pub lts: Vec<Package>,
+    pub official: Vec<Package>,
+    pub stable: Vec<Package>,
 }
 
 impl Releases {
     pub fn new() -> Releases {
         Releases {
-            official_releases: Vec::new(),
-            lts_releases: Vec::new(),
-            experimental_branches: Vec::new(),
-            latest_daily: Vec::new(),
-            latest_stable: Vec::new(),
+            daily: Vec::new(),
+            experimental: Vec::new(),
+            lts: Vec::new(),
+            official: Vec::new(),
+            stable: Vec::new(),
         }
     }
 
@@ -63,7 +63,317 @@ impl Releases {
         Ok(())
     }
 
-    pub async fn fetch_official_releases(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn fetch_daily(&mut self) -> Result<(), Box<dyn Error>> {
+        let url = "https://builder.blender.org/download/";
+        let resp = reqwest::get(url).await.unwrap();
+        assert!(resp.status().is_success());
+        let resp = resp.bytes().await.unwrap();
+        let document = Document::from_read(&resp[..]).unwrap();
+
+        let current_year = Utc::today().year();
+        let current_year = format!("-{}", current_year);
+
+        let mut fetched = Releases::new();
+
+        for build in document.find(Class("os")) {
+            let targ_os = if cfg!(target_os = "linux") {
+                "Linux"
+            } else if cfg!(target_os = "windows") {
+                "Windows"
+            } else if cfg!(target_os = "macos") {
+                "macOS"
+            } else {
+                unreachable!("Unsupported OS config");
+            };
+
+            let o = build.find(Class("build")).next().unwrap().text();
+            if !o.contains(targ_os) {
+                continue;
+            }
+
+            let mut package = Package::new();
+
+            package.build = Build::Daily(build.find(Class("build-var")).next().unwrap().text());
+
+            package.version = build
+                .find(Class("name"))
+                .next()
+                .unwrap()
+                .text()
+                .split_whitespace()
+                .skip(1)
+                .next()
+                .unwrap()
+                .to_string();
+
+            let mut date = build.find(Name("small")).next().unwrap().text();
+            let mut date: String = date.drain(..date.find('-').unwrap()).collect();
+            date.push_str(&current_year);
+            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
+
+            package.commit = build
+                .find(Name("small"))
+                .next()
+                .unwrap()
+                .text()
+                .split_whitespace()
+                .last()
+                .unwrap()
+                .to_string();
+
+            package.url = format!(
+                "https://builder.blender.org{}",
+                build.find(Name("a")).next().unwrap().attr("href").unwrap()
+            );
+
+            package.name = get_file_stem(&package.url).to_string();
+
+            package.os = {
+                if o.contains("Linux") {
+                    Os::Linux
+                } else if o.contains("Windows") {
+                    Os::Windows
+                } else if o.contains("macOS") {
+                    Os::MacOs
+                } else {
+                    unreachable!("Unexpected OS");
+                }
+            };
+
+            fetched.daily.push(package);
+        }
+
+        if self.daily != fetched.daily {
+            self.daily = fetched.daily;
+
+            self.save()?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn fetch_experimental(&mut self) -> Result<(), Box<dyn Error>> {
+        let url = "https://builder.blender.org/download/branches/";
+        let resp = reqwest::get(url).await.unwrap();
+        assert!(resp.status().is_success());
+        let resp = resp.bytes().await.unwrap();
+        let document = Document::from_read(&resp[..]).unwrap();
+
+        let current_year = Utc::today().year();
+        let current_year = format!("-{}", current_year);
+
+        let mut fetched = Releases::new();
+
+        for build in document.find(Class("os")) {
+            let targ_os = if cfg!(target_os = "linux") {
+                "Linux"
+            } else if cfg!(target_os = "windows") {
+                "Windows"
+            } else if cfg!(target_os = "macos") {
+                "macOS"
+            } else {
+                unreachable!("Unsupported OS config");
+            };
+
+            let o = build.find(Class("build")).next().unwrap().text();
+            if !o.contains(targ_os) {
+                continue;
+            }
+
+            let mut package = Package::new();
+
+            package.build = Build::Experimental(
+                build
+                    .find(Class("build-var"))
+                    .next()
+                    .unwrap()
+                    .text()
+                    .split_whitespace()
+                    .next()
+                    .unwrap()
+                    .to_string(),
+            );
+
+            package.version = build
+                .find(Class("name"))
+                .next()
+                .unwrap()
+                .text()
+                .split_whitespace()
+                .skip(1)
+                .next()
+                .unwrap()
+                .to_string();
+
+            let mut date = build.find(Name("small")).next().unwrap().text();
+            let mut date: String = date.drain(..date.find('-').unwrap()).collect();
+            date.push_str(&current_year);
+            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
+
+            package.commit = build
+                .find(Name("small"))
+                .next()
+                .unwrap()
+                .text()
+                .split_whitespace()
+                .last()
+                .unwrap()
+                .to_string();
+
+            package.url = format!(
+                "https://builder.blender.org{}",
+                build.find(Name("a")).next().unwrap().attr("href").unwrap()
+            );
+
+            package.name = get_file_stem(&package.url).to_string();
+
+            package.os = {
+                if o.contains("Linux") {
+                    Os::Linux
+                } else if o.contains("Windows") {
+                    Os::Windows
+                } else if o.contains("macOS") {
+                    Os::MacOs
+                } else {
+                    unreachable!("Unexpected OS");
+                }
+            };
+
+            fetched.experimental.push(package);
+        }
+
+        if self.experimental != fetched.experimental {
+            self.experimental = fetched.experimental;
+
+            self.save()?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn fetch_lts(&mut self) -> Result<(), Box<dyn Error>> {
+        let url = "https://www.blender.org/download/lts/";
+        let resp = reqwest::get(url).await.unwrap();
+        assert!(resp.status().is_success());
+        let resp = resp.bytes().await.unwrap();
+        let document = Document::from_read(&resp[..]).unwrap();
+
+        let mut fetched = Releases::new();
+
+        // Can be done so it works off a vector of LTS releases, but by that time the website will
+        // probably change anyway so I'll wait until then. Maybe by then it won't require me to do
+        // it so stupidly since the layout is hard to parse.
+        let lts = String::from("283");
+        for rev in 0.. {
+            let mut package = Package::new();
+
+            let lts_id = format!("lts-release-{}{}", lts, rev);
+            let version = match document.find(Attr("id", lts_id.as_str())).next() {
+                Some(a) => a,
+                _ => break,
+            }
+            .text();
+
+            package.version = version
+                .split_whitespace()
+                .skip(2)
+                .next()
+                .unwrap()
+                .to_string();
+
+            let lts_date_id = format!("faq-lts-release-{}{}-1", lts, rev);
+            let section = document
+                .find(Attr("id", lts_date_id.as_str()))
+                .next()
+                .unwrap();
+
+            let mut date = section
+                .find(Name("p"))
+                .next()
+                .unwrap()
+                .text()
+                .strip_prefix("Released on ")
+                .unwrap()
+                .strip_suffix(".")
+                .unwrap()
+                .to_string();
+            date.push_str("-00:00:00");
+            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap();
+
+            for node in section.find(Name("a")) {
+                let name = node.text();
+                if name.is_empty() || name.contains(".msi") {
+                    continue;
+                }
+
+                let targ_os = if cfg!(target_os = "linux") {
+                    "linux"
+                } else if cfg!(target_os = "windows") {
+                    "win"
+                } else if cfg!(target_os = "macos") {
+                    "mac"
+                } else {
+                    unreachable!("Unsupported OS config");
+                };
+
+                if !name.contains(targ_os) {
+                    continue;
+                }
+
+                package.name = get_file_stem(node.text().as_str()).to_string();
+
+                package.build = Build::LTS;
+
+                let download_path =
+                    "https://ftp.nluug.nl/pub/graphics/blender/release/Blender2.83/";
+                package.url = format!("{}{}", download_path, name);
+
+                package.os = {
+                    if name.contains("linux") {
+                        Os::Linux
+                    } else if name.contains("win") {
+                        Os::Windows
+                    } else if name.contains("mac") {
+                        Os::MacOs
+                    } else {
+                        unreachable!("Unexpected OS");
+                    }
+                };
+            }
+
+            let lts_changelog_id = format!("faq-lts-release-{}{}-2", lts, rev);
+            let section = document
+                .find(Attr("id", lts_changelog_id.as_str()))
+                .next()
+                .unwrap();
+
+            for node in section.find(Name("li")) {
+                let text = node.text();
+
+                let url = match node.find(Name("a")).next() {
+                    Some(a) => a.attr("href").unwrap_or_default().to_string(),
+                    _ => String::from("N/A"),
+                };
+
+                let change = Change { text, url };
+                package.changelog.push(change);
+            }
+
+            fetched.lts.push(package);
+        }
+
+        fetched.lts.reverse();
+
+        if self.lts != fetched.lts {
+            self.lts = fetched.lts;
+
+            self.save()?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn fetch_official(&mut self) -> Result<(), Box<dyn Error>> {
         let url = "https://ftp.nluug.nl/pub/graphics/blender/release/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -264,14 +574,14 @@ impl Releases {
         }
 
         for handle in handles {
-            fetched.official_releases.append(&mut handle.await.unwrap());
+            fetched.official.append(&mut handle.await.unwrap());
         }
 
-        fetched.official_releases.sort_by_key(|x| x.version.clone());
-        fetched.official_releases.reverse();
+        fetched.official.sort_by_key(|x| x.version.clone());
+        fetched.official.reverse();
 
-        if self.official_releases != fetched.official_releases {
-            self.official_releases = fetched.official_releases;
+        if self.official != fetched.official {
+            self.official = fetched.official;
 
             self.save()?;
         }
@@ -279,129 +589,7 @@ impl Releases {
         Ok(())
     }
 
-    pub async fn fetch_lts_releases(&mut self) -> Result<(), Box<dyn Error>> {
-        let url = "https://www.blender.org/download/lts/";
-        let resp = reqwest::get(url).await.unwrap();
-        assert!(resp.status().is_success());
-        let resp = resp.bytes().await.unwrap();
-        let document = Document::from_read(&resp[..]).unwrap();
-
-        let mut fetched = Releases::new();
-
-        // Can be done so it works off a vector of LTS releases, but by that time the website will
-        // probably change anyway so I'll wait until then. Maybe by then it won't require me to do
-        // it so stupidly since the layout is hard to parse.
-        let lts = String::from("283");
-        for rev in 0.. {
-            let mut package = Package::new();
-
-            let lts_id = format!("lts-release-{}{}", lts, rev);
-            let version = match document.find(Attr("id", lts_id.as_str())).next() {
-                Some(a) => a,
-                _ => break,
-            }
-            .text();
-
-            package.version = version
-                .split_whitespace()
-                .skip(2)
-                .next()
-                .unwrap()
-                .to_string();
-
-            let lts_date_id = format!("faq-lts-release-{}{}-1", lts, rev);
-            let section = document
-                .find(Attr("id", lts_date_id.as_str()))
-                .next()
-                .unwrap();
-
-            let mut date = section
-                .find(Name("p"))
-                .next()
-                .unwrap()
-                .text()
-                .strip_prefix("Released on ")
-                .unwrap()
-                .strip_suffix(".")
-                .unwrap()
-                .to_string();
-            date.push_str("-00:00:00");
-            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap();
-
-            for node in section.find(Name("a")) {
-                let name = node.text();
-                if name.is_empty() || name.contains(".msi") {
-                    continue;
-                }
-
-                let targ_os = if cfg!(target_os = "linux") {
-                    "linux"
-                } else if cfg!(target_os = "windows") {
-                    "win"
-                } else if cfg!(target_os = "macos") {
-                    "mac"
-                } else {
-                    unreachable!("Unsupported OS config");
-                };
-
-                if !name.contains(targ_os) {
-                    continue;
-                }
-
-                package.name = get_file_stem(node.text().as_str()).to_string();
-
-                package.build = Build::LTS;
-
-                let download_path =
-                    "https://ftp.nluug.nl/pub/graphics/blender/release/Blender2.83/";
-                package.url = format!("{}{}", download_path, name);
-
-                package.os = {
-                    if name.contains("linux") {
-                        Os::Linux
-                    } else if name.contains("win") {
-                        Os::Windows
-                    } else if name.contains("mac") {
-                        Os::MacOs
-                    } else {
-                        unreachable!("Unexpected OS");
-                    }
-                };
-            }
-
-            let lts_changelog_id = format!("faq-lts-release-{}{}-2", lts, rev);
-            let section = document
-                .find(Attr("id", lts_changelog_id.as_str()))
-                .next()
-                .unwrap();
-
-            for node in section.find(Name("li")) {
-                let text = node.text();
-
-                let url = match node.find(Name("a")).next() {
-                    Some(a) => a.attr("href").unwrap_or_default().to_string(),
-                    _ => String::from("N/A"),
-                };
-
-                let change = Change { text, url };
-                package.changelog.push(change);
-            }
-
-            fetched.lts_releases.push(package);
-        }
-
-        fetched.lts_releases.reverse();
-
-        if self.lts_releases != fetched.lts_releases {
-            self.lts_releases = fetched.lts_releases;
-
-            self.save()?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn fetch_latest_stable(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn fetch_stable(&mut self) -> Result<(), Box<dyn Error>> {
         let url = "https://www.blender.org/download/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -470,198 +658,10 @@ impl Releases {
 
         let mut fetched = Releases::new();
 
-        fetched.latest_stable.push(package);
+        fetched.stable.push(package);
 
-        if self.latest_stable != fetched.latest_stable {
-            self.latest_stable = fetched.latest_stable;
-
-            self.save()?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn fetch_latest_daily(&mut self) -> Result<(), Box<dyn Error>> {
-        let url = "https://builder.blender.org/download/";
-        let resp = reqwest::get(url).await.unwrap();
-        assert!(resp.status().is_success());
-        let resp = resp.bytes().await.unwrap();
-        let document = Document::from_read(&resp[..]).unwrap();
-
-        let current_year = Utc::today().year();
-        let current_year = format!("-{}", current_year);
-
-        let mut fetched = Releases::new();
-
-        for build in document.find(Class("os")) {
-            let targ_os = if cfg!(target_os = "linux") {
-                "Linux"
-            } else if cfg!(target_os = "windows") {
-                "Windows"
-            } else if cfg!(target_os = "macos") {
-                "macOS"
-            } else {
-                unreachable!("Unsupported OS config");
-            };
-
-            let o = build.find(Class("build")).next().unwrap().text();
-            if !o.contains(targ_os) {
-                continue;
-            }
-
-            let mut package = Package::new();
-
-            package.build = Build::Daily(build.find(Class("build-var")).next().unwrap().text());
-
-            package.version = build
-                .find(Class("name"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .skip(1)
-                .next()
-                .unwrap()
-                .to_string();
-
-            let mut date = build.find(Name("small")).next().unwrap().text();
-            let mut date: String = date.drain(..date.find('-').unwrap()).collect();
-            date.push_str(&current_year);
-            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
-
-            package.commit = build
-                .find(Name("small"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .last()
-                .unwrap()
-                .to_string();
-
-            package.url = format!(
-                "https://builder.blender.org{}",
-                build.find(Name("a")).next().unwrap().attr("href").unwrap()
-            );
-
-            package.name = get_file_stem(&package.url).to_string();
-
-            package.os = {
-                if o.contains("Linux") {
-                    Os::Linux
-                } else if o.contains("Windows") {
-                    Os::Windows
-                } else if o.contains("macOS") {
-                    Os::MacOs
-                } else {
-                    unreachable!("Unexpected OS");
-                }
-            };
-
-            fetched.latest_daily.push(package);
-        }
-
-        if self.latest_daily != fetched.latest_daily {
-            self.latest_daily = fetched.latest_daily;
-
-            self.save()?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn fetch_experimental_branches(&mut self) -> Result<(), Box<dyn Error>> {
-        let url = "https://builder.blender.org/download/branches/";
-        let resp = reqwest::get(url).await.unwrap();
-        assert!(resp.status().is_success());
-        let resp = resp.bytes().await.unwrap();
-        let document = Document::from_read(&resp[..]).unwrap();
-
-        let current_year = Utc::today().year();
-        let current_year = format!("-{}", current_year);
-
-        let mut fetched = Releases::new();
-
-        for build in document.find(Class("os")) {
-            let targ_os = if cfg!(target_os = "linux") {
-                "Linux"
-            } else if cfg!(target_os = "windows") {
-                "Windows"
-            } else if cfg!(target_os = "macos") {
-                "macOS"
-            } else {
-                unreachable!("Unsupported OS config");
-            };
-
-            let o = build.find(Class("build")).next().unwrap().text();
-            if !o.contains(targ_os) {
-                continue;
-            }
-
-            let mut package = Package::new();
-
-            package.build = Build::Experimental(
-                build
-                    .find(Class("build-var"))
-                    .next()
-                    .unwrap()
-                    .text()
-                    .split_whitespace()
-                    .next()
-                    .unwrap()
-                    .to_string(),
-            );
-
-            package.version = build
-                .find(Class("name"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .skip(1)
-                .next()
-                .unwrap()
-                .to_string();
-
-            let mut date = build.find(Name("small")).next().unwrap().text();
-            let mut date: String = date.drain(..date.find('-').unwrap()).collect();
-            date.push_str(&current_year);
-            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
-
-            package.commit = build
-                .find(Name("small"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .last()
-                .unwrap()
-                .to_string();
-
-            package.url = format!(
-                "https://builder.blender.org{}",
-                build.find(Name("a")).next().unwrap().attr("href").unwrap()
-            );
-
-            package.name = get_file_stem(&package.url).to_string();
-
-            package.os = {
-                if o.contains("Linux") {
-                    Os::Linux
-                } else if o.contains("Windows") {
-                    Os::Windows
-                } else if o.contains("macOS") {
-                    Os::MacOs
-                } else {
-                    unreachable!("Unexpected OS");
-                }
-            };
-
-            fetched.experimental_branches.push(package);
-        }
-
-        if self.experimental_branches != fetched.experimental_branches {
-            self.experimental_branches = fetched.experimental_branches;
+        if self.stable != fetched.stable {
+            self.stable = fetched.stable;
 
             self.save()?;
         }

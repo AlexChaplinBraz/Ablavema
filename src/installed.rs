@@ -58,37 +58,10 @@ impl Installed {
 
         let mut packages_to_install = Vec::new();
 
-        if SETTINGS.read().unwrap().update_stable {
-            releases.fetch_latest_stable().await?;
-
-            let latest_stable = releases.latest_stable.iter().next().unwrap();
-            if !self.contains(latest_stable)
-                && self
-                    .iter()
-                    .find(|p| p.build == latest_stable.build)
-                    .is_some()
-            {
-                packages_to_install.push(latest_stable.clone());
-                println!("Found: {} | {}", latest_stable.name, latest_stable.date);
-            }
-        }
-
-        if SETTINGS.read().unwrap().update_lts {
-            releases.fetch_lts_releases().await?;
-
-            let latest_lts = releases.lts_releases.iter().next().unwrap();
-            if !self.contains(latest_lts)
-                && self.iter().find(|p| p.build == latest_lts.build).is_some()
-            {
-                packages_to_install.push(latest_lts.clone());
-                println!("Found: {} | {}", latest_lts.name, latest_lts.date);
-            }
-        }
-
         if SETTINGS.read().unwrap().update_daily {
-            releases.fetch_latest_daily().await?;
+            releases.fetch_daily().await?;
 
-            for fetched_package in &releases.latest_daily {
+            for fetched_package in &releases.daily {
                 if !self.contains(fetched_package)
                     && self
                         .iter()
@@ -102,9 +75,9 @@ impl Installed {
         }
 
         if SETTINGS.read().unwrap().update_experimental {
-            releases.fetch_experimental_branches().await?;
+            releases.fetch_experimental().await?;
 
-            for fetched_package in &releases.experimental_branches {
+            for fetched_package in &releases.experimental {
                 if !self.contains(fetched_package)
                     && self
                         .iter()
@@ -114,6 +87,33 @@ impl Installed {
                     packages_to_install.push(fetched_package.clone());
                     println!("Found: {} | {}", fetched_package.name, fetched_package.date);
                 }
+            }
+        }
+
+        if SETTINGS.read().unwrap().update_lts {
+            releases.fetch_lts().await?;
+
+            let latest_lts = releases.lts.iter().next().unwrap();
+            if !self.contains(latest_lts)
+                && self.iter().find(|p| p.build == latest_lts.build).is_some()
+            {
+                packages_to_install.push(latest_lts.clone());
+                println!("Found: {} | {}", latest_lts.name, latest_lts.date);
+            }
+        }
+
+        if SETTINGS.read().unwrap().update_stable {
+            releases.fetch_stable().await?;
+
+            let latest_stable = releases.stable.iter().next().unwrap();
+            if !self.contains(latest_stable)
+                && self
+                    .iter()
+                    .find(|p| p.build == latest_stable.build)
+                    .is_some()
+            {
+                packages_to_install.push(latest_stable.clone());
+                println!("Found: {} | {}", latest_stable.name, latest_stable.date);
             }
         }
 

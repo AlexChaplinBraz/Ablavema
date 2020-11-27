@@ -564,43 +564,41 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         }
         ("fetch", Some(a)) => {
             if a.is_present("all") {
-                releases.fetch_official_releases().await?;
-                releases.fetch_lts_releases().await?;
-                releases.fetch_experimental_branches().await?;
-                releases.fetch_latest_daily().await?;
-                releases.fetch_latest_stable().await?;
+                releases.fetch_daily().await?;
+                releases.fetch_experimental().await?;
+                releases.fetch_lts().await?;
+                releases.fetch_official().await?;
+                releases.fetch_stable().await?;
             } else {
                 if a.is_present("daily") {
-                    releases.fetch_latest_daily().await?;
+                    releases.fetch_daily().await?;
                 }
 
                 if a.is_present("experimental") {
-                    releases.fetch_experimental_branches().await?;
+                    releases.fetch_experimental().await?;
                 }
 
                 if a.is_present("lts") {
-                    releases.fetch_lts_releases().await?;
+                    releases.fetch_lts().await?;
                 }
 
                 if a.is_present("official") {
-                    releases.fetch_official_releases().await?;
+                    releases.fetch_official().await?;
                 }
 
                 if a.is_present("stable") {
-                    releases.fetch_latest_stable().await?;
+                    releases.fetch_stable().await?;
                 }
             }
         }
         ("install", Some(a)) => match a.subcommand() {
-            ("daily", Some(b)) => cli_install(b, &releases.latest_daily, "daily").await?,
+            ("daily", Some(b)) => cli_install(b, &releases.daily, "daily").await?,
             ("experimental", Some(b)) => {
-                cli_install(b, &releases.experimental_branches, "experimental").await?
+                cli_install(b, &releases.experimental, "experimental").await?
             }
-            ("lts", Some(b)) => cli_install(b, &releases.lts_releases, "LTS").await?,
-            ("official", Some(b)) => {
-                cli_install(b, &releases.official_releases, "official").await?
-            }
-            ("stable", Some(b)) => cli_install(b, &releases.latest_stable, "stable").await?,
+            ("lts", Some(b)) => cli_install(b, &releases.lts, "LTS").await?,
+            ("official", Some(b)) => cli_install(b, &releases.official, "official").await?,
+            ("stable", Some(b)) => cli_install(b, &releases.stable, "stable").await?,
             _ => unreachable!("Install subcommand"),
         },
         ("list", Some(a)) => match a.subcommand() {
@@ -608,7 +606,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 let mut table = Table::new();
                 table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
                 table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.latest_daily.iter().enumerate() {
+                for (i, p) in releases.daily.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
                 if table.is_empty() {
@@ -625,7 +623,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 let mut table = Table::new();
                 table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
                 table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.experimental_branches.iter().enumerate() {
+                for (i, p) in releases.experimental.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
                 if table.is_empty() {
@@ -651,7 +649,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 let mut table = Table::new();
                 table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
                 table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.lts_releases.iter().enumerate() {
+                for (i, p) in releases.lts.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
                 if table.is_empty() {
@@ -664,7 +662,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 let mut table = Table::new();
                 table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
                 table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.official_releases.iter().enumerate() {
+                for (i, p) in releases.official.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
                 if table.is_empty() {
@@ -677,7 +675,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 let mut table = Table::new();
                 table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
                 table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.latest_stable.iter().enumerate() {
+                for (i, p) in releases.stable.iter().enumerate() {
                     table.add_row(row![i, p.name, p.version, p.build, p.date]);
                 }
                 if table.is_empty() {
