@@ -973,7 +973,6 @@ impl Package {
 
         remove_dir_all(path).await?;
 
-        // TODO: Add this type of reporting to other commands like fetch.
         println!("Removed: {}", self.name);
 
         Ok(())

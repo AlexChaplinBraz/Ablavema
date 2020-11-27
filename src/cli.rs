@@ -564,31 +564,40 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         }
         ("fetch", Some(a)) => {
             if a.is_present("all") {
+                println!("Fetching all packages...");
                 releases.fetch_daily().await?;
                 releases.fetch_experimental().await?;
                 releases.fetch_lts().await?;
                 releases.fetch_official().await?;
                 releases.fetch_stable().await?;
+                println!("Done.");
             } else {
                 if a.is_present("daily") {
+                    println!("Fetching daily packages...");
                     releases.fetch_daily().await?;
                 }
 
                 if a.is_present("experimental") {
+                    println!("Fetching experimental packages...");
                     releases.fetch_experimental().await?;
                 }
 
                 if a.is_present("lts") {
+                    println!("Fetching LTS packages...");
                     releases.fetch_lts().await?;
                 }
 
                 if a.is_present("official") {
+                    println!("Fetching official packages...");
                     releases.fetch_official().await?;
                 }
 
                 if a.is_present("stable") {
+                    println!("Fetching stable packages...");
                     releases.fetch_stable().await?;
                 }
+
+                println!("Done.");
             }
         }
         ("install", Some(a)) => match a.subcommand() {
