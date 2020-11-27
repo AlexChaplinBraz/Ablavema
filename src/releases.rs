@@ -943,7 +943,13 @@ impl Package {
                 "blender-2.79-e045fe53f1b0-win32-official" => {
                     "blender-2.79.0-git.e045fe53f1b0-windows32"
                 }
-                _ => &package.name,
+                _ => {
+                    if package.build == Build::Official {
+                        package.name.trim_end_matches("-official")
+                    } else {
+                        &package.name
+                    }
+                }
             };
 
             let mut package_path = SETTINGS.read().unwrap().packages_dir.join(&package.name);
