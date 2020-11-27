@@ -765,23 +765,23 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         ("select", Some(a)) => {
             SETTINGS.write().unwrap().default_package = {
                 if a.is_present("name") {
-                    installed
+                    match installed
                         .iter()
                         .find(|p| p.name == a.value_of("id").unwrap())
-                        .unwrap()
-                        .name
-                        .to_string()
+                    {
+                        Some(a) => a.name.clone(),
+                        None => Err("No installed package with this name found")?,
+                    }
                 } else {
-                    installed
-                        .iter()
-                        .enumerate()
-                        .find(|(i, _)| *i == usize::from_str(a.value_of("id").unwrap()).unwrap())
-                        .unwrap()
-                        .1
-                        .name
-                        .to_string()
+                    let id = usize::from_str(a.value_of("id").unwrap())?;
+
+                    match installed.iter().enumerate().find(|(i, _)| *i == id) {
+                        Some(a) => a.1.name.clone(),
+                        None => Err("No installed package with this ID found")?,
+                    }
                 }
             };
+
             SETTINGS.read().unwrap().save();
             println!("Selected: {}", SETTINGS.read().unwrap().default_package);
         }
