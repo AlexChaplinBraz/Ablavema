@@ -5,7 +5,6 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
     SubCommand,
 };
-use prettytable::{cell, format, row, Table};
 use std::{error::Error, str::FromStr, sync::atomic::Ordering};
 use tokio::fs::remove_dir_all;
 
@@ -431,6 +430,22 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .about("List packages")
                 .help_message("Print help and exit")
+                .arg(
+                    Arg::with_name("invert")
+                        .global(true)
+                        .short("i")
+                        .long("invert")
+                        .help("Invert the table")
+                        .long_help("Invert the table so it's possible to start reading from ID 0 from the command prompt. Useful for long tables like the one for the official packages if you're looking for the latest ones and don't want to scroll up a lot."),
+                )
+                .arg(
+                    Arg::with_name("wide")
+                        .global(true)
+                        .short("w")
+                        .long("wide")
+                        .help("Use the wide version of the table")
+                        .long_help("Use the wide version of the table. The wider table can be better for listing official packages, as they take three times more space vertically using the narrow table."),
+                )
                 .subcommand(
                     SubCommand::with_name("daily")
                         .about("List daily packages")
@@ -618,86 +633,54 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             _ => unreachable!("Install subcommand"),
         },
         ("list", Some(a)) => match a.subcommand() {
-            ("daily", Some(_b)) => {
-                let mut table = Table::new();
-                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.daily.iter().enumerate() {
-                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
-                }
-                if table.is_empty() {
-                    eprintln!("No daily packages found. Try fetching first.");
+            ("daily", Some(b)) => {
+                if b.is_present("wide") {
+                    cli_list_wide(&releases.daily, "daily", b.is_present("invert"));
                 } else {
-                    table.printstd();
+                    cli_list_narrow(&releases.daily, "daily", b.is_present("invert"));
                 }
             }
-            ("experimental", Some(_b)) => {
-                // TODO: This table can be around 160 characters wide, which breaks formatting
-                // on narrow terminals. Could be solved by checking terminal width and truncating
-                // the package name since it holds repeated information. But even the other tables
-                // have a chance of looking weird depending on how small their terminal window is.
-                let mut table = Table::new();
-                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.experimental.iter().enumerate() {
-                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
-                }
-                if table.is_empty() {
-                    eprintln!("No experimental packages found. Try fetching first.");
+            ("experimental", Some(b)) => {
+                if b.is_present("wide") {
+                    cli_list_wide(
+                        &releases.experimental,
+                        "experimental",
+                        b.is_present("invert"),
+                    );
                 } else {
-                    table.printstd();
+                    cli_list_narrow(
+                        &releases.experimental,
+                        "experimental",
+                        b.is_present("invert"),
+                    );
                 }
             }
-            ("installed", Some(_b)) => {
-                let mut table = Table::new();
-                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in installed.iter().enumerate() {
-                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
-                }
-                if table.is_empty() {
-                    eprintln!("No installed packages found. Try installing first.");
+            ("installed", Some(b)) => {
+                if b.is_present("wide") {
+                    cli_list_wide(&releases.experimental, "installed", b.is_present("invert"));
                 } else {
-                    table.printstd();
+                    cli_list_narrow(&releases.experimental, "installed", b.is_present("invert"));
                 }
             }
-            ("lts", Some(_b)) => {
-                let mut table = Table::new();
-                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.lts.iter().enumerate() {
-                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
-                }
-                if table.is_empty() {
-                    eprintln!("No LTS packages found. Try fetching first.");
+            ("lts", Some(b)) => {
+                if b.is_present("wide") {
+                    cli_list_wide(&releases.lts, "LTS", b.is_present("invert"));
                 } else {
-                    table.printstd();
+                    cli_list_narrow(&releases.lts, "LTS", b.is_present("invert"));
                 }
             }
-            ("official", Some(_b)) => {
-                let mut table = Table::new();
-                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.official.iter().enumerate() {
-                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
-                }
-                if table.is_empty() {
-                    eprintln!("No official packages found. Try fetching first.");
+            ("official", Some(b)) => {
+                if b.is_present("wide") {
+                    cli_list_wide(&releases.official, "official", b.is_present("invert"));
                 } else {
-                    table.printstd();
+                    cli_list_narrow(&releases.official, "official", b.is_present("invert"));
                 }
             }
-            ("stable", Some(_b)) => {
-                let mut table = Table::new();
-                table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-                table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
-                for (i, p) in releases.stable.iter().enumerate() {
-                    table.add_row(row![i, p.name, p.version, p.build, p.date]);
-                }
-                if table.is_empty() {
-                    eprintln!("No stable packages found. Try fetching first.");
+            ("stable", Some(b)) => {
+                if b.is_present("wide") {
+                    cli_list_wide(&releases.stable, "stable", b.is_present("invert"));
                 } else {
-                    table.printstd();
+                    cli_list_narrow(&releases.stable, "stable", b.is_present("invert"));
                 }
             }
             _ => unreachable!("List subcommand"),

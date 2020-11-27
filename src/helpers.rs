@@ -3,6 +3,11 @@
 use crate::{releases::*, settings::*};
 use clap::ArgMatches;
 use indicatif::MultiProgress;
+use prettytable::{
+    cell,
+    format::{self, FormatBuilder},
+    row, table, Table,
+};
 use std::{error::Error, path::Path, str::FromStr};
 
 pub fn process_bool_arg(arg: &ArgMatches, name: &str) -> Result<(), Box<dyn Error>> {
@@ -130,4 +135,63 @@ pub async fn cli_install(
     multi_progress.join().unwrap();
 
     Ok(())
+}
+
+pub fn cli_list_narrow(packages: &Vec<Package>, name: &str, invert: bool) {
+    let mut table = Table::new();
+    table.set_titles(row!["ID", "Package"]);
+
+    for (i, p) in packages.iter().enumerate() {
+        // This is a workaround for the issue of prettytable having a weird behaviour when a cell
+        // has hspan > 1, affecting the other cells and making them uneven based on the content
+        // length of the cell with hspan > 1.
+        let details = format!("{} | {} | {}", p.date, p.version, p.build);
+        let mut package = table!([p.name], [details]);
+
+        let inner_format = FormatBuilder::new().padding(0, 0).build();
+        package.set_format(inner_format);
+
+        table.add_row(row![i, package]);
+    }
+
+    if table.is_empty() {
+        eprintln!("No {} packages found.", name);
+    } else if invert {
+        let mut inverted_table = Table::new();
+        inverted_table.set_titles(row!["ID", "Package"]);
+
+        for r in table.row_iter().rev() {
+            inverted_table.add_row(r.to_owned());
+        }
+
+        inverted_table.printstd();
+    } else {
+        table.printstd();
+    }
+}
+
+pub fn cli_list_wide(packages: &Vec<Package>, name: &str, invert: bool) {
+    let mut table = Table::new();
+    table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
+    table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+
+    for (i, p) in packages.iter().enumerate() {
+        table.add_row(row![i, p.name, p.version, p.build, p.date]);
+    }
+
+    if table.is_empty() {
+        eprintln!("No {} packages found.", name);
+    } else if invert {
+        let mut inverted_table = Table::new();
+        inverted_table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
+        inverted_table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+
+        for r in table.row_iter().rev() {
+            inverted_table.add_row(r.to_owned());
+        }
+
+        inverted_table.printstd();
+    } else {
+        table.printstd();
+    }
 }
