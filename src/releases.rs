@@ -808,10 +808,10 @@ impl Package {
         }
 
         // This value is hardcoded because the cost of calculating it is way too high
-        // to justify it (around 4 seconds). Setting it a bit higher so that it's not stuck
+        // to justify it (up to 30 seconds). Setting it a bit higher so that it's not stuck
         // at 100%. It'll jump to 100% from around 95% for recent packages,
         // but it's jumpy throughout the whole process so it doesn't stand out.
-        // It is, however, noticeable with older packages with smaller size.
+        // It is, however, noticeable with older packages with less files.
         // TODO: Implement a fast way of calculating it.
         let progress_bar = multi_progress.add(ProgressBar::new(5000));
         progress_bar.set_style(extraction_style.clone());
@@ -827,6 +827,16 @@ impl Package {
             progress_bar.enable_steady_tick(250);
 
             if file.extension().unwrap() == "xz" {
+                // This counting implementation adds up to 10 seconds to the extraction
+                // on the latest .tar.xz archives.
+                /*
+                let tar_xz_len = File::open(&file).unwrap();
+                let tar_len = XzDecoder::new(tar_xz_len);
+                let mut archive_len = Archive::new(tar_len);
+                let plen = archive_len.entries().unwrap().count();
+                progress_bar.set_length(plen as u64);
+                */
+
                 let tar_xz = File::open(&file).unwrap();
                 let tar = XzDecoder::new(tar_xz);
                 let mut archive = Archive::new(tar);
@@ -840,6 +850,16 @@ impl Package {
                 let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
                 progress_bar.finish_with_message(&msg);
             } else if file.extension().unwrap() == "bz2" {
+                // This counting implementation adds up to 30 seconds to the extraction
+                // on the latest .tar.bz2 archives.
+                /*
+                let tar_bz2_len = File::open(&file).unwrap();
+                let tar_len = BzDecoder::new(tar_bz2_len);
+                let mut archive_len = Archive::new(tar_len);
+                let plen = archive_len.entries().unwrap().count();
+                progress_bar.set_length(plen as u64);
+                */
+
                 let tar_bz2 = File::open(&file).unwrap();
                 let tar = BzDecoder::new(tar_bz2);
                 let mut archive = Archive::new(tar);
@@ -853,6 +873,13 @@ impl Package {
                 let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
                 progress_bar.finish_with_message(&msg);
             } else if file.extension().unwrap() == "gz" {
+                // Here it's fine since the old archives are really small.
+                let tar_gz_len = File::open(&file).unwrap();
+                let tar_len = GzDecoder::new(tar_gz_len);
+                let mut archive_len = Archive::new(tar_len);
+                let plen = archive_len.entries().unwrap().count();
+                progress_bar.set_length(plen as u64);
+
                 let tar_gz = File::open(&file).unwrap();
                 let tar = GzDecoder::new(tar_gz);
                 let mut archive = Archive::new(tar);
