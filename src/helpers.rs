@@ -3,12 +3,13 @@
 use crate::{releases::*, settings::*};
 use clap::ArgMatches;
 use indicatif::MultiProgress;
+use lazy_static::lazy_static;
 use prettytable::{
     cell,
     format::{self, FormatBuilder},
     row, table, Table,
 };
-use std::{error::Error, path::Path, str::FromStr};
+use std::{collections::HashMap, error::Error, path::Path, str::FromStr};
 
 pub fn process_bool_arg(arg: &ArgMatches, name: &str) -> Result<(), Box<dyn Error>> {
     if arg.is_present(name) {
@@ -193,5 +194,61 @@ pub fn cli_list_wide(packages: &Vec<Package>, name: &str, invert: bool) {
         inverted_table.printstd();
     } else {
         table.printstd();
+    }
+}
+
+lazy_static! {
+    static ref EXTRACTED_NAMES: HashMap<&'static str, &'static str> = [
+        (
+            "blender-2.27.NewPy1-linux-glibc2.3.2-i386-official",
+            "blender-2.27-linux-glibc2.3.2-i386"
+        ),
+        (
+            // Seems like a wrongly packaged version.
+            // This actually conflicts if the 2.35b archive is being installed
+            // at the same time as the actual 2.35a archive.
+            // There's no error, but the files end up distributed between
+            // the two directories, breaking both packages.
+            // TODO: I don't even.
+            "blender-2.35b-linux-glibc2.2.5-i386-official",
+            "blender-2.35a-linux-glibc2.2.5-i386"
+        ),
+        ("blender-2.5-alpha1-linux-glibc27-x86_64-official", "blender-2.50-alpha1-linux-glibc27-x86_64"),
+        ("blender-2.5-alpha1-linux-glibc27-i686-official", "blender-2.50-alpha1-linux-glibc27-i686"),
+        (
+            "blender-2.27.NewPy1-windows-official",
+            "blender-2.27-windows"
+        ),
+        ("blender-2.47-windows-law-official", "blender-2.47-windows"),
+        ("blender-2.48-windows64-official", "Blender248"),
+        ("blender-2.48a-windows64-official", "Blender248a"),
+        ("blender-2.5-alpha1-win64-official", "blender25-win64-26982"),
+        ("blender-2.5-alpha2-win64-official", "Release"),
+        (
+            "blender-2.79-e045fe53f1b0-win64-official",
+            "blender-2.79.0-git.e045fe53f1b0-windows64"
+        ),
+        (
+            "blender-2.79-e045fe53f1b0-win32-official",
+            "blender-2.79.0-git.e045fe53f1b0-windows32"
+        ),
+    ]
+    .iter()
+    .copied()
+    .collect();
+}
+
+/// Handles cases where the extracted directory isn't named the same
+/// as the downloaded archive from which the name of the package is taken.
+pub fn get_extracted_name(package: &Package) -> &str {
+    match EXTRACTED_NAMES.get(&package.name.as_ref()) {
+        Some(s) => *s,
+        None => {
+            if package.build == Build::Official {
+                package.name.trim_end_matches("-official")
+            } else {
+                &package.name
+            }
+        }
     }
 }

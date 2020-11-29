@@ -955,34 +955,14 @@ impl Package {
         let final_tasks = tokio::task::spawn(async move {
             extraction_handle.await.unwrap();
 
-            // This handles cases where the extracted directory isn't named the same
-            // as the downloaded archive from which the name of the package is taken.
-            let extracted_name = match package.name.as_ref() {
-                "blender-2.27.NewPy1-windows-official" => "blender-2.27-windows",
-                "blender-2.47-windows-law-official" => "blender-2.47-windows",
-                "blender-2.48-windows64-official" => "Blender248",
-                "blender-2.48a-windows64-official" => "Blender248a",
-                "blender-2.5-alpha1-win64-official" => "blender25-win64-26982",
-                "blender-2.5-alpha2-win64-official" => "Release",
-                "blender-2.79-e045fe53f1b0-win64-official" => {
-                    "blender-2.79.0-git.e045fe53f1b0-windows64"
-                }
-                "blender-2.79-e045fe53f1b0-win32-official" => {
-                    "blender-2.79.0-git.e045fe53f1b0-windows32"
-                }
-                _ => {
-                    if package.build == Build::Official {
-                        package.name.trim_end_matches("-official")
-                    } else {
-                        &package.name
-                    }
-                }
-            };
-
             let mut package_path = SETTINGS.read().unwrap().packages_dir.join(&package.name);
 
             std::fs::rename(
-                SETTINGS.read().unwrap().cache_dir.join(extracted_name),
+                SETTINGS
+                    .read()
+                    .unwrap()
+                    .cache_dir
+                    .join(get_extracted_name(&package)),
                 &package_path,
             )
             .unwrap();
