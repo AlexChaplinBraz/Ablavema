@@ -9,7 +9,45 @@ use prettytable::{
     format::{self, FormatBuilder},
     row, table, Table,
 };
-use std::{collections::HashMap, error::Error, path::Path, str::FromStr};
+use std::{collections::HashMap, error::Error, path::Path, process::Command, str::FromStr};
+
+pub fn open_blender(package: String, file_path: Option<String>) -> Result<(), Box<dyn Error>> {
+    match file_path {
+        Some(path) => std::thread::spawn(move || {
+            Command::new(SETTINGS.read().unwrap().packages_dir.join(package).join({
+                if cfg!(target_os = "linux") {
+                    "blender"
+                } else if cfg!(target_os = "windows") {
+                    "blender.exe"
+                } else if cfg!(target_os = "macos") {
+                    todo!("macos executable");
+                } else {
+                    unreachable!("Unsupported OS");
+                }
+            }))
+            .arg(path)
+            .status()
+            .unwrap();
+        }),
+        None => std::thread::spawn(move || {
+            Command::new(SETTINGS.read().unwrap().packages_dir.join(package).join({
+                if cfg!(target_os = "linux") {
+                    "blender"
+                } else if cfg!(target_os = "windows") {
+                    "blender.exe"
+                } else if cfg!(target_os = "macos") {
+                    todo!("macos executable");
+                } else {
+                    unreachable!("Unsupported OS");
+                }
+            }))
+            .status()
+            .unwrap();
+        }),
+    };
+
+    Ok(())
+}
 
 pub fn process_bool_arg(arg: &ArgMatches, name: &str) -> Result<(), Box<dyn Error>> {
     if arg.is_present(name) {

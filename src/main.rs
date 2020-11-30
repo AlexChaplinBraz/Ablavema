@@ -37,9 +37,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
             todo!("Launch GUI");
         } else {
             if gui_args.file_path.is_empty() {
-                Installed::open_blender()?;
+                open_blender(SETTINGS.read().unwrap().default_package.clone(), None)?;
             } else {
-                Installed::open_blender_with_file(&gui_args.file_path)?;
+                open_blender(
+                    SETTINGS.read().unwrap().default_package.clone(),
+                    Some(gui_args.file_path),
+                )?;
             }
         }
     }
