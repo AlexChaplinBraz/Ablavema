@@ -657,9 +657,9 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             }
             ("installed", Some(b)) => {
                 if b.is_present("wide") {
-                    cli_list_wide(&releases.experimental, "installed", b.is_present("invert"));
+                    cli_list_wide(&installed, "installed", b.is_present("invert"));
                 } else {
-                    cli_list_narrow(&releases.experimental, "installed", b.is_present("invert"));
+                    cli_list_narrow(&installed, "installed", b.is_present("invert"));
                 }
             }
             ("lts", Some(b)) => {
