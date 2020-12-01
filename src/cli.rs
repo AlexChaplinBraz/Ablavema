@@ -12,6 +12,8 @@ use tokio::fs::remove_dir_all;
 pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
     let mut only_cli = true;
 
+    let mut updates = None;
+
     let mut releases = Releases::new();
     releases.load()?;
 
@@ -839,11 +841,23 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
                 println!("Selected: {}", SETTINGS.read().unwrap().default_package);
             }
         }
-        ("update", Some(_a)) => installed.update(&mut releases).await?,
+        ("update", Some(_a)) => {
+            let packages_found = installed.check_for_updates(&mut releases).await?;
+            installed.cli_update(packages_found).await?
+        }
         _ => {
             only_cli = false;
 
-            if SETTINGS.read().unwrap().bypass_launcher {
+            if SETTINGS.read().unwrap().check_updates_at_launch {
+                if is_time_to_update() {
+                    updates = Some(installed.check_for_updates(&mut releases).await?);
+                    LAUNCH_GUI.store(true, Ordering::Relaxed);
+                } else {
+                    println!("Not yet time to check for updates.");
+                }
+            }
+
+            if SETTINGS.read().unwrap().bypass_launcher && !LAUNCH_GUI.load(Ordering::Relaxed) {
                 let device_state = DeviceState::new();
                 let keys = device_state.get_keys();
 
@@ -860,6 +874,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
         GuiArgs {
             releases,
             installed,
+            updates,
             file_path: {
                 if args.is_present("path") {
                     String::from(args.value_of("path").unwrap())

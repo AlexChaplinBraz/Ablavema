@@ -5,5 +5,6 @@ use crate::{installed::*, releases::*};
 pub struct GuiArgs {
     pub releases: Releases,
     pub installed: Installed,
+    pub updates: Option<Vec<Package>>,
     pub file_path: String,
 }

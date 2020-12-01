@@ -52,11 +52,14 @@ impl Installed {
         Ok(())
     }
 
-    pub async fn update(&mut self, releases: &mut Releases) -> Result<(), Box<dyn Error>> {
+    pub async fn check_for_updates(
+        &mut self,
+        releases: &mut Releases,
+    ) -> Result<Vec<Package>, Box<dyn Error>> {
         SETTINGS.write().unwrap().last_update_time = SystemTime::now();
         SETTINGS.read().unwrap().save();
 
-        let mut packages_to_install = Vec::new();
+        let mut packages_found = Vec::new();
 
         if SETTINGS.read().unwrap().update_daily {
             releases.fetch_daily().await?;
@@ -68,7 +71,7 @@ impl Installed {
                         .find(|p| p.build == fetched_package.build)
                         .is_some()
                 {
-                    packages_to_install.push(fetched_package.clone());
+                    packages_found.push(fetched_package.clone());
                     println!("Found: {} | {}", fetched_package.name, fetched_package.date);
                 }
             }
@@ -84,7 +87,7 @@ impl Installed {
                         .find(|p| p.build == fetched_package.build)
                         .is_some()
                 {
-                    packages_to_install.push(fetched_package.clone());
+                    packages_found.push(fetched_package.clone());
                     println!("Found: {} | {}", fetched_package.name, fetched_package.date);
                 }
             }
@@ -97,7 +100,7 @@ impl Installed {
             if !self.contains(latest_lts)
                 && self.iter().find(|p| p.build == latest_lts.build).is_some()
             {
-                packages_to_install.push(latest_lts.clone());
+                packages_found.push(latest_lts.clone());
                 println!("Found: {} | {}", latest_lts.name, latest_lts.date);
             }
         }
@@ -112,17 +115,21 @@ impl Installed {
                     .find(|p| p.build == latest_stable.build)
                     .is_some()
             {
-                packages_to_install.push(latest_stable.clone());
+                packages_found.push(latest_stable.clone());
                 println!("Found: {} | {}", latest_stable.name, latest_stable.date);
             }
         }
 
-        if packages_to_install.is_empty() {
+        Ok(packages_found)
+    }
+
+    pub async fn cli_update(&mut self, packages_found: Vec<Package>) -> Result<(), Box<dyn Error>> {
+        if packages_found.is_empty() {
             println!("No new packages found.");
         } else {
             let multi_progress = MultiProgress::new();
             let mut install_completion = Vec::new();
-            for package in packages_to_install {
+            for package in packages_found {
                 install_completion.push(package.install(&multi_progress, &(true, true)).await?);
             }
             multi_progress.join().unwrap();
