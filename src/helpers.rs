@@ -76,6 +76,7 @@ fn expand_bool(boolean: &str) -> bool {
 
 fn read_bool_setting(name: &str) -> bool {
     match name {
+        "bypass_launcher" => SETTINGS.read().unwrap().bypass_launcher,
         "use_latest_as_default" => SETTINGS.read().unwrap().use_latest_as_default,
         "check_updates_at_launch" => SETTINGS.read().unwrap().check_updates_at_launch,
         "update_daily" => SETTINGS.read().unwrap().update_daily,
@@ -86,12 +87,13 @@ fn read_bool_setting(name: &str) -> bool {
         "keep_only_latest_experimental" => SETTINGS.read().unwrap().keep_only_latest_experimental,
         "keep_only_latest_stable" => SETTINGS.read().unwrap().keep_only_latest_stable,
         "keep_only_latest_lts" => SETTINGS.read().unwrap().keep_only_latest_lts,
-        _ => panic!("Unknown bool field"),
+        _ => panic!("Unknown boolean field"),
     }
 }
 
 fn write_bool_setting(name: &str, value: bool) {
     match name {
+        "bypass_launcher" => SETTINGS.write().unwrap().bypass_launcher = value,
         "use_latest_as_default" => SETTINGS.write().unwrap().use_latest_as_default = value,
         "check_updates_at_launch" => SETTINGS.write().unwrap().check_updates_at_launch = value,
         "update_daily" => SETTINGS.write().unwrap().update_daily = value,
@@ -104,7 +106,7 @@ fn write_bool_setting(name: &str, value: bool) {
         }
         "keep_only_latest_stable" => SETTINGS.write().unwrap().keep_only_latest_stable = value,
         "keep_only_latest_lts" => SETTINGS.write().unwrap().keep_only_latest_lts = value,
-        _ => panic!("Unknown bool field"),
+        _ => panic!("Unknown boolean field"),
     }
 }
 

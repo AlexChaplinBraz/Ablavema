@@ -6,7 +6,7 @@ mod helpers;
 mod installed;
 mod releases;
 mod settings;
-use crate::{cli::*, helpers::*, installed::*, settings::*};
+use crate::{cli::*, gui::*, helpers::*, installed::*, settings::*};
 use std::{error::Error, process::exit, sync::atomic::Ordering};
 
 #[tokio::main]
@@ -21,19 +21,11 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Box<dyn Error>> {
-    let mut gui_args = run_cli().await?;
+    let (gui_args, only_cli) = run_cli().await?;
 
-    if LAUNCH_GUI.load(Ordering::Relaxed) {
-        // TODO: Move all this logic into the GUI.
-        if SETTINGS.read().unwrap().check_updates_at_launch {
-            if is_time_to_update() {
-                gui_args.installed.update(&mut gui_args.releases).await?;
-            } else {
-                println!("Not yet time to check for updates.");
-            }
-        }
-
-        if SETTINGS.read().unwrap().default_package.is_empty() {
+    if !only_cli {
+        if LAUNCH_GUI.load(Ordering::Relaxed) || SETTINGS.read().unwrap().default_package.is_empty()
+        {
             todo!("Launch GUI");
         } else {
             if gui_args.file_path.is_empty() {

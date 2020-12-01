@@ -21,7 +21,7 @@ A more or less chronological, non-comprehensive list of finished features and fe
 - [X] Only check for updates after a set amount of time.
 - [X] Use the platform-specific, user-accessible locations for storing files.
 - [X] Work as portable by creating an empty file named "portable" in the same directory as the executable.
-- [ ] Bypass opening the launcher if a default package is set. In which case, to open the launcher while opening a .blend file you'd hold a configurable modifier key like Shift down.
+- [X] Bypass opening the launcher if a default package is set. In which case, to open the launcher while opening a .blend file you'd hold a configurable modifier key like Shift down.
 - [X] Command line interface.
     - [X] Fetch packages.
     - [X] List packages.

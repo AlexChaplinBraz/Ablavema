@@ -5,10 +5,13 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
     SubCommand,
 };
+use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::{error::Error, str::FromStr, sync::atomic::Ordering};
 use tokio::fs::remove_dir_all;
 
-pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
+pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
+    let mut only_cli = true;
+
     let mut releases = Releases::new();
     releases.load()?;
 
@@ -16,6 +19,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
 
     // Workaround for 'clap' not supporting colours on Windows,
     // even though 'indicatif' does display colours on Windows.
+    // TODO: Upgrade to version 3 once it's out of beta.
     // It's also a workaround for showing the current values of SETTINGS
     // without it being named and parsed as "default".
     let left_ansi_code;
@@ -36,6 +40,18 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         "Select default package to use for opening .blend files [current: {}{}{}]",
         left_ansi_code,
         SETTINGS.read().unwrap().default_package,
+        right_ansi_code
+    );
+    let help_bypass_launcher = format!(
+        "If default package is set, only open launcher when the set modifier key is held down [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().bypass_launcher,
+        right_ansi_code
+    );
+    let help_modifier_key = format!(
+        "Modifier key to use for opening launcher [current: {}{}{}]",
+        left_ansi_code,
+        SETTINGS.read().unwrap().modifier_key,
         right_ansi_code
     );
     let help_use_latest_as_default = format!(
@@ -129,6 +145,26 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 .about("Set configuration settings")
                 .long_about("Set configuration settings. It's possible to make the program portable by creating an empty file named 'portable' in the same directory as the executable, which will make it store everything together.")
                 .help_message("Print help and exit")
+                .arg(
+                    Arg::with_name("bypass_launcher")
+                        .display_order(13)
+                        .takes_value(true)
+                        .value_name("BOOL")
+                        .possible_values(&["t", "f", "true", "false"])
+                        .short("b")
+                        .long("bypass-launcher")
+                        .help(&help_bypass_launcher),
+                )
+                .arg(
+                    Arg::with_name("modifier_key")
+                        .display_order(17)
+                        .takes_value(true)
+                        .value_name("KEY")
+                        .possible_values(&["shift", "ctrl", "alt"])
+                        .short("k")
+                        .long("modifier-key")
+                        .help(&help_modifier_key),
+                )
                 .arg(
                     Arg::with_name("use_latest_as_default")
                         .display_order(20)
@@ -241,6 +277,8 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 .group(
                     ArgGroup::with_name("config_group")
                         .args(&[
+                            "bypass_launcher",
+                            "modifier_key",
                             "use_latest_as_default",
                             "check_updates_at_launch",
                             "minutes_between_updates",
@@ -550,6 +588,29 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
 
     match args.subcommand() {
         ("config", Some(a)) => {
+            process_bool_arg(a, "bypass_launcher")?;
+
+            if a.is_present("modifier_key") {
+                let new_arg = a.value_of("modifier_key").unwrap();
+                let old_arg = SETTINGS.read().unwrap().modifier_key.clone();
+
+                if new_arg == old_arg.to_string() {
+                    println!("'{}' is unchanged from '{}'.", "modifier_key", old_arg);
+                } else {
+                    SETTINGS.write().unwrap().modifier_key = match new_arg {
+                        "shift" => ModifierKey::Shift,
+                        "ctrl" => ModifierKey::Control,
+                        "alt" => ModifierKey::Alt,
+                        _ => unreachable!("Unknown ModifierKey"),
+                    };
+
+                    println!(
+                        "'{}' changed from '{}' to '{}'.",
+                        "modifier_key", old_arg, new_arg
+                    );
+                }
+            }
+
             process_bool_arg(a, "use_latest_as_default")?;
             process_bool_arg(a, "check_updates_at_launch")?;
 
@@ -783,19 +844,33 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         }
         ("update", Some(_a)) => installed.update(&mut releases).await?,
         _ => {
-            LAUNCH_GUI.store(true, Ordering::Relaxed);
+            only_cli = false;
+
+            if SETTINGS.read().unwrap().bypass_launcher {
+                let device_state = DeviceState::new();
+                let keys = device_state.get_keys();
+
+                if keys.contains(&SETTINGS.read().unwrap().modifier_key.get_keycode()) {
+                    LAUNCH_GUI.store(true, Ordering::Relaxed);
+                }
+            } else {
+                LAUNCH_GUI.store(true, Ordering::Relaxed);
+            }
         }
     }
 
-    Ok(GuiArgs {
-        releases,
-        installed,
-        file_path: {
-            if args.is_present("path") {
-                String::from(args.value_of("path").unwrap())
-            } else {
-                String::new()
-            }
+    Ok((
+        GuiArgs {
+            releases,
+            installed,
+            file_path: {
+                if args.is_present("path") {
+                    String::from(args.value_of("path").unwrap())
+                } else {
+                    String::new()
+                }
+            },
         },
-    })
+        only_cli,
+    ))
 }

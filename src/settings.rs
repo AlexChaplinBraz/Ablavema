@@ -1,5 +1,6 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
+use device_query::Keycode;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,8 @@ lazy_static! {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub default_package: String,
+    pub bypass_launcher: bool,
+    pub modifier_key: ModifierKey,
     pub use_latest_as_default: bool,
     pub check_updates_at_launch: bool,
     pub minutes_between_updates: u64,
@@ -96,6 +99,8 @@ impl Default for Settings {
 
         Self {
             default_package: String::new(),
+            bypass_launcher: false,
+            modifier_key: ModifierKey::Shift,
             use_latest_as_default: true,
             check_updates_at_launch: true,
             minutes_between_updates,
@@ -132,5 +137,33 @@ impl Default for Settings {
                 .checked_sub(Duration::from_secs(minutes_between_updates * 60))
                 .unwrap_or_else(|| SystemTime::now()),
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ModifierKey {
+    Shift,
+    Control,
+    Alt,
+}
+
+impl ModifierKey {
+    pub fn get_keycode(&self) -> Keycode {
+        match self {
+            ModifierKey::Shift => Keycode::LShift,
+            ModifierKey::Control => Keycode::LControl,
+            ModifierKey::Alt => Keycode::LAlt,
+        }
+    }
+}
+
+impl std::fmt::Display for ModifierKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let printable = match self {
+            ModifierKey::Shift => "shift",
+            ModifierKey::Control => "ctrl",
+            ModifierKey::Alt => "alt",
+        };
+        write!(f, "{}", printable)
     }
 }
