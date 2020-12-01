@@ -54,10 +54,19 @@ pub fn process_bool_arg(arg: &ArgMatches, name: &str) -> Result<(), Box<dyn Erro
         let new_arg = expand_bool(arg.value_of(name).unwrap());
         let old_arg = read_bool_setting(name);
         if new_arg == old_arg {
-            println!("'{}' is unchanged from '{}'.", name, old_arg);
+            println!(
+                "'{}' is unchanged from '{}'.",
+                name.replace("_", "-"),
+                old_arg
+            );
         } else {
             write_bool_setting(name, new_arg);
-            println!("'{}' changed from '{}' to '{}'.", name, old_arg, new_arg);
+            println!(
+                "'{}' changed from '{}' to '{}'.",
+                name.replace("_", "-"),
+                old_arg,
+                new_arg
+            );
         }
     }
 

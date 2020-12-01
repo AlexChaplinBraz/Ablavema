@@ -241,7 +241,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
                         .short("D")
-                        .long("keep_only_latest_daily")
+                        .long("keep-only-latest-daily")
                         .help(&help_keep_only_latest_daily),
                 )
                 .arg(
@@ -251,7 +251,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
                         .short("E")
-                        .long("keep_only_latest_experimental")
+                        .long("keep-only-latest-experimental")
                         .help(&help_keep_only_latest_experimental),
                 )
                 .arg(
@@ -261,7 +261,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
                         .short("S")
-                        .long("keep_only_latest_stable")
+                        .long("keep-only-latest-stable")
                         .help(&help_keep_only_latest_stable),
                 )
                 .arg(
@@ -271,7 +271,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
                         .short("L")
-                        .long("keep_only_latest_lts")
+                        .long("keep-only-latest-lts")
                         .help(&help_keep_only_latest_lts),
                 )
                 .group(
@@ -595,7 +595,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
                 let old_arg = SETTINGS.read().unwrap().modifier_key.clone();
 
                 if new_arg == old_arg.to_string() {
-                    println!("'{}' is unchanged from '{}'.", "modifier_key", old_arg);
+                    println!("'modifier-key' is unchanged from '{}'.", old_arg);
                 } else {
                     SETTINGS.write().unwrap().modifier_key = match new_arg {
                         "shift" => ModifierKey::Shift,
@@ -605,8 +605,8 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
                     };
 
                     println!(
-                        "'{}' changed from '{}' to '{}'.",
-                        "modifier_key", old_arg, new_arg
+                        "'modifier-key' changed from '{}' to '{}'.",
+                        old_arg, new_arg
                     );
                 }
             }
@@ -620,16 +620,13 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
                 let old_arg = SETTINGS.read().unwrap().minutes_between_updates;
 
                 if new_arg == old_arg {
-                    println!(
-                        "'{}' is unchanged from '{}'.",
-                        "minutes_between_updates", old_arg
-                    );
+                    println!("'minutes-between-updates' is unchanged from '{}'.", old_arg);
                 } else {
                     SETTINGS.write().unwrap().minutes_between_updates = new_arg;
 
                     println!(
-                        "'{}' changed from '{}' to '{}'.",
-                        "minutes_between_updates", old_arg, new_arg
+                        "'minutes-between-updates' changed from '{}' to '{}'.",
+                        old_arg, new_arg
                     );
                 }
             }
