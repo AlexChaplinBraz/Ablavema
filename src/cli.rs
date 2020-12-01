@@ -850,8 +850,15 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
 
             if SETTINGS.read().unwrap().check_updates_at_launch {
                 if is_time_to_update() {
-                    updates = Some(installed.check_for_updates(&mut releases).await?);
-                    LAUNCH_GUI.store(true, Ordering::Relaxed);
+                    let packages_found = installed.check_for_updates(&mut releases).await?;
+
+                    if !packages_found.is_empty() {
+                        LAUNCH_GUI.store(true, Ordering::Relaxed);
+                    } else {
+                        println!("No new packages found.");
+                    }
+
+                    updates = Some(packages_found);
                 } else {
                     println!("Not yet time to check for updates.");
                 }

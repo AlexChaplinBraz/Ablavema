@@ -59,6 +59,8 @@ impl Installed {
         SETTINGS.write().unwrap().last_update_time = SystemTime::now();
         SETTINGS.read().unwrap().save();
 
+        println!("Checking for updates...");
+
         let mut packages_found = Vec::new();
 
         if SETTINGS.read().unwrap().update_daily {
