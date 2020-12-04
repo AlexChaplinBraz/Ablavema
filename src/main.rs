@@ -4,6 +4,7 @@ mod cli;
 mod gui;
 mod helpers;
 mod installed;
+mod package;
 mod releases;
 mod settings;
 mod style;

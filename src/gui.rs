@@ -1,6 +1,6 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
-use crate::{helpers::*, installed::*, releases::*, settings::*, style::*};
+use crate::{helpers::*, installed::*, package::*, releases::*, settings::*, style::*};
 use iced::{
     button, executor, scrollable, Align, Application, Button, Column, Command, Container, Element,
     HorizontalAlignment, Length, Row, Scrollable, Text,
