@@ -12,6 +12,9 @@ use prettytable::{
 use std::{collections::HashMap, error::Error, path::Path, process::Command, str::FromStr};
 
 pub fn open_blender(package: String, file_path: Option<String>) -> Result<(), Box<dyn Error>> {
+    // TODO: Investigate why it's not working on Windows.
+    // The problem seems to be with the thread spawning, since it works without it.
+    // But I need to spawn it somehow so I can close the launcher after opening a package.
     match file_path {
         Some(path) => std::thread::spawn(move || {
             Command::new(SETTINGS.read().unwrap().packages_dir.join(package).join({
@@ -163,7 +166,7 @@ pub async fn cli_install(
 
         if args.is_present("name") {
             match packages.iter().find(|p| p.name == build) {
-                Some(a) => a.install(&multi_progress, &flags).await?,
+                Some(a) => a.cli_install(&multi_progress, &flags).await?,
                 None => {
                     println!("No {} package named '{}' found.", name, build);
                     continue;
@@ -173,7 +176,7 @@ pub async fn cli_install(
             let build = usize::from_str(build)?;
 
             match packages.iter().enumerate().find(|(i, _)| *i == build) {
-                Some(a) => a.1.install(&multi_progress, &flags).await?,
+                Some(a) => a.1.cli_install(&multi_progress, &flags).await?,
                 None => {
                     println!("No {} package with ID '{}' found.", name, build);
                     continue;

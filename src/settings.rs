@@ -76,6 +76,9 @@ impl Settings {
             settings
         };
 
+        // TODO: This causes panics when a portable configuration is moved.
+        // Probably better to use relative paths.
+        // Or just update these fields if any of them error.
         create_dir_all(&settings.packages_dir).unwrap();
         create_dir_all(&settings.releases_db.parent().unwrap()).unwrap();
         create_dir_all(&settings.cache_dir).unwrap();

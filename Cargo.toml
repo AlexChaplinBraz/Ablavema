@@ -25,3 +25,13 @@ lazy_static = "1.4"
 directories-next = "2.0"
 msgbox = "0.6"
 device_query = "0.2"
+# TODO: Figure out the backend issues.
+# This works for Linux and compiling from Linux to x86_64-pc-windows-gnu too.
+# But any other rendering backend compiled from Linux and ran on Windows makes it error with:
+# "The code execution cannot proceed because libstdc++-6.dll was not found."
+# Now, if compiling on Windows, then all the backends work there.
+# The problem is that any backends other than "glow" error with:
+# "a suitable graphics adapter or device could not be found"
+# on Linux (also in a Windows VM running on the same Linux machine, even if compiled inside the VM),
+# even though I have Vulkan and OpenGL, regardless of X11 or Wayland.
+iced = { version = "0.2", features = ["glow", "glow_default_system_font"] }

@@ -32,12 +32,15 @@ A more or less chronological, non-comprehensive list of finished features and fe
     - [X] Open a .blend file with the selected default Blender package.
     - [X] Change configuration settings.
 - [ ] Graphical user interface.
-    - [ ] Show updates at runtime if set.
-    - [ ] Select package for opening .blend file at runtime.
+    - [X] Show updates at runtime if set.
+    - [X] Open an installed package.
+    - [X] Open .blend file with an installed package.
+    - [X] Select default package.
+    - [ ] Fetch packages.
     - [ ] Install packages.
     - [ ] Update packages.
-    - [ ] Select default package.
-    - [ ] Remove packages.
+    - [X] Remove packages.
+    - [ ] Change configuration settings.
     - [ ] List recent files.
     - [ ] Remember which package a .blend file was opened with.
     - [ ] Custom entries, for things like locally compiled Blender versions.

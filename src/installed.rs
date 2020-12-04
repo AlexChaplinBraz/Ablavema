@@ -8,7 +8,6 @@ use std::{
     fs,
     fs::File,
     ops::{Deref, DerefMut},
-    process::Command,
     time::SystemTime,
 };
 
@@ -132,7 +131,7 @@ impl Installed {
             let multi_progress = MultiProgress::new();
             let mut install_completion = Vec::new();
             for package in packages_found {
-                install_completion.push(package.install(&multi_progress, &(true, true)).await?);
+                install_completion.push(package.cli_install(&multi_progress, &(true, true)).await?);
             }
             multi_progress.join().unwrap();
             for handle in install_completion {
@@ -178,13 +177,13 @@ impl Installed {
                     Build::Stable => {
                         stable_count += 1;
                         if stable_count > 1 && SETTINGS.read().unwrap().keep_only_latest_stable {
-                            package.remove().await?;
+                            package.cli_remove().await?;
                         }
                     }
                     Build::LTS => {
                         lts_count += 1;
                         if lts_count > 1 && SETTINGS.read().unwrap().keep_only_latest_lts {
-                            package.remove().await?;
+                            package.cli_remove().await?;
                         }
                     }
                     Build::Daily(s) => {
@@ -192,7 +191,7 @@ impl Installed {
                         if daily_count.iter().filter(|&n| n == s).count() > 1
                             && SETTINGS.read().unwrap().keep_only_latest_daily
                         {
-                            package.remove().await?;
+                            package.cli_remove().await?;
                         }
                     }
                     Build::Experimental(s) => {
@@ -200,7 +199,7 @@ impl Installed {
                         if experimental_count.iter().filter(|&n| n == s).count() > 1
                             && SETTINGS.read().unwrap().keep_only_latest_experimental
                         {
-                            package.remove().await?;
+                            package.cli_remove().await?;
                         }
                     }
                     Build::None => unreachable!("Unexpected build type"),

@@ -4,6 +4,7 @@ use crate::{helpers::*, settings::*};
 use bzip2::read::BzDecoder;
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use flate2::read::GzDecoder;
+use iced::button;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
 use reqwest::{self, header, Client};
@@ -26,7 +27,7 @@ use tokio::{
 use xz2::read::XzDecoder;
 use zip::{read::ZipFile, ZipArchive};
 
-#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Releases {
     pub daily: Vec<Package>,
     pub experimental: Vec<Package>,
@@ -670,7 +671,8 @@ impl Releases {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
+// TODO: Move Package into its own file.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Package {
     pub version: String,
     pub name: String,
@@ -680,6 +682,16 @@ pub struct Package {
     pub url: String,
     pub os: Os,
     pub changelog: Vec<Change>,
+    #[serde(skip)]
+    pub install_button: button::State,
+    #[serde(skip)]
+    pub remove_button: button::State,
+    #[serde(skip)]
+    pub open_button: button::State,
+    #[serde(skip)]
+    pub open_file_button: button::State,
+    #[serde(skip)]
+    pub set_default_button: button::State,
 }
 
 impl Package {
@@ -696,10 +708,15 @@ impl Package {
             url: String::new(),
             os: Os::None,
             changelog: Vec::new(),
+            install_button: button::State::new(),
+            remove_button: button::State::new(),
+            open_button: button::State::new(),
+            open_file_button: button::State::new(),
+            set_default_button: button::State::new(),
         }
     }
 
-    pub async fn install(
+    pub async fn cli_install(
         &self,
         multi_progress: &MultiProgress,
         flags: &(bool, bool),
@@ -965,7 +982,7 @@ impl Package {
         Ok(Some(final_tasks))
     }
 
-    pub async fn remove(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn cli_remove(&self) -> Result<(), Box<dyn Error>> {
         let path = SETTINGS.read().unwrap().packages_dir.join(&self.name);
 
         remove_dir_all(path).await?;

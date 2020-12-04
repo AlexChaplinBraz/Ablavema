@@ -5,7 +5,7 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
     SubCommand,
 };
-use device_query::{DeviceQuery, DeviceState, Keycode};
+use device_query::{DeviceQuery, DeviceState};
 use std::{error::Error, str::FromStr, sync::atomic::Ordering};
 use tokio::fs::remove_dir_all;
 
@@ -776,7 +776,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
 
                     if a.is_present("name") {
                         match installed.iter().find(|p| p.name == build) {
-                            Some(a) => a.remove().await?,
+                            Some(a) => a.cli_remove().await?,
                             None => {
                                 println!("No installed package named '{}' found.", build);
                                 continue;
@@ -786,7 +786,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
                         let build = usize::from_str(build)?;
 
                         match installed.iter().enumerate().find(|(i, _)| *i == build) {
-                            Some(a) => a.1.remove().await?,
+                            Some(a) => a.1.cli_remove().await?,
                             None => {
                                 println!("No installed package with ID '{}' found.", build);
                                 continue;
@@ -860,7 +860,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
 
                     updates = Some(packages_found);
                 } else {
-                    println!("Not yet time to check for updates.");
+                    println!("Not the time to check for updates yet.");
                 }
             }
 
@@ -882,12 +882,10 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
             releases,
             installed,
             updates,
-            file_path: {
-                if args.is_present("path") {
-                    String::from(args.value_of("path").unwrap())
-                } else {
-                    String::new()
-                }
+            file_path: if args.is_present("path") {
+                Some(String::from(args.value_of("path").unwrap()))
+            } else {
+                None
             },
         },
         only_cli,
