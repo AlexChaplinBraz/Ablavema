@@ -9,9 +9,7 @@ use device_query::{DeviceQuery, DeviceState};
 use std::{error::Error, str::FromStr, sync::atomic::Ordering};
 use tokio::fs::remove_dir_all;
 
-pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
-    let mut only_cli = true;
-
+pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
     let mut updates = None;
 
     let mut releases = Releases::new();
@@ -846,7 +844,7 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
             installed.cli_update(packages_found).await?
         }
         _ => {
-            only_cli = false;
+            ONLY_CLI.store(false, Ordering::Relaxed);
 
             if SETTINGS.read().unwrap().check_updates_at_launch {
                 if is_time_to_update() {
@@ -877,17 +875,14 @@ pub async fn run_cli() -> Result<(GuiArgs, bool), Box<dyn Error>> {
         }
     }
 
-    Ok((
-        GuiArgs {
-            releases,
-            installed,
-            updates,
-            file_path: if args.is_present("path") {
-                Some(String::from(args.value_of("path").unwrap()))
-            } else {
-                None
-            },
+    Ok(GuiArgs {
+        releases,
+        installed,
+        updates,
+        file_path: if args.is_present("path") {
+            Some(String::from(args.value_of("path").unwrap()))
+        } else {
+            None
         },
-        only_cli,
-    ))
+    })
 }

@@ -15,6 +15,8 @@ use std::{
 
 const CONFIG_NAME: &str = "config.bin";
 
+pub static ONLY_CLI: AtomicBool = AtomicBool::new(true);
+
 pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {

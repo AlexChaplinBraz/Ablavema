@@ -23,21 +23,19 @@ use std::{error::Error, process::exit, sync::atomic::Ordering};
 async fn main() {
     if let Err(e) = run().await {
         eprintln!("Error: {}.", e);
-        // TODO: This may be flawed logic. If there's an error trying to run Blender
-        // while bypassing the launcher it won't be shown to the user unless they
-        // run it from the terminal. Probably better to always pop a msgbox, or
-        // maybe not pop it only when CLI commands are ran.
-        if LAUNCH_GUI.load(Ordering::Relaxed) {
+
+        if !ONLY_CLI.load(Ordering::Relaxed) {
             msgbox::create("BlenderLauncher", &e.to_string(), msgbox::IconType::Error).unwrap();
         }
+
         exit(1);
     }
 }
 
 async fn run() -> Result<(), Box<dyn Error>> {
-    let (gui_args, only_cli) = run_cli().await?;
+    let gui_args = run_cli().await?;
 
-    if !only_cli {
+    if !ONLY_CLI.load(Ordering::Relaxed) {
         if LAUNCH_GUI.load(Ordering::Relaxed) || SETTINGS.read().unwrap().default_package.is_empty()
         {
             let mut window = iced::window::Settings::default();
