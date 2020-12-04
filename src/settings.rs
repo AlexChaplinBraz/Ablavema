@@ -8,31 +8,29 @@ use std::{
     env::current_exe,
     fs::{create_dir_all, File},
     path::PathBuf,
-    sync::{atomic::AtomicBool, RwLock},
-    time::Duration,
-    time::SystemTime,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        RwLock,
+    },
+    time::{Duration, SystemTime},
 };
 
 const CONFIG_NAME: &str = "config.bin";
-
+static PORTABLE: AtomicBool = AtomicBool::new(false);
 pub static ONLY_CLI: AtomicBool = AtomicBool::new(true);
-
 pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
     static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "BlenderLauncher").unwrap();
+    static ref PORTABLE_PATH: PathBuf = current_exe().unwrap().parent().unwrap().to_path_buf();
     static ref CONFIG_PATH: PathBuf = {
-        let current_exe = current_exe().unwrap();
-        let portable_path = current_exe.parent().unwrap().to_path_buf();
-        let portable_file = portable_path.join("portable");
-
-        if portable_file.exists() {
-            portable_path.join(CONFIG_NAME)
+        if PORTABLE_PATH.join("portable").exists() {
+            PORTABLE.store(true, Ordering::Relaxed);
+            PORTABLE_PATH.join(CONFIG_NAME)
         } else {
-            let mut config_path = PROJECT_DIRS.config_dir().to_path_buf();
+            let config_path = PROJECT_DIRS.config_dir().to_path_buf();
             create_dir_all(&config_path).unwrap();
-            config_path.push(CONFIG_NAME);
-            config_path
+            config_path.join(CONFIG_NAME)
         }
     };
     pub static ref SETTINGS: RwLock<Settings> = RwLock::new(Settings::init());
@@ -62,7 +60,7 @@ pub struct Settings {
 
 impl Settings {
     pub fn init() -> Self {
-        let settings = if !CONFIG_PATH.exists() {
+        let mut settings = if !CONFIG_PATH.exists() {
             let default = Settings::default();
             let conf_file = File::create(&*CONFIG_PATH).unwrap();
             bincode::serialize_into(conf_file, &default).unwrap();
@@ -78,12 +76,19 @@ impl Settings {
             settings
         };
 
-        // TODO: This causes panics when a portable configuration is moved.
-        // Probably better to use relative paths.
-        // Or just update these fields if any of them error.
-        create_dir_all(&settings.packages_dir).unwrap();
-        create_dir_all(&settings.releases_db.parent().unwrap()).unwrap();
-        create_dir_all(&settings.cache_dir).unwrap();
+        if PORTABLE.load(Ordering::Relaxed) {
+            settings.packages_dir = PORTABLE_PATH.join("packages");
+            settings.releases_db = PORTABLE_PATH.join("releases_db.bin");
+            settings.cache_dir = PORTABLE_PATH.join("cache");
+
+            create_dir_all(&settings.packages_dir).unwrap();
+            create_dir_all(&settings.releases_db.parent().unwrap()).unwrap();
+            create_dir_all(&settings.cache_dir).unwrap();
+        } else {
+            create_dir_all(&settings.packages_dir).unwrap();
+            create_dir_all(&settings.releases_db.parent().unwrap()).unwrap();
+            create_dir_all(&settings.cache_dir).unwrap();
+        }
 
         settings
     }
@@ -97,10 +102,6 @@ impl Settings {
 impl Default for Settings {
     fn default() -> Self {
         let minutes_between_updates = 60;
-
-        let current_exe = current_exe().unwrap();
-        let portable_path = current_exe.parent().unwrap().to_path_buf();
-        let portable_file = portable_path.join("portable");
 
         Self {
             default_package: String::new(),
@@ -117,27 +118,9 @@ impl Default for Settings {
             keep_only_latest_experimental: false,
             keep_only_latest_stable: false,
             keep_only_latest_lts: false,
-            packages_dir: {
-                if portable_file.exists() {
-                    portable_path.join("packages")
-                } else {
-                    PROJECT_DIRS.data_dir().to_path_buf()
-                }
-            },
-            releases_db: {
-                if portable_file.exists() {
-                    portable_path.join("releases_db.bin")
-                } else {
-                    PROJECT_DIRS.config_dir().join("releases_db.bin")
-                }
-            },
-            cache_dir: {
-                if portable_file.exists() {
-                    portable_path.join("cache")
-                } else {
-                    PROJECT_DIRS.cache_dir().to_path_buf()
-                }
-            },
+            packages_dir: PROJECT_DIRS.data_dir().to_path_buf(),
+            releases_db: PROJECT_DIRS.config_dir().join("releases_db.bin"),
+            cache_dir: PROJECT_DIRS.cache_dir().to_path_buf(),
             last_update_time: SystemTime::now()
                 .checked_sub(Duration::from_secs(minutes_between_updates * 60))
                 .unwrap_or_else(|| SystemTime::now()),
