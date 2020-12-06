@@ -3,10 +3,11 @@
 use iced::{
     button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input,
 };
+use serde::{Deserialize, Serialize};
 
 /// Lifted practically as is from the styling example of iced.
 /// Only thing I added was methods for getting darker versions of the container.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Theme {
     Light,
     Dark,
@@ -32,7 +33,7 @@ impl Theme {
 
 impl Default for Theme {
     fn default() -> Theme {
-        Theme::Light
+        Theme::Dark
     }
 }
 

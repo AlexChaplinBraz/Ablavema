@@ -1,5 +1,6 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
+use crate::style::Theme;
 use device_query::Keycode;
 use directories_next::ProjectDirs;
 use lazy_static::lazy_static;
@@ -56,6 +57,7 @@ pub struct Settings {
     pub cache_dir: PathBuf,
     pub releases_db: PathBuf,
     pub last_update_time: SystemTime,
+    pub theme: Theme,
 }
 
 impl Settings {
@@ -124,11 +126,12 @@ impl Default for Settings {
             last_update_time: SystemTime::now()
                 .checked_sub(Duration::from_secs(minutes_between_updates * 60))
                 .unwrap_or_else(|| SystemTime::now()),
+            theme: Theme::default(),
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModifierKey {
     Shift,
     Control,
@@ -136,6 +139,8 @@ pub enum ModifierKey {
 }
 
 impl ModifierKey {
+    pub const ALL: [ModifierKey; 3] = [ModifierKey::Shift, ModifierKey::Control, ModifierKey::Alt];
+
     pub fn get_keycode(&self) -> Keycode {
         match self {
             ModifierKey::Shift => Keycode::LShift,

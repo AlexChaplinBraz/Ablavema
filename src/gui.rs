@@ -2,8 +2,8 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 use crate::{helpers::*, installed::*, package::*, releases::*, settings::*, style::*};
 use iced::{
-    button, executor, scrollable, Align, Application, Button, Column, Command, Container, Element,
-    HorizontalAlignment, Length, Row, Scrollable, Text,
+    button, executor, scrollable, slider, Align, Application, Button, Column, Command, Container,
+    Element, HorizontalAlignment, Length, Radio, Row, Rule, Scrollable, Slider, Text,
 };
 use std::fs::remove_dir_all;
 
@@ -34,6 +34,8 @@ pub struct Gui {
     official_button: button::State,
     settings_button: button::State,
     about_button: button::State,
+    minute_slider: slider::State,
+    minute_value: f64,
     theme: Theme,
 }
 
@@ -55,6 +57,21 @@ pub enum Message {
     PackageMessage(Tab, usize, PackageMessage),
     PackageRemoved(Result<String, GuiError>),
     ChangeTab(Tab),
+    BypassLauncher(Choice),
+    ModifierKey(ModifierKey),
+    UseLatestAsDefault(Choice),
+    CheckUpdatesAtLaunch(Choice),
+    MinutesBetweenUpdatesChanged(f64),
+    MinutesBetweenUpdates(f64),
+    UpdateDaily(Choice),
+    UpdateExperimental(Choice),
+    UpdateStable(Choice),
+    UpdateLts(Choice),
+    KeepOnlyLatestDaily(Choice),
+    KeepOnlyLatestExperimental(Choice),
+    KeepOnlyLatestStable(Choice),
+    KeepOnlyLatestLts(Choice),
+    ThemeChanged(Theme),
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +82,16 @@ pub enum PackageMessage {
     OpenWithFile(String, String),
     SetDefault,
     UnsetDefault,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Choice {
+    Enable,
+    Disable,
+}
+
+impl Choice {
+    pub const ALL: [Choice; 2] = [Choice::Enable, Choice::Disable];
 }
 
 #[derive(Debug, Clone)]
@@ -111,7 +138,9 @@ impl Application for Gui {
                 official_button: button::State::new(),
                 settings_button: button::State::new(),
                 about_button: button::State::new(),
-                theme: Theme::Dark,
+                minute_slider: slider::State::new(),
+                minute_value: SETTINGS.read().unwrap().minutes_between_updates as f64,
+                theme: SETTINGS.read().unwrap().theme,
             },
             Command::none(),
         )
@@ -184,6 +213,118 @@ impl Application for Gui {
 
                 self.installed.check().unwrap();
 
+                Command::none()
+            }
+            Message::BypassLauncher(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().bypass_launcher = true,
+                    Choice::Disable => SETTINGS.write().unwrap().bypass_launcher = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::ModifierKey(modifier_key) => {
+                SETTINGS.write().unwrap().modifier_key = modifier_key;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::UseLatestAsDefault(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().use_latest_as_default = true,
+                    Choice::Disable => SETTINGS.write().unwrap().use_latest_as_default = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::CheckUpdatesAtLaunch(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().check_updates_at_launch = true,
+                    Choice::Disable => SETTINGS.write().unwrap().check_updates_at_launch = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::MinutesBetweenUpdatesChanged(minutes) => {
+                self.minute_value = minutes;
+                Command::none()
+            }
+            Message::MinutesBetweenUpdates(minutes) => {
+                SETTINGS.write().unwrap().minutes_between_updates = minutes as u64;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::UpdateDaily(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().update_daily = true,
+                    Choice::Disable => SETTINGS.write().unwrap().update_daily = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::UpdateExperimental(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().update_experimental = true,
+                    Choice::Disable => SETTINGS.write().unwrap().update_experimental = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::UpdateStable(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().update_stable = true,
+                    Choice::Disable => SETTINGS.write().unwrap().update_stable = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::UpdateLts(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().update_lts = true,
+                    Choice::Disable => SETTINGS.write().unwrap().update_lts = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::KeepOnlyLatestDaily(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().keep_only_latest_daily = true,
+                    Choice::Disable => SETTINGS.write().unwrap().keep_only_latest_daily = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::KeepOnlyLatestExperimental(choice) => {
+                match choice {
+                    Choice::Enable => {
+                        SETTINGS.write().unwrap().keep_only_latest_experimental = true
+                    }
+                    Choice::Disable => {
+                        SETTINGS.write().unwrap().keep_only_latest_experimental = false
+                    }
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::KeepOnlyLatestStable(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().keep_only_latest_stable = true,
+                    Choice::Disable => SETTINGS.write().unwrap().keep_only_latest_stable = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::KeepOnlyLatestLts(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().keep_only_latest_lts = true,
+                    Choice::Disable => SETTINGS.write().unwrap().keep_only_latest_lts = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::ThemeChanged(theme) => {
+                self.theme = theme;
+                SETTINGS.write().unwrap().theme = theme;
+                SETTINGS.read().unwrap().save();
                 Command::none()
             }
         }
@@ -374,7 +515,181 @@ impl Application for Gui {
                 &mut self.scroll,
                 self.theme,
             ),
-            Tab::Settings => todo("Settings tab", self.theme),
+            Tab::Settings => {
+                macro_rules! choice_setting {
+                    ($title:expr, $description:expr, &$array:expr, $option:expr, $message:expr,) => {
+                        Row::new()
+                            .spacing(40)
+                            .align_items(Align::Center)
+                            .push(
+                                Column::new()
+                                    .spacing(10)
+                                    .width(Length::Fill)
+                                    .push(Text::new($title).size(30))
+                                    .push(Text::new($description)),
+                            )
+                            .push($array.iter().fold(
+                                Column::new().spacing(10).width(Length::Units(110)),
+                                |col, value| {
+                                    col.push(
+                                        Radio::new(
+                                            *value,
+                                            &format!("{:?}", value),
+                                            $option,
+                                            $message,
+                                        )
+                                        .style(theme),
+                                    )
+                                },
+                            ))
+                    };
+                }
+
+                let choice = |flag| match flag {
+                    true => Some(Choice::Enable),
+                    false => Some(Choice::Disable),
+                };
+
+                let settings = Column::new()
+                    .padding(20)
+                    .push(
+                        choice_setting!(
+                            "Bypass launcher",
+                            "If a default package is set and no updates were found, only open launcher when the selected modifier key is held down.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().bypass_launcher).unwrap()),
+                            Message::BypassLauncher,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Modifier key",
+                            "Change the modifier key if there's any interference when opening the launcher or a .blend file while holding it down.",
+                            &ModifierKey::ALL,
+                            Some(SETTINGS.read().unwrap().modifier_key),
+                            Message::ModifierKey,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Use latest as default",
+                            "Change to the latest package of the same build type when updating.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().use_latest_as_default).unwrap()),
+                            Message::UseLatestAsDefault,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Check updates at launch",
+                            "Increases launch time for about a second or two. Having a delay between checks improves launch speed.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().check_updates_at_launch).unwrap()),
+                            Message::CheckUpdatesAtLaunch,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(Column::new()
+                        .spacing(10)
+                        .push(Text::new("Delay between update checking").size(30))
+                        .push(Text::new("Minutes to wait between update checks. Setting it to 0 will make it check every time. Maximum is 24 hours."))
+                        .push(Row::new()
+                            .push(Text::new(format!("Current: {}", self.minute_value)).width(Length::Units(130)))
+                            .push(Slider::new(
+                                &mut self.minute_slider,
+                                0.0..=1440.0,
+                                self.minute_value,
+                                Message::MinutesBetweenUpdatesChanged)
+                                    .on_release(Message::MinutesBetweenUpdates(self.minute_value))
+                                    .style(self.theme)))
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Check for daily packages",
+                            "Check updates for daily packages.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().update_daily).unwrap()),
+                            Message::UpdateDaily,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Check for experimental packages",
+                            "Check updates for experimental packages.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().update_experimental).unwrap()),
+                            Message::UpdateExperimental,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Check for LTS packages",
+                            "Check updates for LTS packages.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().update_lts).unwrap()),
+                            Message::UpdateLts,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Check for stable packages",
+                            "Check updates for stable packages.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().update_stable).unwrap()),
+                            Message::UpdateStable,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Keep only newest daily package",
+                            "Remove all daily packages other than the newest.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_daily).unwrap()),
+                            Message::KeepOnlyLatestDaily,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Keep only newest experimental package",
+                            "Remove all experimental packages other than the newest.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_experimental).unwrap()),
+                            Message::KeepOnlyLatestExperimental,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Keep only newest LTS package",
+                            "Remove all LTS packages other than the newest.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_lts).unwrap()),
+                            Message::KeepOnlyLatestLts,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Keep only newest stable package",
+                            "Remove all stable packages other than the newest.",
+                            &Choice::ALL,
+                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_stable).unwrap()),
+                            Message::KeepOnlyLatestStable,
+                        )
+                    ).push(Rule::horizontal(20).style(self.theme)
+                    ).push(
+                        choice_setting!(
+                            "Choose the theme",
+                            "Both are simple light and dark colour schemes.",
+                            &Theme::ALL,
+                            Some(theme),
+                            Message::ThemeChanged,
+                        )
+                    );
+
+                Container::new(Scrollable::new(&mut self.scroll).push(settings))
+                    .height(Length::Fill)
+                    .width(Length::Fill)
+                    .style(theme)
+                    .into()
+            }
             Tab::About => todo("About tab", self.theme),
         };
 
