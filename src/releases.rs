@@ -16,7 +16,7 @@ pub struct Releases {
     pub daily: Vec<Package>,
     pub experimental: Vec<Package>,
     pub lts: Vec<Package>,
-    pub official: Vec<Package>,
+    pub archived: Vec<Package>,
     pub stable: Vec<Package>,
 }
 
@@ -26,7 +26,7 @@ impl Releases {
             daily: Vec::new(),
             experimental: Vec::new(),
             lts: Vec::new(),
-            official: Vec::new(),
+            archived: Vec::new(),
             stable: Vec::new(),
         }
     }
@@ -358,7 +358,7 @@ impl Releases {
         Ok(())
     }
 
-    pub async fn fetch_official(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn fetch_archived(&mut self) -> Result<(), Box<dyn Error>> {
         let url = "https://ftp.nluug.nl/pub/graphics/blender/release/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -468,9 +468,9 @@ impl Releases {
 
                     let mut package = Package::new();
 
-                    package.name = format!("{}-official", get_file_stem(name));
+                    package.name = format!("{}-archived", get_file_stem(name));
 
-                    package.build = Build::Official;
+                    package.build = Build::Archived;
 
                     package.version = match version.as_ref() {
                         "1.0" => String::from("1.0"),
@@ -559,14 +559,14 @@ impl Releases {
         }
 
         for handle in handles {
-            fetched.official.append(&mut handle.await.unwrap());
+            fetched.archived.append(&mut handle.await.unwrap());
         }
 
-        fetched.official.sort_by_key(|x| x.version.clone());
-        fetched.official.reverse();
+        fetched.archived.sort_by_key(|x| x.version.clone());
+        fetched.archived.reverse();
 
-        if self.official != fetched.official {
-            self.official = fetched.official;
+        if self.archived != fetched.archived {
+            self.archived = fetched.archived;
 
             self.save()?;
         }

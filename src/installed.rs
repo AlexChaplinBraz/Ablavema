@@ -172,7 +172,7 @@ impl Installed {
             let mut experimental_count = Vec::new();
             for package in &**self {
                 match &package.build {
-                    Build::Official => continue,
+                    Build::Archived => continue,
                     Build::Stable => {
                         stable_count += 1;
                         if stable_count > 1 && SETTINGS.read().unwrap().keep_only_latest_stable {

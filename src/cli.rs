@@ -325,10 +325,10 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help("Fetch LTS packages"),
                 )
                 .arg(
-                    Arg::with_name("official")
+                    Arg::with_name("archived")
                         .short("o")
-                        .long("official")
-                        .help("Fetch official packages"),
+                        .long("archived")
+                        .help("Fetch archived packages"),
                 )
                 .arg(
                     Arg::with_name("stable")
@@ -338,7 +338,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 )
                 .group(
                     ArgGroup::with_name("fetch_group")
-                        .args(&["all", "daily", "experimental", "lts", "official", "stable"])
+                        .args(&["all", "daily", "experimental", "lts", "archived", "stable"])
                         .required(true)
                         .multiple(true)
                 ),
@@ -423,9 +423,9 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         ),
                 )
                 .subcommand(
-                    SubCommand::with_name("official")
+                    SubCommand::with_name("archived")
                         .setting(AppSettings::ArgRequiredElseHelp)
-                        .about("Install official packages")
+                        .about("Install archived packages")
                         .help_message("Print help and exit")
                         .arg(
                             Arg::with_name("id")
@@ -474,7 +474,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .short("i")
                         .long("invert")
                         .help("Invert the table")
-                        .long_help("Invert the table so it's possible to start reading from ID 0 from the command prompt. Useful for long tables like the one for the official packages if you're looking for the latest ones and don't want to scroll up a lot."),
+                        .long_help("Invert the table so it's possible to start reading from ID 0 from the command prompt. Useful for long tables like the one for the archived packages if you're looking for the latest ones and don't want to scroll up a lot."),
                 )
                 .arg(
                     Arg::with_name("wide")
@@ -482,7 +482,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .short("w")
                         .long("wide")
                         .help("Use the wide version of the table")
-                        .long_help("Use the wide version of the table. The wider table can be better for listing official packages, as they take three times more space vertically using the narrow table."),
+                        .long_help("Use the wide version of the table. The wider table can be better for listing archived packages, as they take three times more space vertically using the narrow table."),
                 )
                 .subcommand(
                     SubCommand::with_name("daily")
@@ -505,8 +505,8 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help_message("Print help and exit"),
                 )
                 .subcommand(
-                    SubCommand::with_name("official")
-                        .about("List official packages")
+                    SubCommand::with_name("archived")
+                        .about("List archived packages")
                         .help_message("Print help and exit"),
                 )
                 .subcommand(
@@ -648,7 +648,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 releases.fetch_daily().await?;
                 releases.fetch_experimental().await?;
                 releases.fetch_lts().await?;
-                releases.fetch_official().await?;
+                releases.fetch_archived().await?;
                 releases.fetch_stable().await?;
                 println!("Done.");
             } else {
@@ -667,9 +667,9 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                     releases.fetch_lts().await?;
                 }
 
-                if a.is_present("official") {
-                    println!("Fetching official packages...");
-                    releases.fetch_official().await?;
+                if a.is_present("archived") {
+                    println!("Fetching archived packages...");
+                    releases.fetch_archived().await?;
                 }
 
                 if a.is_present("stable") {
@@ -686,7 +686,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 cli_install(b, &releases.experimental, "experimental").await?
             }
             ("lts", Some(b)) => cli_install(b, &releases.lts, "LTS").await?,
-            ("official", Some(b)) => cli_install(b, &releases.official, "official").await?,
+            ("archived", Some(b)) => cli_install(b, &releases.archived, "archived").await?,
             ("stable", Some(b)) => cli_install(b, &releases.stable, "stable").await?,
             _ => unreachable!("Install subcommand"),
         },
@@ -727,11 +727,11 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                     cli_list_narrow(&releases.lts, "LTS", b.is_present("invert"));
                 }
             }
-            ("official", Some(b)) => {
+            ("archived", Some(b)) => {
                 if b.is_present("wide") {
-                    cli_list_wide(&releases.official, "official", b.is_present("invert"));
+                    cli_list_wide(&releases.archived, "archived", b.is_present("invert"));
                 } else {
-                    cli_list_narrow(&releases.official, "official", b.is_present("invert"));
+                    cli_list_narrow(&releases.archived, "archived", b.is_present("invert"));
                 }
             }
             ("stable", Some(b)) => {

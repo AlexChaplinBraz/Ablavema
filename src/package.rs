@@ -373,7 +373,7 @@ impl Package {
 
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
 pub enum Build {
-    Official,
+    Archived,
     Stable,
     LTS,
     Daily(String),
@@ -384,7 +384,7 @@ pub enum Build {
 impl std::fmt::Display for Build {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let printable = match self {
-            Build::Official => "Official Release",
+            Build::Archived => "Archived Release",
             Build::Stable => "Stable Release",
             Build::LTS => "LTS Release",
             Build::Daily(s) | Build::Experimental(s) => s,

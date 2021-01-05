@@ -34,7 +34,7 @@ pub struct Gui {
     experimental_button: button::State,
     lts_button: button::State,
     stable_button: button::State,
-    official_button: button::State,
+    archived_button: button::State,
     settings_button: button::State,
     about_button: button::State,
     minute_slider: slider::State,
@@ -50,7 +50,7 @@ pub enum Tab {
     Experimental,
     LTS,
     Stable,
-    Official,
+    Archived,
     Settings,
     About,
 }
@@ -142,7 +142,7 @@ impl Application for Gui {
                 experimental_button: button::State::new(),
                 lts_button: button::State::new(),
                 stable_button: button::State::new(),
-                official_button: button::State::new(),
+                archived_button: button::State::new(),
                 settings_button: button::State::new(),
                 about_button: button::State::new(),
                 minute_slider: slider::State::new(),
@@ -200,7 +200,7 @@ impl Application for Gui {
                     Some(package) => package.update(package_message),
                     None => unreachable!(),
                 },
-                Tab::Official => match self.releases.official.get_mut(index) {
+                Tab::Archived => match self.releases.archived.get_mut(index) {
                     Some(package) => package.update(package_message),
                     None => unreachable!(),
                 },
@@ -236,17 +236,17 @@ impl Application for Gui {
                             .push((package.to_owned(), Tab::Updates, index));
                     }
                     None => match build {
-                        Build::Official => {
+                        Build::Archived => {
                             let (index, package) = self
                                 .releases
-                                .official
+                                .archived
                                 .iter()
                                 .enumerate()
                                 .find(|(_index, package)| package.name == name)
                                 .unwrap();
 
                             self.installing
-                                .push((package.to_owned(), Tab::Official, index));
+                                .push((package.to_owned(), Tab::Archived, index));
                         }
                         Build::Stable => {
                             let (index, package) = self
@@ -476,9 +476,9 @@ impl Application for Gui {
                 .push(top_button("LTS", Tab::LTS, &mut self.lts_button))
                 .push(top_button("Stable", Tab::Stable, &mut self.stable_button))
                 .push(top_button(
-                    "Official",
-                    Tab::Official,
-                    &mut self.official_button,
+                    "Archived",
+                    Tab::Archived,
+                    &mut self.archived_button,
                 ))
                 .push(top_button(
                     "Settings",
@@ -609,9 +609,9 @@ impl Application for Gui {
                 &mut self.scroll,
                 self.theme,
             ),
-            Tab::Official => packages_body(
-                &mut self.releases.official,
-                Tab::Official,
+            Tab::Archived => packages_body(
+                &mut self.releases.archived,
+                Tab::Archived,
                 &self.file_path,
                 &self.installed,
                 &mut self.scroll,

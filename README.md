@@ -11,7 +11,7 @@ Will be available for Linux and Windows first, and maybe MacOS later once I get 
 A more or less chronological, non-comprehensive list of finished features and features I'm planning to add.
 
 - [X] Fetch packages.
-    - [X] [Official releases](https://download.blender.org/release/).
+    - [X] [Archived releases](https://download.blender.org/release/).
     - [X] [LTS releases](https://www.blender.org/download/lts/).
     - [X] [Latest stable release](https://www.blender.org/download/).
     - [X] [Latest daily release](https://builder.blender.org/download/).
