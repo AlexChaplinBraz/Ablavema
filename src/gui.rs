@@ -1,9 +1,11 @@
 //#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
+use self::install::{Install, Progress};
 use crate::{helpers::*, installed::*, package::*, releases::*, settings::*, style::*};
 use iced::{
     button, executor, scrollable, slider, Align, Application, Button, Column, Command, Container,
-    Element, HorizontalAlignment, Length, Radio, Row, Rule, Scrollable, Slider, Text,
+    Element, HorizontalAlignment, Length, ProgressBar, Radio, Row, Rule, Scrollable, Slider,
+    Subscription, Text,
 };
 use std::fs::remove_dir_all;
 
@@ -19,6 +21,7 @@ pub struct GuiArgs {
 pub struct Gui {
     releases: Releases,
     installed: Installed,
+    installing: Vec<(Package, Tab, usize)>,
     updates: Option<Vec<Package>>,
     unpacked_updates: Vec<Package>,
     default_package: Option<Package>,
@@ -55,6 +58,8 @@ pub enum Tab {
 #[derive(Debug, Clone)]
 pub enum Message {
     PackageMessage(Tab, usize, PackageMessage),
+    PackageInstalled(Result<String, GuiError>),
+    PackageInstall(Result<(String, Build), GuiError>),
     PackageRemoved(Result<String, GuiError>),
     ChangeTab(Tab),
     BypassLauncher(Choice),
@@ -77,6 +82,7 @@ pub enum Message {
 #[derive(Debug, Clone)]
 pub enum PackageMessage {
     Install,
+    InstallProgress(Progress),
     Remove,
     Open(String),
     OpenWithFile(String, String),
@@ -123,6 +129,7 @@ impl Application for Gui {
             Gui {
                 releases: flags.releases,
                 installed,
+                installing: Vec::new(),
                 updates: flags.updates,
                 unpacked_updates: Vec::new(),
                 default_package,
@@ -202,6 +209,95 @@ impl Application for Gui {
             },
             Message::ChangeTab(tab) => {
                 self.tab = tab;
+
+                Command::none()
+            }
+            Message::PackageInstalled(_package) => {
+                /* if package.unwrap() == SETTINGS.read().unwrap().default_package {
+                    SETTINGS.write().unwrap().default_package = String::new();
+                    SETTINGS.read().unwrap().save();
+                } */
+
+                self.installed.check().unwrap();
+
+                Command::none()
+            }
+            Message::PackageInstall(result) => {
+                let (name, build) = result.unwrap();
+
+                match self
+                    .unpacked_updates
+                    .iter()
+                    .enumerate()
+                    .find(|(_index, package)| package.name == name)
+                {
+                    Some((index, package)) => {
+                        self.installing
+                            .push((package.to_owned(), Tab::Updates, index));
+                    }
+                    None => match build {
+                        Build::Official => {
+                            let (index, package) = self
+                                .releases
+                                .official
+                                .iter()
+                                .enumerate()
+                                .find(|(_index, package)| package.name == name)
+                                .unwrap();
+
+                            self.installing
+                                .push((package.to_owned(), Tab::Official, index));
+                        }
+                        Build::Stable => {
+                            let (index, package) = self
+                                .releases
+                                .stable
+                                .iter()
+                                .enumerate()
+                                .find(|(_index, package)| package.name == name)
+                                .unwrap();
+
+                            self.installing
+                                .push((package.to_owned(), Tab::Stable, index));
+                        }
+                        Build::LTS => {
+                            let (index, package) = self
+                                .releases
+                                .lts
+                                .iter()
+                                .enumerate()
+                                .find(|(_index, package)| package.name == name)
+                                .unwrap();
+
+                            self.installing.push((package.to_owned(), Tab::LTS, index));
+                        }
+                        Build::Daily(_) => {
+                            let (index, package) = self
+                                .releases
+                                .daily
+                                .iter()
+                                .enumerate()
+                                .find(|(_index, package)| package.name == name)
+                                .unwrap();
+
+                            self.installing
+                                .push((package.to_owned(), Tab::Daily, index));
+                        }
+                        Build::Experimental(_) => {
+                            let (index, package) = self
+                                .releases
+                                .experimental
+                                .iter()
+                                .enumerate()
+                                .find(|(_index, package)| package.name == name)
+                                .unwrap();
+
+                            self.installing
+                                .push((package.to_owned(), Tab::Experimental, index));
+                        }
+                        Build::None => unreachable!(),
+                    },
+                }
 
                 Command::none()
             }
@@ -328,6 +424,12 @@ impl Application for Gui {
                 Command::none()
             }
         }
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        Subscription::batch(self.installing.iter().map(|(package, tab, index)| {
+            Install::package(package.to_owned(), tab.to_owned(), index.to_owned())
+        }))
     }
 
     fn view(&mut self) -> Element<'_, Message> {
@@ -700,8 +802,53 @@ impl Application for Gui {
 impl Package {
     fn update(&mut self, message: PackageMessage) -> Command<Message> {
         match message {
-            PackageMessage::Install => Command::none(),
+            PackageMessage::Install => {
+                self.state = PackageState::Downloading { progress: 0.0 };
+                Command::perform(
+                    Package::install(self.name.clone(), self.build.clone()),
+                    Message::PackageInstall,
+                )
+            }
+            PackageMessage::InstallProgress(progress) => match progress {
+                Progress::Started => Command::none(),
+                Progress::DownloadProgress(progress) => {
+                    self.state = PackageState::Downloading { progress };
+
+                    Command::none()
+                }
+                Progress::FinishedDownloading => Command::none(),
+                Progress::ExtractionProgress(progress) => {
+                    self.state = PackageState::Extracting { progress };
+
+                    Command::none()
+                }
+                Progress::FinishedExtracting => Command::none(),
+                Progress::FinishedInstalling => {
+                    self.state = PackageState::Installed {
+                        open_button: Default::default(),
+                        open_file_button: Default::default(),
+                        set_default_button: Default::default(),
+                        remove_button: Default::default(),
+                    };
+
+                    Command::perform(
+                        Package::installed(self.name.clone()),
+                        Message::PackageInstalled,
+                    )
+                }
+                Progress::Errored => {
+                    self.state = PackageState::Errored {
+                        retry_button: Default::default(),
+                    };
+
+                    Command::none()
+                }
+            },
             PackageMessage::Remove => {
+                self.state = PackageState::Fetched {
+                    install_button: Default::default(),
+                };
+
                 Command::perform(Package::remove(self.name.clone()), Message::PackageRemoved)
             }
             PackageMessage::Open(package) => {
@@ -763,67 +910,128 @@ impl Package {
             }
         };
 
-        let buttons;
-        if installed.contains(self) {
-            let button1 = Row::new().push(button(
-                "Open package",
-                Some(PackageMessage::Open(self.name.clone())),
-                &mut self.open_button,
-            ));
-
-            let button2;
-            match file_path {
-                Some(file_path) => {
-                    button2 = button1.push(button(
-                        "Open file with package",
-                        Some(PackageMessage::OpenWithFile(
-                            self.name.clone(),
-                            file_path.clone(),
-                        )),
-                        &mut self.open_file_button,
-                    ))
-                }
-                None => {
-                    button2 = button1.push(button(
-                        "Open file with package",
-                        None,
-                        &mut self.open_file_button,
-                    ))
-                }
+        if matches!(self.state, PackageState::Fetched { .. }) && installed.contains(self) {
+            self.state = PackageState::Installed {
+                open_button: Default::default(),
+                open_file_button: Default::default(),
+                set_default_button: Default::default(),
+                remove_button: Default::default(),
             }
-
-            let button3;
-            if SETTINGS.read().unwrap().default_package == self.name {
-                button3 = button2.push(button(
-                    "Unset default",
-                    Some(PackageMessage::UnsetDefault),
-                    &mut self.set_default_button,
-                ));
-            } else {
-                button3 = button2.push(button(
-                    "Set as default",
-                    Some(PackageMessage::SetDefault),
-                    &mut self.set_default_button,
-                ));
+        } else if matches!(self.state, PackageState::Installed { .. }) && !installed.contains(self)
+        {
+            self.state = PackageState::Fetched {
+                install_button: Default::default(),
             }
-
-            buttons = button3.push(button(
-                "Remove",
-                Some(PackageMessage::Remove),
-                &mut self.remove_button,
-            ));
-        } else {
-            buttons = Row::new().push(button(
-                "Install",
-                Some(PackageMessage::Install),
-                &mut self.install_button,
-            ));
         }
 
-        Column::new()
-            .push(package_info)
-            .push(buttons.spacing(40).width(Length::Shrink))
-            .into()
+        let controls: Element<PackageMessage> = match &mut self.state {
+            PackageState::Fetched { install_button } => Row::new()
+                .push(button(
+                    "Install",
+                    Some(PackageMessage::Install),
+                    install_button,
+                ))
+                .into(),
+            PackageState::Downloading { progress } => Row::new()
+                .push(
+                    Text::new(format!("Downloading... {:.2}%", progress)).width(Length::Units(200)),
+                )
+                .push(
+                    ProgressBar::new(0.0..=100.0, *progress)
+                        .width(Length::Fill)
+                        .style(theme),
+                )
+                .into(),
+            PackageState::Extracting { progress } => {
+                if cfg!(target_os = "linux") {
+                    Row::new()
+                        .push(
+                            Text::new(format!("Extracting..."))
+                                .width(Length::Fill)
+                                .horizontal_alignment(HorizontalAlignment::Center),
+                        )
+                        .into()
+                } else {
+                    Row::new()
+                        .push(
+                            Text::new(format!("Extracting... {:.2}%", progress))
+                                .width(Length::Units(200)),
+                        )
+                        .push(
+                            ProgressBar::new(0.0..=100.0, *progress)
+                                .width(Length::Fill)
+                                .style(theme),
+                        )
+                        .into()
+                }
+            }
+            PackageState::Installed {
+                open_button,
+                open_file_button,
+                set_default_button,
+                remove_button,
+            } => {
+                let button1 = Row::new().push(button(
+                    "Open package",
+                    Some(PackageMessage::Open(self.name.clone())),
+                    open_button,
+                ));
+
+                let button2;
+                match file_path {
+                    Some(file_path) => {
+                        button2 = button1.push(button(
+                            "Open file with package",
+                            Some(PackageMessage::OpenWithFile(
+                                self.name.clone(),
+                                file_path.clone(),
+                            )),
+                            open_file_button,
+                        ))
+                    }
+                    None => {
+                        button2 =
+                            button1.push(button("Open file with package", None, open_file_button))
+                    }
+                }
+
+                let button3;
+                if SETTINGS.read().unwrap().default_package == self.name {
+                    button3 = button2.push(button(
+                        "Unset default",
+                        Some(PackageMessage::UnsetDefault),
+                        set_default_button,
+                    ));
+                } else {
+                    button3 = button2.push(button(
+                        "Set as default",
+                        Some(PackageMessage::SetDefault),
+                        set_default_button,
+                    ));
+                }
+
+                button3
+                    .spacing(40)
+                    .width(Length::Shrink)
+                    .push(button(
+                        "Remove",
+                        Some(PackageMessage::Remove),
+                        remove_button,
+                    ))
+                    .into()
+            }
+            PackageState::Errored { retry_button: _ } => Text::new("Error").into(),
+        };
+
+        Column::new().push(package_info).push(controls).into()
+    }
+
+    async fn install(name: String, build: Build) -> Result<(String, Build), GuiError> {
+        Ok((name, build))
+    }
+
+    async fn installed(name: String) -> Result<String, GuiError> {
+        Ok(name)
     }
 
     async fn remove(name: String) -> Result<String, GuiError> {
@@ -881,4 +1089,455 @@ fn todo(unimplemented_part: &str, theme: Theme) -> Element<Message> {
         .center_y()
         .style(theme)
         .into()
+}
+
+pub mod install {
+    use crate::{helpers::get_extracted_name, package::*, settings::*};
+    use bzip2::read::BzDecoder;
+    use flate2::read::GzDecoder;
+    use iced_futures::futures;
+    use std::{fs::create_dir_all, fs::File, io::Read, io::Write, path::PathBuf};
+    use tar::Archive;
+    use tokio::fs::{remove_dir_all, remove_file};
+    use xz2::read::XzDecoder;
+    use zip::{read::ZipFile, ZipArchive};
+
+    use super::{Message, PackageMessage, Tab};
+
+    pub struct Install {
+        package: Package,
+        tab: Tab,
+        index: usize,
+    }
+
+    impl Install {
+        pub fn package(package: Package, tab: Tab, index: usize) -> iced::Subscription<Message> {
+            iced::Subscription::from_recipe(Install {
+                package,
+                tab,
+                index,
+            })
+            .map(|(tab, index, progress)| {
+                Message::PackageMessage(tab, index, PackageMessage::InstallProgress(progress))
+            })
+        }
+    }
+
+    impl<H, I> iced_native::subscription::Recipe<H, I> for Install
+    where
+        H: std::hash::Hasher,
+    {
+        type Output = (Tab, usize, Progress);
+
+        fn hash(&self, state: &mut H) {
+            use std::hash::Hash;
+
+            std::any::TypeId::of::<Self>().hash(state);
+            self.package.name.hash(state);
+            self.package.date.hash(state);
+        }
+
+        fn stream(
+            self: Box<Self>,
+            _input: futures::stream::BoxStream<'static, I>,
+        ) -> futures::stream::BoxStream<'static, Self::Output> {
+            Box::pin(futures::stream::unfold(
+                State::ReadyToInstall {
+                    package: self.package,
+                    tab: self.tab,
+                    index: self.index,
+                },
+                |state| async move {
+                    match state {
+                        State::ReadyToInstall {
+                            package,
+                            tab,
+                            index,
+                        } => {
+                            let response = reqwest::get(&package.url).await;
+
+                            match response {
+                                Ok(response) => {
+                                    if let Some(total) = response.content_length() {
+                                        let file = SETTINGS.read().unwrap().cache_dir.join(
+                                            package.url.split_terminator('/').last().unwrap(),
+                                        );
+
+                                        if file.exists() {
+                                            remove_file(&file).await.unwrap();
+                                        }
+
+                                        let package_dir = SETTINGS
+                                            .read()
+                                            .unwrap()
+                                            .packages_dir
+                                            .join(&package.name);
+
+                                        if package_dir.exists() {
+                                            remove_dir_all(&package_dir).await.unwrap();
+                                        }
+
+                                        let destination = tokio::fs::OpenOptions::new()
+                                            .create(true)
+                                            .append(true)
+                                            .open(&file)
+                                            .await
+                                            .unwrap();
+
+                                        Some((
+                                            (tab, index, Progress::Started),
+                                            State::Downloading {
+                                                package,
+                                                response,
+                                                file,
+                                                destination,
+                                                total,
+                                                downloaded: 0,
+                                                tab,
+                                                index,
+                                            },
+                                        ))
+                                    } else {
+                                        Some((
+                                            (tab, index, Progress::Errored),
+                                            State::FinishedInstalling,
+                                        ))
+                                    }
+                                }
+                                Err(_) => Some((
+                                    (tab, index, Progress::Errored),
+                                    State::FinishedInstalling,
+                                )),
+                            }
+                        }
+                        State::Downloading {
+                            package,
+                            mut response,
+                            file,
+                            mut destination,
+                            total,
+                            downloaded,
+                            tab,
+                            index,
+                        } => match response.chunk().await {
+                            Ok(Some(chunk)) => {
+                                tokio::io::AsyncWriteExt::write_all(&mut destination, &chunk)
+                                    .await
+                                    .unwrap();
+
+                                let downloaded = downloaded + chunk.len() as u64;
+                                let percentage = (downloaded as f32 / total as f32) * 100.0;
+
+                                Some((
+                                    (tab, index, Progress::DownloadProgress(percentage)),
+                                    State::Downloading {
+                                        package,
+                                        response,
+                                        file,
+                                        destination,
+                                        total,
+                                        downloaded,
+                                        tab,
+                                        index,
+                                    },
+                                ))
+                            }
+                            Ok(None) => Some((
+                                (tab, index, Progress::FinishedDownloading),
+                                State::FinishedDownloading {
+                                    package,
+                                    file,
+                                    tab,
+                                    index,
+                                },
+                            )),
+                            Err(_) => {
+                                Some(((tab, index, Progress::Errored), State::FinishedInstalling))
+                            }
+                        },
+                        State::FinishedDownloading {
+                            package,
+                            file,
+                            tab,
+                            index,
+                        } => {
+                            let archive = if file.extension().unwrap() == "xz" {
+                                DownloadedArchive::TarXz
+                            } else if file.extension().unwrap() == "bz2" {
+                                DownloadedArchive::TarBz
+                            } else if file.extension().unwrap() == "gz" {
+                                DownloadedArchive::TarGz
+                            } else if file.extension().unwrap() == "zip" {
+                                let zip = File::open(&file).unwrap();
+                                let archive = ZipArchive::new(zip).unwrap();
+
+                                // This handles some archives that don't have an inner directory.
+                                let extraction_dir =
+                                    match file.file_name().unwrap().to_str().unwrap() {
+                                        "blender-2.49-win64.zip" => SETTINGS
+                                            .read()
+                                            .unwrap()
+                                            .cache_dir
+                                            .join("blender-2.49-win64"),
+                                        "blender-2.49a-win64-python26.zip" => SETTINGS
+                                            .read()
+                                            .unwrap()
+                                            .cache_dir
+                                            .join("blender-2.49a-win64-python26"),
+                                        "blender-2.49b-win64-python26.zip" => SETTINGS
+                                            .read()
+                                            .unwrap()
+                                            .cache_dir
+                                            .join("blender-2.49b-win64-python26"),
+                                        _ => SETTINGS.read().unwrap().cache_dir.clone(),
+                                    };
+
+                                let total = archive.len() as u64;
+
+                                DownloadedArchive::Zip {
+                                    archive,
+                                    extraction_dir,
+                                    total,
+                                    extracted: 0,
+                                }
+                            } else if file.extension().unwrap() == "dmg" {
+                                todo!("macos extraction");
+                            } else {
+                                panic!("Unknown archive extension");
+                            };
+
+                            Some((
+                                (tab, index, Progress::ExtractionProgress(0.0)),
+                                State::Extracting {
+                                    package,
+                                    file,
+                                    archive,
+                                    tab,
+                                    index,
+                                },
+                            ))
+                        }
+                        State::Extracting {
+                            package,
+                            file,
+                            archive,
+                            tab,
+                            index,
+                        } => match archive {
+                            DownloadedArchive::TarXz => {
+                                let tar_xz = File::open(&file).unwrap();
+                                let tar = XzDecoder::new(tar_xz);
+                                let mut archive = Archive::new(tar);
+
+                                for entry in archive.entries().unwrap() {
+                                    let mut file = entry.unwrap();
+                                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                                }
+
+                                Some((
+                                    (tab, index, Progress::FinishedExtracting),
+                                    State::FinishedExtracting {
+                                        package,
+                                        tab,
+                                        index,
+                                    },
+                                ))
+                            }
+                            DownloadedArchive::TarGz => {
+                                let tar_bz2 = File::open(&file).unwrap();
+                                let tar = BzDecoder::new(tar_bz2);
+                                let mut archive = Archive::new(tar);
+
+                                for entry in archive.entries().unwrap() {
+                                    let mut file = entry.unwrap();
+                                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                                }
+
+                                Some((
+                                    (tab, index, Progress::FinishedExtracting),
+                                    State::FinishedExtracting {
+                                        package,
+                                        tab,
+                                        index,
+                                    },
+                                ))
+                            }
+                            DownloadedArchive::TarBz => {
+                                let tar_gz = File::open(&file).unwrap();
+                                let tar = GzDecoder::new(tar_gz);
+                                let mut archive = Archive::new(tar);
+
+                                for entry in archive.entries().unwrap() {
+                                    let mut file = entry.unwrap();
+                                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                                }
+
+                                Some((
+                                    (tab, index, Progress::FinishedExtracting),
+                                    State::FinishedExtracting {
+                                        package,
+                                        tab,
+                                        index,
+                                    },
+                                ))
+                            }
+                            DownloadedArchive::Zip {
+                                mut archive,
+                                extraction_dir,
+                                total,
+                                extracted,
+                            } => {
+                                if extracted == total - 1 {
+                                    Some((
+                                        (tab, index, Progress::FinishedExtracting),
+                                        State::FinishedExtracting {
+                                            package,
+                                            tab,
+                                            index,
+                                        },
+                                    ))
+                                } else {
+                                    {
+                                        let mut entry: ZipFile =
+                                            archive.by_index(extracted as usize).unwrap();
+                                        let entry_name = entry.name().to_owned();
+
+                                        if entry.is_dir() {
+                                            let extracted_dir_path =
+                                                extraction_dir.join(entry_name);
+                                            create_dir_all(extracted_dir_path).unwrap();
+                                        } else if entry.is_file() {
+                                            let mut buffer: Vec<u8> = Vec::new();
+                                            let _bytes_read =
+                                                entry.read_to_end(&mut buffer).unwrap();
+                                            let extracted_file_path =
+                                                extraction_dir.join(entry_name);
+                                            create_dir_all(extracted_file_path.parent().unwrap())
+                                                .unwrap();
+                                            let mut file =
+                                                File::create(extracted_file_path).unwrap();
+                                            file.write(&buffer).unwrap();
+                                        }
+                                    }
+
+                                    let extracted = extracted + 1;
+                                    let percentage = (extracted as f32 / total as f32) * 100.0;
+
+                                    let archive = DownloadedArchive::Zip {
+                                        archive,
+                                        extraction_dir,
+                                        total,
+                                        extracted,
+                                    };
+
+                                    Some((
+                                        (tab, index, Progress::ExtractionProgress(percentage)),
+                                        State::Extracting {
+                                            package,
+                                            file,
+                                            archive,
+                                            tab,
+                                            index,
+                                        },
+                                    ))
+                                }
+                            }
+                        },
+                        State::FinishedExtracting {
+                            package,
+                            tab,
+                            index,
+                        } => {
+                            let mut package_path =
+                                SETTINGS.read().unwrap().packages_dir.join(&package.name);
+
+                            std::fs::rename(
+                                SETTINGS
+                                    .read()
+                                    .unwrap()
+                                    .cache_dir
+                                    .join(get_extracted_name(&package)),
+                                &package_path,
+                            )
+                            .unwrap();
+
+                            package_path.push("package_info.bin");
+                            let file = File::create(&package_path).unwrap();
+                            bincode::serialize_into(file, &package).unwrap();
+
+                            Some((
+                                (tab, index, Progress::FinishedInstalling),
+                                State::FinishedInstalling,
+                            ))
+                        }
+                        State::FinishedInstalling => {
+                            let _: () = iced::futures::future::pending().await;
+
+                            None
+                        }
+                    }
+                },
+            ))
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum Progress {
+        Started,
+        DownloadProgress(f32),
+        FinishedDownloading,
+        ExtractionProgress(f32),
+        FinishedExtracting,
+        FinishedInstalling,
+        Errored,
+    }
+
+    pub enum State {
+        ReadyToInstall {
+            package: Package,
+            tab: Tab,
+            index: usize,
+        },
+        Downloading {
+            package: Package,
+            response: reqwest::Response,
+            file: PathBuf,
+            destination: tokio::fs::File,
+            total: u64,
+            downloaded: u64,
+            tab: Tab,
+            index: usize,
+        },
+        FinishedDownloading {
+            package: Package,
+            file: PathBuf,
+            tab: Tab,
+            index: usize,
+        },
+        Extracting {
+            package: Package,
+            file: PathBuf,
+            archive: DownloadedArchive,
+            tab: Tab,
+            index: usize,
+        },
+        FinishedExtracting {
+            package: Package,
+            tab: Tab,
+            index: usize,
+        },
+        FinishedInstalling,
+    }
+
+    pub enum DownloadedArchive {
+        TarXz, // { entries: Entries<XzDecoder<File>> },
+        TarGz, // { entries: Entries<GzDecoder<File>> },
+        TarBz, // { entries: Entries<BzDecoder<File>> },
+        Zip {
+            archive: ZipArchive<File>,
+            extraction_dir: PathBuf,
+            total: u64,
+            extracted: u64,
+        },
+    }
 }

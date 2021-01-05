@@ -22,7 +22,7 @@ use tokio::{
 use xz2::read::XzDecoder;
 use zip::{read::ZipFile, ZipArchive};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Package {
     pub version: String,
     pub name: String,
@@ -33,15 +33,47 @@ pub struct Package {
     pub os: Os,
     pub changelog: Vec<Change>,
     #[serde(skip)]
-    pub install_button: button::State,
-    #[serde(skip)]
-    pub remove_button: button::State,
-    #[serde(skip)]
-    pub open_button: button::State,
-    #[serde(skip)]
-    pub open_file_button: button::State,
-    #[serde(skip)]
-    pub set_default_button: button::State,
+    pub state: PackageState,
+}
+
+impl PartialEq for Package {
+    fn eq(&self, other: &Self) -> bool {
+        self.version == other.version
+            && self.name == other.name
+            && self.build == other.build
+            && self.date == other.date
+            && self.os == other.os
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum PackageState {
+    Fetched {
+        install_button: button::State,
+    },
+    Downloading {
+        progress: f32,
+    },
+    Extracting {
+        progress: f32,
+    },
+    Installed {
+        open_button: button::State,
+        open_file_button: button::State,
+        set_default_button: button::State,
+        remove_button: button::State,
+    },
+    Errored {
+        retry_button: button::State,
+    },
+}
+
+impl Default for PackageState {
+    fn default() -> Self {
+        Self::Fetched {
+            install_button: button::State::new(),
+        }
+    }
 }
 
 impl Package {
@@ -58,11 +90,7 @@ impl Package {
             url: String::new(),
             os: Os::None,
             changelog: Vec::new(),
-            install_button: button::State::new(),
-            remove_button: button::State::new(),
-            open_button: button::State::new(),
-            open_file_button: button::State::new(),
-            set_default_button: button::State::new(),
+            state: PackageState::default(),
         }
     }
 

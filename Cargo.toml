@@ -34,4 +34,6 @@ device_query = "0.2"
 # "a suitable graphics adapter or device could not be found"
 # on Linux (also in a Windows VM running on the same Linux machine, even if compiled inside the VM),
 # even though I have Vulkan and OpenGL, regardless of X11 or Wayland.
-iced = { version = "0.2", features = ["glow", "glow_default_system_font"] }
+iced = { version = "0.2", features = ["glow", "glow_default_system_font", "tokio_old"] }
+iced_native = "0.3"
+iced_futures = "0.2"
