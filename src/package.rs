@@ -377,7 +377,7 @@ pub enum Build {
     Stable,
     LTS,
     Daily(String),
-    Experimental(String),
+    Branched(String),
     None,
 }
 
@@ -387,7 +387,7 @@ impl std::fmt::Display for Build {
             Build::Archived => "Archived Release",
             Build::Stable => "Stable Release",
             Build::LTS => "LTS Release",
-            Build::Daily(s) | Build::Experimental(s) => s,
+            Build::Daily(s) | Build::Branched(s) => s,
             Build::None => unreachable!("Unexpected build type"),
         };
         write!(f, "{}", printable)

@@ -14,7 +14,7 @@ use std::{error::Error, fs::File};
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Releases {
     pub daily: Vec<Package>,
-    pub experimental: Vec<Package>,
+    pub branched: Vec<Package>,
     pub lts: Vec<Package>,
     pub archived: Vec<Package>,
     pub stable: Vec<Package>,
@@ -24,7 +24,7 @@ impl Releases {
     pub fn new() -> Releases {
         Releases {
             daily: Vec::new(),
-            experimental: Vec::new(),
+            branched: Vec::new(),
             lts: Vec::new(),
             archived: Vec::new(),
             stable: Vec::new(),
@@ -137,7 +137,7 @@ impl Releases {
         Ok(())
     }
 
-    pub async fn fetch_experimental(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn fetch_branched(&mut self) -> Result<(), Box<dyn Error>> {
         let url = "https://builder.blender.org/download/branches/";
         let resp = reqwest::get(url).await.unwrap();
         assert!(resp.status().is_success());
@@ -167,7 +167,7 @@ impl Releases {
 
             let mut package = Package::new();
 
-            package.build = Build::Experimental(
+            package.build = Build::Branched(
                 build
                     .find(Class("build-var"))
                     .next()
@@ -224,11 +224,11 @@ impl Releases {
                 }
             };
 
-            fetched.experimental.push(package);
+            fetched.branched.push(package);
         }
 
-        if self.experimental != fetched.experimental {
-            self.experimental = fetched.experimental;
+        if self.branched != fetched.branched {
+            self.branched = fetched.branched;
 
             self.save()?;
         }

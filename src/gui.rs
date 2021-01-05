@@ -31,7 +31,7 @@ pub struct Gui {
     updates_button: button::State,
     installed_button: button::State,
     daily_button: button::State,
-    experimental_button: button::State,
+    branched_button: button::State,
     lts_button: button::State,
     stable_button: button::State,
     archived_button: button::State,
@@ -47,7 +47,7 @@ pub enum Tab {
     Updates,
     Installed,
     Daily,
-    Experimental,
+    Branched,
     LTS,
     Stable,
     Archived,
@@ -69,11 +69,11 @@ pub enum Message {
     MinutesBetweenUpdatesChanged(f64),
     MinutesBetweenUpdates(f64),
     UpdateDaily(Choice),
-    UpdateExperimental(Choice),
+    UpdateBranched(Choice),
     UpdateStable(Choice),
     UpdateLts(Choice),
     KeepOnlyLatestDaily(Choice),
-    KeepOnlyLatestExperimental(Choice),
+    KeepOnlyLatestBranched(Choice),
     KeepOnlyLatestStable(Choice),
     KeepOnlyLatestLts(Choice),
     ThemeChanged(Theme),
@@ -139,7 +139,7 @@ impl Application for Gui {
                 updates_button: button::State::new(),
                 installed_button: button::State::new(),
                 daily_button: button::State::new(),
-                experimental_button: button::State::new(),
+                branched_button: button::State::new(),
                 lts_button: button::State::new(),
                 stable_button: button::State::new(),
                 archived_button: button::State::new(),
@@ -188,7 +188,7 @@ impl Application for Gui {
                     Some(package) => package.update(package_message),
                     None => unreachable!(),
                 },
-                Tab::Experimental => match self.releases.experimental.get_mut(index) {
+                Tab::Branched => match self.releases.branched.get_mut(index) {
                     Some(package) => package.update(package_message),
                     None => unreachable!(),
                 },
@@ -283,17 +283,17 @@ impl Application for Gui {
                             self.installing
                                 .push((package.to_owned(), Tab::Daily, index));
                         }
-                        Build::Experimental(_) => {
+                        Build::Branched(_) => {
                             let (index, package) = self
                                 .releases
-                                .experimental
+                                .branched
                                 .iter()
                                 .enumerate()
                                 .find(|(_index, package)| package.name == name)
                                 .unwrap();
 
                             self.installing
-                                .push((package.to_owned(), Tab::Experimental, index));
+                                .push((package.to_owned(), Tab::Branched, index));
                         }
                         Build::None => unreachable!(),
                     },
@@ -357,10 +357,10 @@ impl Application for Gui {
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
-            Message::UpdateExperimental(choice) => {
+            Message::UpdateBranched(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().update_experimental = true,
-                    Choice::Disable => SETTINGS.write().unwrap().update_experimental = false,
+                    Choice::Enable => SETTINGS.write().unwrap().update_branched = true,
+                    Choice::Disable => SETTINGS.write().unwrap().update_branched = false,
                 }
                 SETTINGS.read().unwrap().save();
                 Command::none()
@@ -389,14 +389,10 @@ impl Application for Gui {
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
-            Message::KeepOnlyLatestExperimental(choice) => {
+            Message::KeepOnlyLatestBranched(choice) => {
                 match choice {
-                    Choice::Enable => {
-                        SETTINGS.write().unwrap().keep_only_latest_experimental = true
-                    }
-                    Choice::Disable => {
-                        SETTINGS.write().unwrap().keep_only_latest_experimental = false
-                    }
+                    Choice::Enable => SETTINGS.write().unwrap().keep_only_latest_branched = true,
+                    Choice::Disable => SETTINGS.write().unwrap().keep_only_latest_branched = false,
                 }
                 SETTINGS.read().unwrap().save();
                 Command::none()
@@ -469,9 +465,9 @@ impl Application for Gui {
                 ))
                 .push(top_button("Daily", Tab::Daily, &mut self.daily_button))
                 .push(top_button(
-                    "Experimental",
-                    Tab::Experimental,
-                    &mut self.experimental_button,
+                    "Branched",
+                    Tab::Branched,
+                    &mut self.branched_button,
                 ))
                 .push(top_button("LTS", Tab::LTS, &mut self.lts_button))
                 .push(top_button("Stable", Tab::Stable, &mut self.stable_button))
@@ -585,9 +581,9 @@ impl Application for Gui {
                 &mut self.scroll,
                 self.theme,
             ),
-            Tab::Experimental => packages_body(
-                &mut self.releases.experimental,
-                Tab::Experimental,
+            Tab::Branched => packages_body(
+                &mut self.releases.branched,
+                Tab::Branched,
                 &self.file_path,
                 &self.installed,
                 &mut self.scroll,
@@ -715,11 +711,11 @@ impl Application for Gui {
                     ).push(Rule::horizontal(20).style(self.theme)
                     ).push(
                         choice_setting!(
-                            "Check for experimental packages",
-                            "Check updates for experimental packages.",
+                            "Check for branched packages",
+                            "Check updates for branched packages.",
                             &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().update_experimental).unwrap()),
-                            Message::UpdateExperimental,
+                            Some(choice(SETTINGS.read().unwrap().update_branched).unwrap()),
+                            Message::UpdateBranched,
                         )
                     ).push(Rule::horizontal(20).style(self.theme)
                     ).push(
@@ -751,11 +747,11 @@ impl Application for Gui {
                     ).push(Rule::horizontal(20).style(self.theme)
                     ).push(
                         choice_setting!(
-                            "Keep only newest experimental package",
-                            "Remove all experimental packages other than the newest.",
+                            "Keep only newest branched package",
+                            "Remove all branched packages other than the newest.",
                             &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_experimental).unwrap()),
-                            Message::KeepOnlyLatestExperimental,
+                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_branched).unwrap()),
+                            Message::KeepOnlyLatestBranched,
                         )
                     ).push(Rule::horizontal(20).style(self.theme)
                     ).push(

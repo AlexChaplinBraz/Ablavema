@@ -77,10 +77,10 @@ impl Installed {
             }
         }
 
-        if SETTINGS.read().unwrap().update_experimental {
-            releases.fetch_experimental().await?;
+        if SETTINGS.read().unwrap().update_branched {
+            releases.fetch_branched().await?;
 
-            for fetched_package in &releases.experimental {
+            for fetched_package in &releases.branched {
                 if !self.contains(fetched_package)
                     && self
                         .iter()
@@ -169,7 +169,7 @@ impl Installed {
             let mut stable_count = 0;
             let mut lts_count = 0;
             let mut daily_count = Vec::new();
-            let mut experimental_count = Vec::new();
+            let mut branched_count = Vec::new();
             for package in &**self {
                 match &package.build {
                     Build::Archived => continue,
@@ -193,10 +193,10 @@ impl Installed {
                             package.cli_remove().await?;
                         }
                     }
-                    Build::Experimental(s) => {
-                        experimental_count.push(s.clone());
-                        if experimental_count.iter().filter(|&n| n == s).count() > 1
-                            && SETTINGS.read().unwrap().keep_only_latest_experimental
+                    Build::Branched(s) => {
+                        branched_count.push(s.clone());
+                        if branched_count.iter().filter(|&n| n == s).count() > 1
+                            && SETTINGS.read().unwrap().keep_only_latest_branched
                         {
                             package.cli_remove().await?;
                         }
@@ -206,7 +206,7 @@ impl Installed {
             }
 
             if !daily_count.is_empty()
-                || !experimental_count.is_empty()
+                || !branched_count.is_empty()
                 || !lts_count == 0
                 || !stable_count == 0
             {

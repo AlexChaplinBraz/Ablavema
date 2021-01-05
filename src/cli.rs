@@ -78,10 +78,10 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         SETTINGS.read().unwrap().update_daily,
         right_ansi_code
     );
-    let help_update_experimental = format!(
-        "Download the latest experimental package [current: {}{}{}]",
+    let help_update_branched = format!(
+        "Download the latest branched package [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().update_experimental,
+        SETTINGS.read().unwrap().update_branched,
         right_ansi_code
     );
     let help_update_stable = format!(
@@ -102,10 +102,10 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         SETTINGS.read().unwrap().keep_only_latest_daily,
         right_ansi_code
     );
-    let help_keep_only_latest_experimental = format!(
-        "Remove all experimental packages other than the newest [current: {}{}{}]",
+    let help_keep_only_latest_branched = format!(
+        "Remove all branched packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().keep_only_latest_experimental,
+        SETTINGS.read().unwrap().keep_only_latest_branched,
         right_ansi_code
     );
     let help_keep_only_latest_stable = format!(
@@ -205,14 +205,14 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help(&help_update_daily),
                 )
                 .arg(
-                    Arg::with_name("update_experimental")
+                    Arg::with_name("update_branched")
                         .display_order(40)
                         .takes_value(true)
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
                         .short("e")
-                        .long("update-experimental")
-                        .help(&help_update_experimental),
+                        .long("update-branched")
+                        .help(&help_update_branched),
                 )
                 .arg(
                     Arg::with_name("update_stable")
@@ -245,14 +245,14 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help(&help_keep_only_latest_daily),
                 )
                 .arg(
-                    Arg::with_name("keep_only_latest_experimental")
+                    Arg::with_name("keep_only_latest_branched")
                         .display_order(80)
                         .takes_value(true)
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
                         .short("E")
-                        .long("keep-only-latest-experimental")
-                        .help(&help_keep_only_latest_experimental),
+                        .long("keep-only-latest-branched")
+                        .help(&help_keep_only_latest_branched),
                 )
                 .arg(
                     Arg::with_name("keep_only_latest_stable")
@@ -283,11 +283,11 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                             "check_updates_at_launch",
                             "minutes_between_updates",
                             "update_daily",
-                            "update_experimental",
+                            "update_branched",
                             "update_stable",
                             "update_lts",
                             "keep_only_latest_daily",
-                            "keep_only_latest_experimental",
+                            "keep_only_latest_branched",
                             "keep_only_latest_stable",
                             "keep_only_latest_lts"
                         ])
@@ -313,10 +313,10 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help("Fetch daily packages"),
                 )
                 .arg(
-                    Arg::with_name("experimental")
+                    Arg::with_name("branched")
                         .short("e")
-                        .long("experimental")
-                        .help("Fetch experimental packages"),
+                        .long("branched")
+                        .help("Fetch branched packages"),
                 )
                 .arg(
                     Arg::with_name("lts")
@@ -338,7 +338,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 )
                 .group(
                     ArgGroup::with_name("fetch_group")
-                        .args(&["all", "daily", "experimental", "lts", "archived", "stable"])
+                        .args(&["all", "daily", "branched", "lts", "archived", "stable"])
                         .required(true)
                         .multiple(true)
                 ),
@@ -383,9 +383,9 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         ),
                 )
                 .subcommand(
-                    SubCommand::with_name("experimental")
+                    SubCommand::with_name("branched")
                         .setting(AppSettings::ArgRequiredElseHelp)
-                        .about("Install experimental packages")
+                        .about("Install branched packages")
                         .help_message("Print help and exit")
                         .arg(
                             Arg::with_name("id")
@@ -490,8 +490,8 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help_message("Print help and exit"),
                 )
                 .subcommand(
-                    SubCommand::with_name("experimental")
-                        .about("List experimental packages")
+                    SubCommand::with_name("branched")
+                        .about("List branched packages")
                         .help_message("Print help and exit"),
                 )
                 .subcommand(
@@ -632,11 +632,11 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             }
 
             process_bool_arg(a, "update_daily")?;
-            process_bool_arg(a, "update_experimental")?;
+            process_bool_arg(a, "update_branched")?;
             process_bool_arg(a, "update_stable")?;
             process_bool_arg(a, "update_lts")?;
             process_bool_arg(a, "keep_only_latest_daily")?;
-            process_bool_arg(a, "keep_only_latest_experimental")?;
+            process_bool_arg(a, "keep_only_latest_branched")?;
             process_bool_arg(a, "keep_only_latest_stable")?;
             process_bool_arg(a, "keep_only_latest_lts")?;
 
@@ -646,7 +646,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
             if a.is_present("all") {
                 println!("Fetching all packages...");
                 releases.fetch_daily().await?;
-                releases.fetch_experimental().await?;
+                releases.fetch_branched().await?;
                 releases.fetch_lts().await?;
                 releases.fetch_archived().await?;
                 releases.fetch_stable().await?;
@@ -657,9 +657,9 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                     releases.fetch_daily().await?;
                 }
 
-                if a.is_present("experimental") {
-                    println!("Fetching experimental packages...");
-                    releases.fetch_experimental().await?;
+                if a.is_present("branched") {
+                    println!("Fetching branched packages...");
+                    releases.fetch_branched().await?;
                 }
 
                 if a.is_present("lts") {
@@ -682,9 +682,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         }
         ("install", Some(a)) => match a.subcommand() {
             ("daily", Some(b)) => cli_install(b, &releases.daily, "daily").await?,
-            ("experimental", Some(b)) => {
-                cli_install(b, &releases.experimental, "experimental").await?
-            }
+            ("branched", Some(b)) => cli_install(b, &releases.branched, "branched").await?,
             ("lts", Some(b)) => cli_install(b, &releases.lts, "LTS").await?,
             ("archived", Some(b)) => cli_install(b, &releases.archived, "archived").await?,
             ("stable", Some(b)) => cli_install(b, &releases.stable, "stable").await?,
@@ -698,19 +696,11 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                     cli_list_narrow(&releases.daily, "daily", b.is_present("invert"));
                 }
             }
-            ("experimental", Some(b)) => {
+            ("branched", Some(b)) => {
                 if b.is_present("wide") {
-                    cli_list_wide(
-                        &releases.experimental,
-                        "experimental",
-                        b.is_present("invert"),
-                    );
+                    cli_list_wide(&releases.branched, "branched", b.is_present("invert"));
                 } else {
-                    cli_list_narrow(
-                        &releases.experimental,
-                        "experimental",
-                        b.is_present("invert"),
-                    );
+                    cli_list_narrow(&releases.branched, "branched", b.is_present("invert"));
                 }
             }
             ("installed", Some(b)) => {
