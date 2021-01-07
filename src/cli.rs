@@ -151,7 +151,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .takes_value(true)
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
-                        .short("b")
+                        .short("y")
                         .long("bypass-launcher")
                         .help(&help_bypass_launcher),
                 )
@@ -210,7 +210,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .takes_value(true)
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
-                        .short("e")
+                        .short("b")
                         .long("update-branched")
                         .help(&help_update_branched),
                 )
@@ -250,7 +250,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .takes_value(true)
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
-                        .short("E")
+                        .short("B")
                         .long("keep-only-latest-branched")
                         .help(&help_keep_only_latest_branched),
                 )
@@ -302,7 +302,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 .help_message("Print help and exit")
                 .arg(
                     Arg::with_name("all")
-                        .short("a")
+                        .short("A")
                         .long("all")
                         .help("Fetch all packages"),
                 )
@@ -314,7 +314,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 )
                 .arg(
                     Arg::with_name("branched")
-                        .short("e")
+                        .short("b")
                         .long("branched")
                         .help("Fetch branched packages"),
                 )
@@ -326,7 +326,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 )
                 .arg(
                     Arg::with_name("archived")
-                        .short("o")
+                        .short("a")
                         .long("archived")
                         .help("Fetch archived packages"),
                 )
