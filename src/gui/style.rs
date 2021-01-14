@@ -1,4 +1,3 @@
-//#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
 use iced::{
     button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input,
@@ -7,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// Lifted practically as is from the styling example of iced.
 /// Only thing I added was methods for getting darker versions of the container.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum Theme {
     Light,
     Dark,

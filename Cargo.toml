@@ -6,34 +6,28 @@ authors = ["Alexander Chaplin Braz <contact@alexchaplinbraz.com>"]
 edition = "2018"
 
 [dependencies]
-reqwest = "0.10"
-select = "0.5"
-tokio = { version = "0.2", features = ["full"] }
-clap = "2.33"
-serde = { version = "1.0", features = ["derive"] }
-xz2 = "0.1"
-bzip2 = "0.4"
-flate2 = "1.0"
-tar = "0.4"
-zip = "0.5"
+async-trait = "0.1"
 bincode = "1.3"
-indicatif = "0.15"
-prettytable-rs = "0.8"
+bzip2 = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
-regex = "1.4"
-lazy_static = "1.4"
-directories-next = "2.0"
-msgbox = "0.6"
+clap = "2.33"
+derive_deref = "1.1"
 device_query = "0.2"
-# TODO: Figure out the backend issues.
-# This works for Linux and compiling from Linux to x86_64-pc-windows-gnu too.
-# But any other rendering backend compiled from Linux and ran on Windows makes it error with:
-# "The code execution cannot proceed because libstdc++-6.dll was not found."
-# Now, if compiling on Windows, then all the backends work there.
-# The problem is that any backends other than "glow" error with:
-# "a suitable graphics adapter or device could not be found"
-# on Linux (also in a Windows VM running on the same Linux machine, even if compiled inside the VM),
-# even though I have Vulkan and OpenGL, regardless of X11 or Wayland.
-iced = { version = "0.2", features = ["glow", "glow_default_system_font", "tokio_old"] }
-iced_native = "0.3"
-iced_futures = "0.2"
+directories-next = "2.0"
+flate2 = "1.0"
+iced = { git = "https://github.com/hecrj/iced", rev = "92d647d1a6145e19ef9f540e02faef6a892f51fa" }
+iced_native = { git = "https://github.com/hecrj/iced", rev = "92d647d1a6145e19ef9f540e02faef6a892f51fa" }
+iced_futures = { git = "https://github.com/hecrj/iced", rev = "92d647d1a6145e19ef9f540e02faef6a892f51fa" }
+indicatif = "0.15"
+lazy_static = "1.4"
+msgbox = "0.6"
+natord = "1.0"
+prettytable-rs = "0.8"
+regex = "1.4"
+reqwest = "0.11"
+select = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+tar = "0.4"
+tokio = { version = "1.0", features = ["fs", "io-util", "macros", "rt-multi-thread"] }
+xz2 = "0.1"
+zip = "0.5"

@@ -1,6 +1,6 @@
-//#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
-use crate::style::Theme;
+use crate::{gui::style::Theme, package::Package};
+use bincode;
 use device_query::Keycode;
 use directories_next::ProjectDirs;
 use lazy_static::lazy_static;
@@ -18,13 +18,16 @@ use std::{
 
 const CONFIG_NAME: &str = "config.bin";
 static PORTABLE: AtomicBool = AtomicBool::new(false);
+// TODO: Use this to lock GUI buttons and CLI functionality.
+pub static CAN_CONNECT: AtomicBool = AtomicBool::new(true);
 pub static ONLY_CLI: AtomicBool = AtomicBool::new(true);
 pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
-    static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "BlenderLauncher").unwrap();
+    pub static ref PROJECT_DIRS: ProjectDirs =
+        ProjectDirs::from("", "", "BlenderLauncher").unwrap();
     static ref PORTABLE_PATH: PathBuf = current_exe().unwrap().parent().unwrap().to_path_buf();
-    static ref CONFIG_PATH: PathBuf = {
+    pub static ref CONFIG_PATH: PathBuf = {
         if PORTABLE_PATH.join("portable").exists() {
             PORTABLE.store(true, Ordering::Relaxed);
             PORTABLE_PATH.join(CONFIG_NAME)
@@ -37,9 +40,9 @@ lazy_static! {
     pub static ref SETTINGS: RwLock<Settings> = RwLock::new(Settings::init());
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Settings {
-    pub default_package: String,
+    pub default_package: Option<Package>,
     pub bypass_launcher: bool,
     pub modifier_key: ModifierKey,
     pub use_latest_as_default: bool,
@@ -61,7 +64,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn init() -> Self {
+    fn init() -> Self {
         let mut settings = if !CONFIG_PATH.exists() {
             let default = Settings::default();
             let conf_file = File::create(&*CONFIG_PATH).unwrap();
@@ -70,6 +73,8 @@ impl Settings {
         } else {
             let conf_file = File::open(&*CONFIG_PATH).unwrap();
             let settings: Settings = bincode::deserialize_from(conf_file).unwrap_or_else(|_| {
+                // This is in case the Settings struct changed,
+                // which would just the settings with defaults.
                 let default = Settings::default();
                 let conf_file = File::create(&*CONFIG_PATH).unwrap();
                 bincode::serialize_into(conf_file, &default).unwrap();
@@ -106,7 +111,7 @@ impl Default for Settings {
         let minutes_between_updates = 60;
 
         Self {
-            default_package: String::new(),
+            default_package: None,
             bypass_launcher: false,
             modifier_key: ModifierKey::Shift,
             use_latest_as_default: true,
@@ -131,7 +136,7 @@ impl Default for Settings {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ModifierKey {
     Shift,
     Control,
@@ -151,7 +156,7 @@ impl ModifierKey {
 }
 
 impl std::fmt::Display for ModifierKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let printable = match self {
             ModifierKey::Shift => "shift",
             ModifierKey::Control => "ctrl",

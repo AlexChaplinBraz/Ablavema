@@ -1,656 +1,572 @@
-//#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
-use crate::{helpers::*, package::*, settings::*};
-use chrono::{Datelike, NaiveDateTime, Utc};
-use regex::Regex;
-use reqwest;
-use select::{
-    document::Document,
-    predicate::{Attr, Class, Name},
+pub mod archived;
+pub mod branched;
+pub mod daily;
+pub mod installed;
+pub mod lts;
+pub mod stable;
+use self::{
+    archived::Archived, branched::Branched, daily::Daily, installed::Installed, lts::Lts,
+    stable::Stable,
 };
-use serde::{Deserialize, Serialize};
-use std::{error::Error, fs::File};
+use crate::{
+    package::{Build, Package, PackageState, PackageStatus},
+    settings::{CAN_CONNECT, SETTINGS},
+};
+use async_trait::async_trait;
+use bincode;
+use indicatif::MultiProgress;
+use reqwest;
+use serde::{de::DeserializeOwned, Serialize};
+use std::{fs::File, iter, mem, ops, path::PathBuf, sync::atomic::Ordering, time::SystemTime};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default)]
 pub struct Releases {
-    pub daily: Vec<Package>,
-    pub branched: Vec<Package>,
-    pub lts: Vec<Package>,
-    pub archived: Vec<Package>,
-    pub stable: Vec<Package>,
+    pub daily: Daily,
+    pub branched: Branched,
+    pub stable: Stable,
+    pub lts: Lts,
+    pub archived: Archived,
+    pub installed: Installed,
 }
 
 impl Releases {
-    pub fn new() -> Releases {
-        Releases {
-            daily: Vec::new(),
-            branched: Vec::new(),
-            lts: Vec::new(),
-            archived: Vec::new(),
-            stable: Vec::new(),
+    /// Load databases and sync them with installed packages.
+    pub async fn init() -> Releases {
+        let mut releases = Releases::default();
+        releases.load_all().await;
+        releases.sync();
+        releases
+    }
+
+    /// Load all databases, or initialise them if non-existent.
+    async fn load_all(&mut self) {
+        if self.daily.get_db_path().exists() {
+            self.daily.load();
+        } else {
+            self.daily.init().await;
+            self.daily.save();
+        }
+
+        if self.branched.get_db_path().exists() {
+            self.branched.load();
+        } else {
+            self.branched.init().await;
+            self.branched.save();
+        }
+
+        if self.stable.get_db_path().exists() {
+            self.stable.load();
+        } else {
+            self.stable.init().await;
+            self.stable.save();
+        }
+
+        if self.lts.get_db_path().exists() {
+            self.lts.load();
+        } else {
+            self.lts.init().await;
+            self.lts.save();
+        }
+
+        if self.archived.get_db_path().exists() {
+            self.archived.load();
+        } else {
+            self.archived.init().await;
+            self.archived.save();
         }
     }
 
-    pub fn load(&mut self) -> Result<(), Box<dyn Error>> {
-        if SETTINGS.read().unwrap().releases_db.exists() {
-            let file = File::open(&SETTINGS.read().unwrap().releases_db)?;
-            let bin: Releases = bincode::deserialize_from(file)?;
+    /// Refreshes the state and status of all packages.
+    pub fn sync(&mut self) {
+        self.installed.fetch();
+
+        for package in self.daily.iter_mut() {
+            if matches!(package.state, PackageState::Installed { .. }) {
+                package.state = PackageState::default();
+            }
+            if self.installed.contains(package) {
+                package.state = PackageState::default_installed();
+            }
+        }
+        if SETTINGS.read().unwrap().update_daily {
+            self.daily.refresh_status();
+        } else {
+            self.daily.unset_status();
+        }
+
+        for package in self.branched.iter_mut() {
+            if matches!(package.state, PackageState::Installed { .. }) {
+                package.state = PackageState::default();
+            }
+            if self.installed.contains(package) {
+                package.state = PackageState::default_installed();
+            }
+        }
+        if SETTINGS.read().unwrap().update_branched {
+            self.branched.refresh_status();
+        } else {
+            self.branched.unset_status();
+        }
+
+        for package in self.stable.iter_mut() {
+            if matches!(package.state, PackageState::Installed { .. }) {
+                package.state = PackageState::default();
+            }
+            if self.installed.contains(package) {
+                package.state = PackageState::default_installed();
+            }
+        }
+        if SETTINGS.read().unwrap().update_stable {
+            self.stable.refresh_status();
+        } else {
+            self.stable.unset_status();
+        }
+
+        for package in self.lts.iter_mut() {
+            if matches!(package.state, PackageState::Installed { .. }) {
+                package.state = PackageState::default();
+            }
+            if self.installed.contains(package) {
+                package.state = PackageState::default_installed();
+            }
+        }
+        if SETTINGS.read().unwrap().update_lts {
+            self.lts.refresh_status();
+        } else {
+            self.lts.unset_status();
+        }
+
+        for package in self.archived.iter_mut() {
+            if matches!(package.state, PackageState::Installed { .. }) {
+                package.state = PackageState::default();
+            }
+            if self.installed.contains(package) {
+                package.state = PackageState::default_installed();
+            }
+        }
+    }
+
+    /// Check for new packages. This returns a tuple where the first item is a boolean
+    /// that indicates whether there were any new packages found.
+    pub async fn check_updates(
+        packages: (Daily, Branched, Stable, Lts),
+    ) -> (bool, Daily, Branched, Stable, Lts) {
+        SETTINGS.write().unwrap().last_update_time = SystemTime::now();
+        SETTINGS.read().unwrap().save();
+
+        let (mut daily, mut branched, mut stable, mut lts) = packages;
+
+        let mut updated_daily = false;
+        if SETTINGS.read().unwrap().update_daily {
+            let (updated, fetched_daily) = Releases::check_daily_updates(daily).await;
+            updated_daily = updated;
+            daily = fetched_daily;
+        }
+
+        let mut updated_branched = false;
+        if SETTINGS.read().unwrap().update_branched {
+            let (updated, fetched_branched) = Releases::check_branched_updates(branched).await;
+            updated_branched = updated;
+            branched = fetched_branched;
+        }
+
+        let mut updated_stable = false;
+        if SETTINGS.read().unwrap().update_stable {
+            let (updated, fetched_stable) = Releases::check_stable_updates(stable).await;
+            updated_stable = updated;
+            stable = fetched_stable;
+        }
+
+        let mut updated_lts = false;
+        if SETTINGS.read().unwrap().update_lts {
+            let (updated, fetched_lts) = Releases::check_lts_updates(lts).await;
+            updated_lts = updated;
+            lts = fetched_lts;
+        }
+
+        (
+            updated_daily || updated_branched || updated_stable || updated_lts,
+            daily,
+            branched,
+            stable,
+            lts,
+        )
+    }
+
+    /// Used for getting the packages for `Releases::check_updates()`.
+    pub fn take(&mut self) -> (Daily, Branched, Stable, Lts) {
+        (
+            self.daily.take(),
+            self.branched.take(),
+            self.stable.take(),
+            self.lts.take(),
+        )
+    }
+
+    /// Used for adding the results of `Releases::check_updates()`
+    /// back into the variable and syncing.
+    pub fn add_new_packages(&mut self, packages: (bool, Daily, Branched, Stable, Lts)) {
+        self.daily = packages.1;
+        self.branched = packages.2;
+        self.stable = packages.3;
+        self.lts = packages.4;
+        self.sync();
+    }
+
+    pub async fn check_daily_updates(mut daily: Daily) -> (bool, Daily) {
+        print!("Checking for daily updates... ");
+        match daily.get_new_packages().await {
+            Some(new_packages) => {
+                println!("Found:");
+                daily.add_new_packages(new_packages);
+                (true, daily)
+            }
+            None => {
+                println!("None found.");
+                (false, daily)
+            }
+        }
+    }
+
+    pub async fn check_branched_updates(mut branched: Branched) -> (bool, Branched) {
+        print!("Checking for branched updates... ");
+        match branched.get_new_packages().await {
+            Some(new_packages) => {
+                println!("Found:");
+                branched.add_new_packages(new_packages);
+                (true, branched)
+            }
+            None => {
+                println!("None found.");
+                (false, branched)
+            }
+        }
+    }
+
+    pub async fn check_stable_updates(mut stable: Stable) -> (bool, Stable) {
+        print!("Checking for stable updates... ");
+        match stable.get_new_packages().await {
+            Some(new_packages) => {
+                println!("Found:");
+                stable.add_new_packages(new_packages);
+                (true, stable)
+            }
+            None => {
+                println!("None found.");
+                (false, stable)
+            }
+        }
+    }
+
+    pub async fn check_lts_updates(mut lts: Lts) -> (bool, Lts) {
+        print!("Checking for LTS updates... ");
+        match lts.get_new_packages().await {
+            Some(new_packages) => {
+                println!("Found:");
+                lts.add_new_packages(new_packages);
+                (true, lts)
+            }
+            None => {
+                println!("None found.");
+                (false, lts)
+            }
+        }
+    }
+
+    pub async fn check_archived_updates(mut archived: Archived) -> (bool, Archived) {
+        print!("Checking for archived updates... ");
+        match archived.get_new_packages().await {
+            Some(new_packages) => {
+                println!("Found:");
+                archived.add_new_packages(new_packages);
+                (true, archived)
+            }
+            None => {
+                println!("None found.");
+                (false, archived)
+            }
+        }
+    }
+
+    /// Returns the amount of updates if there are any.
+    pub fn count_updates(&self) -> Option<usize> {
+        let count = iter::empty()
+            .chain(self.daily.iter())
+            .chain(self.branched.iter())
+            .chain(self.stable.iter())
+            .chain(self.lts.iter())
+            .chain(self.archived.iter())
+            .filter(|package| package.status == PackageStatus::Update)
+            .count();
+
+        if count == 0 {
+            None
+        } else {
+            Some(count)
+        }
+    }
+
+    /// Installs the latest packages for each build, as long as there's one older package
+    /// of that build already installed. Operates based on user settings, so it updates only the
+    /// enabled types and can delete old packages of the same build. Can also update the default
+    /// package to the latest of its build type if one was installed.
+    pub async fn cli_install_updates(&mut self) {
+        let updates_found = iter::empty()
+            .chain(self.daily.iter())
+            .chain(self.branched.iter())
+            .chain(self.stable.iter())
+            .chain(self.lts.iter())
+            .chain(self.archived.iter())
+            .filter(|package| package.status == PackageStatus::Update)
+            .collect::<Vec<_>>();
+
+        if updates_found.is_empty() {
+            println!("No updates to install.");
+        } else {
+            let multi_progress = MultiProgress::new();
+            let mut install_completion = Vec::new();
+
+            for package in updates_found {
+                install_completion.push(
+                    package
+                        .cli_install(&multi_progress, &(true, true))
+                        .await
+                        .unwrap(),
+                );
+            }
+
+            multi_progress.join().unwrap();
+            for handle in install_completion {
+                handle.await.unwrap();
+            }
+
+            self.installed.fetch();
+
+            if SETTINGS.read().unwrap().default_package.is_none() {
+                println!(
+                    "No default package found, please select a package to open .blend files with."
+                );
+            } else if SETTINGS.read().unwrap().use_latest_as_default {
+                let default_package = SETTINGS.read().unwrap().default_package.clone().unwrap();
+                let old_default = self
+                    .installed
+                    .iter()
+                    .find(|package| package.name == default_package.name)
+                    .unwrap();
+                let new_default = self
+                    .installed
+                    .iter()
+                    .find(|package| package.build == old_default.build)
+                    .unwrap();
+
+                if old_default == new_default {
+                    println!(
+                        "No updates found for the default package:\n{} | {}",
+                        old_default.name, old_default.date
+                    );
+                } else {
+                    SETTINGS.write().unwrap().default_package = Some(new_default.clone());
+                    SETTINGS.read().unwrap().save();
+
+                    println!(
+                        "Found an update for the default package, switched from:\n{} | {}\nTo:\n{} | {}",
+                        old_default.name, old_default.date, new_default.name, new_default.date
+                    );
+                }
+            }
+
+            let mut daily_count = Vec::new();
+            let mut branched_count = Vec::new();
+            let mut stable_count = 0;
+            let mut lts_count = 0;
+            for package in &*self.installed {
+                match &package.build {
+                    Build::Daily(s) => {
+                        daily_count.push(s.clone());
+                        if daily_count.iter().filter(|&n| n == s).count() > 1
+                            && SETTINGS.read().unwrap().keep_only_latest_daily
+                        {
+                            package.cli_remove().await;
+                        }
+                    }
+                    Build::Branched(s) => {
+                        branched_count.push(s.clone());
+                        if branched_count.iter().filter(|&n| n == s).count() > 1
+                            && SETTINGS.read().unwrap().keep_only_latest_branched
+                        {
+                            package.cli_remove().await;
+                        }
+                    }
+                    Build::Stable => {
+                        stable_count += 1;
+                        if stable_count > 1 && SETTINGS.read().unwrap().keep_only_latest_stable {
+                            package.cli_remove().await;
+                        }
+                    }
+                    Build::Lts => {
+                        lts_count += 1;
+                        if lts_count > 1 && SETTINGS.read().unwrap().keep_only_latest_lts {
+                            package.cli_remove().await;
+                        }
+                    }
+                    Build::Archived => continue,
+                }
+            }
+
+            self.sync();
+
+            if SETTINGS.read().unwrap().keep_only_latest_daily {
+                self.daily.remove_dead_packages().await;
+            }
+
+            if SETTINGS.read().unwrap().keep_only_latest_branched {
+                self.branched.remove_dead_packages().await;
+            }
+        }
+    }
+}
+
+#[async_trait]
+pub trait ReleaseType:
+    Sized
+    + Default
+    + Serialize
+    + DeserializeOwned
+    + ops::Deref<Target = Vec<Package>>
+    + ops::DerefMut<Target = Vec<Package>>
+{
+    async fn fetch() -> Self;
+
+    async fn get_new_packages(&self) -> Option<Self> {
+        let mut fetched_packages = Self::fetch().await;
+        let mut new_packages = Self::default();
+
+        for package in &mut *fetched_packages {
+            if !self.contains(package) {
+                new_packages.push(package.take());
+            }
+        }
+
+        if new_packages.is_empty() {
+            None
+        } else {
+            Some(new_packages)
+        }
+    }
+
+    fn add_new_packages(&mut self, mut new_packages: Self) {
+        for mut package in new_packages.iter_mut() {
+            package.status = PackageStatus::New;
+            println!("    {} | {}", package.name, package.date);
+            self.push(package.take());
+        }
+        self.sort();
+    }
+
+    fn unset_status(&mut self) {
+        for package in self.iter_mut() {
+            if package.status == PackageStatus::Update {
+                package.status = PackageStatus::Old;
+            }
+        }
+    }
+
+    fn refresh_status(&mut self) {
+        self.unset_status();
+
+        let mut installed_packages: Vec<Package> = Vec::new();
+        for package in self.iter() {
+            if matches!(package.state, PackageState::Installed { .. }) {
+                match package.build {
+                    Build::Daily(_) | Build::Branched(_) => {
+                        match installed_packages
+                            .iter()
+                            .find(|installed_package| installed_package.build == package.build)
+                        {
+                            Some(_) => break,
+                            None => installed_packages.push(package.clone()),
+                        }
+                    }
+                    Build::Stable | Build::Lts | Build::Archived => {
+                        installed_packages.push(package.clone());
+                        break;
+                    }
+                }
+            }
+        }
+
+        for installed_package in installed_packages {
+            if let Some(package) = self
+                .iter_mut()
+                .find(|package| package.build == installed_package.build)
+            {
+                if package.date > installed_package.date {
+                    package.status = PackageStatus::Update;
+                }
+            }
+        }
+    }
+
+    /// This method tends to temporarily ban the user due to the large amount of requests sent
+    /// over a short period of time, so it shouldn't be used in places like .sync().
+    /// It's better to check the availability of a package on clicking Install and Remove.
+    async fn remove_dead_packages(&mut self) {
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            let mut checkables = Vec::new();
+            for (index, package) in self.iter().enumerate() {
+                if !matches!(package.state, PackageState::Installed { .. }) {
+                    checkables.push((index, package.url.clone()));
+                }
+            }
+
+            let mut handles = Vec::new();
+            for (index, url) in checkables {
+                let handle = tokio::task::spawn(async move {
+                    if reqwest::get(&url).await.unwrap().status().is_client_error() {
+                        Some(index)
+                    } else {
+                        None
+                    }
+                });
+                handles.push(handle);
+            }
+
+            for handle in handles {
+                if let Some(index) = handle.await.unwrap() {
+                    self.remove(index);
+                }
+            }
+        }
+    }
+
+    fn take(&mut self) -> Self {
+        mem::take(self)
+    }
+
+    fn get_name(&self) -> String;
+
+    async fn init(&mut self) {
+        print!(
+            "No database for {} packages found. Fetching... ",
+            self.get_name()
+        );
+        *self = Self::fetch().await;
+        println!("Done");
+    }
+
+    fn get_db_path(&self) -> PathBuf;
+
+    fn save(&self) {
+        let file = File::create(self.get_db_path()).unwrap();
+        bincode::serialize_into(file, self).unwrap();
+    }
+
+    fn load(&mut self) {
+        if self.get_db_path().exists() {
+            let file = File::open(self.get_db_path()).unwrap();
+            let bin: Self = bincode::deserialize_from(file).unwrap();
             *self = bin;
         }
-
-        Ok(())
-    }
-
-    pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
-        let file = File::create(&SETTINGS.read().unwrap().releases_db)?;
-        bincode::serialize_into(file, self)?;
-
-        Ok(())
-    }
-
-    pub async fn fetch_daily(&mut self) -> Result<(), Box<dyn Error>> {
-        let url = "https://builder.blender.org/download/";
-        let resp = reqwest::get(url).await.unwrap();
-        assert!(resp.status().is_success());
-        let resp = resp.bytes().await.unwrap();
-        let document = Document::from_read(&resp[..]).unwrap();
-
-        let current_year = Utc::today().year();
-        let current_year = format!("-{}", current_year);
-
-        let mut fetched = Releases::new();
-
-        for build in document.find(Class("os")) {
-            let targ_os = if cfg!(target_os = "linux") {
-                "Linux"
-            } else if cfg!(target_os = "windows") {
-                "Windows"
-            } else if cfg!(target_os = "macos") {
-                "macOS"
-            } else {
-                unreachable!("Unsupported OS config");
-            };
-
-            let o = build.find(Class("build")).next().unwrap().text();
-            if !o.contains(targ_os) {
-                continue;
-            }
-
-            let mut package = Package::new();
-
-            package.build = Build::Daily(build.find(Class("build-var")).next().unwrap().text());
-
-            package.version = build
-                .find(Class("name"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .skip(1)
-                .next()
-                .unwrap()
-                .to_string();
-
-            let mut date = build.find(Name("small")).next().unwrap().text();
-            let mut date: String = date.drain(..date.find('-').unwrap()).collect();
-            date.push_str(&current_year);
-            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
-
-            package.commit = build
-                .find(Name("small"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .last()
-                .unwrap()
-                .to_string();
-
-            package.url = format!(
-                "https://builder.blender.org{}",
-                build.find(Name("a")).next().unwrap().attr("href").unwrap()
-            );
-
-            package.name = get_file_stem(&package.url).to_string();
-
-            package.os = {
-                if o.contains("Linux") {
-                    Os::Linux
-                } else if o.contains("Windows") {
-                    Os::Windows
-                } else if o.contains("macOS") {
-                    Os::MacOs
-                } else {
-                    unreachable!("Unexpected OS");
-                }
-            };
-
-            fetched.daily.push(package);
-        }
-
-        if self.daily != fetched.daily {
-            self.daily = fetched.daily;
-
-            self.save()?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn fetch_branched(&mut self) -> Result<(), Box<dyn Error>> {
-        let url = "https://builder.blender.org/download/branches/";
-        let resp = reqwest::get(url).await.unwrap();
-        assert!(resp.status().is_success());
-        let resp = resp.bytes().await.unwrap();
-        let document = Document::from_read(&resp[..]).unwrap();
-
-        let current_year = Utc::today().year();
-        let current_year = format!("-{}", current_year);
-
-        let mut fetched = Releases::new();
-
-        for build in document.find(Class("os")) {
-            let targ_os = if cfg!(target_os = "linux") {
-                "Linux"
-            } else if cfg!(target_os = "windows") {
-                "Windows"
-            } else if cfg!(target_os = "macos") {
-                "macOS"
-            } else {
-                unreachable!("Unsupported OS config");
-            };
-
-            let o = build.find(Class("build")).next().unwrap().text();
-            if !o.contains(targ_os) {
-                continue;
-            }
-
-            let mut package = Package::new();
-
-            package.build = Build::Branched(
-                build
-                    .find(Class("build-var"))
-                    .next()
-                    .unwrap()
-                    .text()
-                    .split_whitespace()
-                    .next()
-                    .unwrap()
-                    .to_string(),
-            );
-
-            package.version = build
-                .find(Class("name"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .skip(1)
-                .next()
-                .unwrap()
-                .to_string();
-
-            let mut date = build.find(Name("small")).next().unwrap().text();
-            let mut date: String = date.drain(..date.find('-').unwrap()).collect();
-            date.push_str(&current_year);
-            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
-
-            package.commit = build
-                .find(Name("small"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .last()
-                .unwrap()
-                .to_string();
-
-            package.url = format!(
-                "https://builder.blender.org{}",
-                build.find(Name("a")).next().unwrap().attr("href").unwrap()
-            );
-
-            package.name = get_file_stem(&package.url).to_string();
-
-            package.os = {
-                if o.contains("Linux") {
-                    Os::Linux
-                } else if o.contains("Windows") {
-                    Os::Windows
-                } else if o.contains("macOS") {
-                    Os::MacOs
-                } else {
-                    unreachable!("Unexpected OS");
-                }
-            };
-
-            fetched.branched.push(package);
-        }
-
-        if self.branched != fetched.branched {
-            self.branched = fetched.branched;
-
-            self.save()?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn fetch_lts(&mut self) -> Result<(), Box<dyn Error>> {
-        let url = "https://www.blender.org/download/lts/";
-        let resp = reqwest::get(url).await.unwrap();
-        assert!(resp.status().is_success());
-        let resp = resp.bytes().await.unwrap();
-        let document = Document::from_read(&resp[..]).unwrap();
-
-        let mut fetched = Releases::new();
-
-        // Can be done so it works off a vector of LTS releases, but by that time the website will
-        // probably change anyway so I'll wait until then. Maybe by then it won't require me to do
-        // it so stupidly since the layout is hard to parse.
-        let lts = String::from("283");
-        for rev in 0.. {
-            let mut package = Package::new();
-
-            let lts_id = format!("lts-release-{}{}", lts, rev);
-            let version = match document.find(Attr("id", lts_id.as_str())).next() {
-                Some(a) => a,
-                _ => break,
-            }
-            .text();
-
-            package.version = version
-                .split_whitespace()
-                .skip(2)
-                .next()
-                .unwrap()
-                .to_string();
-
-            let lts_date_id = format!("faq-lts-release-{}{}-1", lts, rev);
-            let section = document
-                .find(Attr("id", lts_date_id.as_str()))
-                .next()
-                .unwrap();
-
-            let mut date = section
-                .find(Name("p"))
-                .next()
-                .unwrap()
-                .text()
-                .strip_prefix("Released on ")
-                .unwrap()
-                .strip_suffix(".")
-                .unwrap()
-                .to_string();
-            date.push_str("-00:00:00");
-            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap();
-
-            for node in section.find(Name("a")) {
-                let name = node.text();
-                if name.is_empty() || name.contains(".msi") {
-                    continue;
-                }
-
-                let targ_os = if cfg!(target_os = "linux") {
-                    "linux"
-                } else if cfg!(target_os = "windows") {
-                    "win"
-                } else if cfg!(target_os = "macos") {
-                    "mac"
-                } else {
-                    unreachable!("Unsupported OS config");
-                };
-
-                if !name.contains(targ_os) {
-                    continue;
-                }
-
-                package.name = get_file_stem(node.text().as_str()).to_string();
-
-                package.build = Build::LTS;
-
-                let download_path =
-                    "https://ftp.nluug.nl/pub/graphics/blender/release/Blender2.83/";
-                package.url = format!("{}{}", download_path, name);
-
-                package.os = {
-                    if name.contains("linux") {
-                        Os::Linux
-                    } else if name.contains("win") {
-                        Os::Windows
-                    } else if name.contains("mac") {
-                        Os::MacOs
-                    } else {
-                        unreachable!("Unexpected OS");
-                    }
-                };
-            }
-
-            let lts_changelog_id = format!("faq-lts-release-{}{}-2", lts, rev);
-            let section = document
-                .find(Attr("id", lts_changelog_id.as_str()))
-                .next()
-                .unwrap();
-
-            for node in section.find(Name("li")) {
-                let text = node.text();
-
-                let url = match node.find(Name("a")).next() {
-                    Some(a) => a.attr("href").unwrap_or_default().to_string(),
-                    _ => String::from("N/A"),
-                };
-
-                let change = Change { text, url };
-                package.changelog.push(change);
-            }
-
-            fetched.lts.push(package);
-        }
-
-        fetched.lts.reverse();
-
-        if self.lts != fetched.lts {
-            self.lts = fetched.lts;
-
-            self.save()?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn fetch_archived(&mut self) -> Result<(), Box<dyn Error>> {
-        let url = "https://ftp.nluug.nl/pub/graphics/blender/release/";
-        let resp = reqwest::get(url).await.unwrap();
-        assert!(resp.status().is_success());
-        let resp = resp.bytes().await.unwrap();
-        let document = Document::from_read(&resp[..]).unwrap();
-
-        let mut fetched = Releases::new();
-
-        let mut versions = Vec::new();
-
-        for node in document.find(Name("a")) {
-            let url_path = node.attr("href").unwrap();
-            versions.push(url_path.to_string());
-        }
-
-        versions.retain(|x| x.contains("Blender") && x.ends_with('/') && !x.contains("Benchmark"));
-        versions.push("Blender2.79/latest/".to_string());
-
-        let mut handles = Vec::new();
-        for ver in versions {
-            let handle = tokio::task::spawn(async move {
-                let mut packages = Vec::new();
-
-                let version = ver.strip_prefix("Blender").unwrap().replace("/", "");
-
-                let url = format!(
-                    "{}{}",
-                    "https://ftp.nluug.nl/pub/graphics/blender/release/", ver
-                );
-
-                let resp = reqwest::get(url.as_str()).await.unwrap();
-                assert!(resp.status().is_success());
-                let resp = resp.bytes().await.unwrap();
-                let document = Document::from_read(&resp[..]).unwrap();
-                let mut builds = Vec::new();
-
-                let re = Regex::new(r"\d{2}-\w{3}-\d{4}\s\d{2}:\d{2}").unwrap();
-                let mut dates = Vec::new();
-                for node in document.find(Name("pre")).next().unwrap().children() {
-                    if let Some(text) = node.as_text() {
-                        if text.chars().filter(|&c| c == '-').count() > 2 {
-                            continue;
-                        }
-
-                        if let Some(date) = re.find(text) {
-                            dates.push(format!("{}:00", date.as_str()));
-                        }
-                    }
-                }
-
-                for node in document.find(Name("a")) {
-                    builds.push(node.attr("href").unwrap());
-                }
-
-                builds.retain(|x| !x.ends_with('/') && !x.contains("?"));
-                builds.reverse();
-
-                for name in builds {
-                    let date = dates.pop().unwrap();
-
-                    if name.contains(".msi")
-                        || name.contains(".md")
-                        || name.contains(".sha256")
-                        || name.contains(".msix")
-                        || name.contains(".exe")
-                        || name.contains(".txt")
-                        || name.contains(".rpm")
-                        || name.contains(".deb")
-                        || name.contains(".tbz")
-                        || name.contains(".7z")
-                        || name.contains("md5sums")
-                        || name.contains("source")
-                        || name.contains("demo")
-                        || name.contains("script")
-                        || name.contains("manual")
-                        || name.contains("files")
-                        || name.contains("beos")
-                        || name.contains("static")
-                        || name.contains("irix")
-                        || name.contains("solaris")
-                        || name.contains("powerpc")
-                        || name.contains("-ppc")
-                        || name.contains("_ppc")
-                        || name.contains("freebsd")
-                        || name.contains("FreeBSD")
-                    //|| name.contains("i386")
-                    //|| name.contains("i686")
-                    //|| name.contains("-win32")
-                    //|| name.contains("-windows32")
-                    {
-                        continue;
-                    }
-
-                    let targ_os = if cfg!(target_os = "linux") {
-                        "linux"
-                    } else if cfg!(target_os = "windows") {
-                        "win"
-                    } else if cfg!(target_os = "macos") {
-                        "OS"
-                    } else {
-                        unreachable!("Unsupported OS config");
-                    };
-
-                    if !name.contains(targ_os) {
-                        continue;
-                    }
-
-                    let mut package = Package::new();
-
-                    package.name = format!("{}-archived", get_file_stem(name));
-
-                    package.build = Build::Archived;
-
-                    package.version = match version.as_ref() {
-                        "1.0" => String::from("1.0"),
-                        "1.60" => String::from("1.60"),
-                        "1.73" => String::from("1.73"),
-                        "1.80" => {
-                            let v = {
-                                if package.name.contains("alpha") {
-                                    "alpha"
-                                } else {
-                                    "a"
-                                }
-                            };
-                            format!("1.80{}", v)
-                        }
-                        "2.04" => {
-                            let v = {
-                                if package.name.contains("alpha") {
-                                    "alpha"
-                                } else {
-                                    ""
-                                }
-                            };
-                            format!("2.04{}", v)
-                        }
-                        "2.39" => {
-                            let v = {
-                                if package.name.contains("alpha1") {
-                                    "alpha1"
-                                } else {
-                                    "alpha2"
-                                }
-                            };
-                            format!("2.40{}", v)
-                        }
-                        "2.50alpha" => {
-                            let v = {
-                                if package.name.contains("alpha0") {
-                                    "alpha0"
-                                } else if package.name.contains("alpha1") {
-                                    "alpha1"
-                                } else {
-                                    "alpha2"
-                                }
-                            };
-                            format!("2.50{}", v)
-                        }
-                        "2.53beta" => String::from("2.53beta"),
-                        "2.54beta" => String::from("2.54beta"),
-                        "2.55beta" => String::from("2.55beta"),
-                        "2.56beta" => String::from("2.56beta"),
-                        "2.56abeta" => String::from("2.56abeta"),
-                        "2.79latest" => String::from("2.79latest"),
-                        _ => package
-                            .name
-                            .split_terminator("-")
-                            .skip(1)
-                            .next()
-                            .unwrap()
-                            .to_string(),
-                    };
-
-                    package.date = NaiveDateTime::parse_from_str(&date, "%d-%b-%Y %T").unwrap();
-
-                    package.url = format!("{}{}", url, name);
-
-                    package.os = {
-                        if name.contains("linux") {
-                            Os::Linux
-                        } else if name.contains("win") {
-                            Os::Windows
-                        } else if name.contains("OS") {
-                            Os::MacOs
-                        } else {
-                            unreachable!("Unexpected OS");
-                        }
-                    };
-
-                    packages.push(package);
-                }
-
-                packages
-            });
-
-            handles.push(handle);
-        }
-
-        for handle in handles {
-            fetched.archived.append(&mut handle.await.unwrap());
-        }
-
-        fetched.archived.sort_by_key(|x| x.version.clone());
-        fetched.archived.reverse();
-
-        if self.archived != fetched.archived {
-            self.archived = fetched.archived;
-
-            self.save()?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn fetch_stable(&mut self) -> Result<(), Box<dyn Error>> {
-        let url = "https://www.blender.org/download/";
-        let resp = reqwest::get(url).await.unwrap();
-        assert!(resp.status().is_success());
-        let resp = resp.bytes().await.unwrap();
-        let document = Document::from_read(&resp[..]).unwrap();
-
-        let o = if cfg!(target_os = "linux") {
-            "linux"
-        } else if cfg!(target_os = "windows") {
-            "windows"
-        } else if cfg!(target_os = "macos") {
-            "macos"
-        } else {
-            unreachable!("Unsupported OS config");
-        };
-
-        let node = document.find(Attr("id", o)).next().unwrap();
-        let mut package = Package::new();
-
-        package.version = node.find(Name("a")).next().unwrap().text();
-        package
-            .version
-            .retain(|c| c.is_numeric() || c.is_ascii_punctuation());
-
-        package.build = Build::Stable;
-
-        package.url = format!(
-            "https://ftp.nluug.nl/pub/graphics/blender/release/{}",
-            node.find(Name("a"))
-                .next()
-                .unwrap()
-                .attr("href")
-                .unwrap()
-                .strip_prefix(&url)
-                .unwrap()
-                .strip_suffix("/")
-                .unwrap()
-                .replace(".msi", ".zip")
-        );
-
-        package.name = get_file_stem(&package.url).to_string();
-
-        let mut date = node
-            .find(Class("dl-header-info-platform"))
-            .next()
-            .unwrap()
-            .find(Name("small"))
-            .next()
-            .unwrap()
-            .text();
-        let mut date = date.split_off(date.find("on").unwrap() + 3);
-        date.push_str("-00:00:00");
-        package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap();
-
-        package.os = {
-            if o == "linux" {
-                Os::Linux
-            } else if o == "windows" {
-                Os::Windows
-            } else if o == "macos" {
-                Os::MacOs
-            } else {
-                unreachable!("Unexpected OS");
-            }
-        };
-
-        let mut fetched = Releases::new();
-
-        fetched.stable.push(package);
-
-        if self.stable != fetched.stable {
-            self.stable = fetched.stable;
-
-            self.save()?;
-        }
-
-        Ok(())
     }
 }

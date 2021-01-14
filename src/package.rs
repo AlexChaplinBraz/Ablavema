@@ -1,17 +1,20 @@
-//#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
-use crate::{helpers::*, settings::*};
+use crate::{
+    helpers::{get_count, get_extracted_name},
+    settings::SETTINGS,
+};
+use bincode;
 use bzip2::read::BzDecoder;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use flate2::read::GzDecoder;
 use iced::button;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use reqwest::{self, header, Client};
+use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::{
-    error::Error,
     fs::{create_dir_all, File},
     io::{Read, Write},
+    mem,
 };
 use tar::Archive;
 use tokio::{
@@ -22,7 +25,7 @@ use tokio::{
 use xz2::read::XzDecoder;
 use zip::{read::ZipFile, ZipArchive};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Package {
     pub version: String,
     pub name: String,
@@ -34,71 +37,16 @@ pub struct Package {
     pub changelog: Vec<Change>,
     #[serde(skip)]
     pub state: PackageState,
-}
-
-impl PartialEq for Package {
-    fn eq(&self, other: &Self) -> bool {
-        self.version == other.version
-            && self.name == other.name
-            && self.build == other.build
-            && self.date == other.date
-            && self.os == other.os
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum PackageState {
-    Fetched {
-        install_button: button::State,
-    },
-    Downloading {
-        progress: f32,
-    },
-    Extracting {
-        progress: f32,
-    },
-    Installed {
-        open_button: button::State,
-        open_file_button: button::State,
-        set_default_button: button::State,
-        remove_button: button::State,
-    },
-    Errored {
-        retry_button: button::State,
-    },
-}
-
-impl Default for PackageState {
-    fn default() -> Self {
-        Self::Fetched {
-            install_button: button::State::new(),
-        }
-    }
+    #[serde(skip)]
+    pub status: PackageStatus,
 }
 
 impl Package {
-    pub fn new() -> Package {
-        Package {
-            version: String::new(),
-            name: String::new(),
-            build: Build::None,
-            date: NaiveDateTime::new(
-                NaiveDate::from_ymd(1999, 12, 31),
-                NaiveTime::from_hms(23, 59, 59),
-            ),
-            commit: String::new(),
-            url: String::new(),
-            os: Os::None,
-            changelog: Vec::new(),
-            state: PackageState::default(),
-        }
-    }
-
     pub async fn cli_install(
         &self,
         multi_progress: &MultiProgress,
         flags: &(bool, bool),
-    ) -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
+    ) -> Option<JoinHandle<()>> {
         let information_style = ProgressStyle::default_bar()
             .template("{wide_msg}")
             .progress_chars("---");
@@ -118,9 +66,9 @@ impl Package {
             let msg = format!("Package '{}' is already installed.", self.name);
             progress_bar.finish_with_message(&msg);
 
-            return Ok(None);
+            return None;
         } else if package.exists() && flags.0 {
-            remove_dir_all(&package).await?;
+            remove_dir_all(&package).await.unwrap();
         }
 
         let download_handle;
@@ -144,7 +92,7 @@ impl Package {
             download_handle = Option::None;
         } else {
             if file.exists() {
-                remove_file(&file).await?;
+                remove_file(&file).await.unwrap();
             }
 
             let client = Client::new();
@@ -310,7 +258,7 @@ impl Package {
 
                 for file_index in 0..archive.len() {
                     progress_bar.inc(1);
-                    let mut entry: ZipFile = archive.by_index(file_index).unwrap();
+                    let mut entry: ZipFile<'_> = archive.by_index(file_index).unwrap();
                     let name = entry.name().to_owned();
 
                     if entry.is_dir() {
@@ -338,6 +286,11 @@ impl Package {
         let package = (*self).clone();
 
         let final_tasks = tokio::task::spawn(async move {
+            // TODO: Packages installed this way don't seem to be moving anymore.
+            // Specifically older packages, so it may be related to the Install module's
+            // extracion issue where .tar.bz2 and .tar.gz packages panic.
+            // Except they do get extracted, so it may be an issue with the upgrade to tokio 1.
+            // TODO: Consider reusing the Install module for the CLI as well.
             extraction_handle.await.unwrap();
 
             let mut package_path = SETTINGS.read().unwrap().packages_dir.join(&package.name);
@@ -357,53 +310,167 @@ impl Package {
             bincode::serialize_into(file, &package).unwrap();
         });
 
-        Ok(Some(final_tasks))
+        Some(final_tasks)
     }
 
-    pub async fn cli_remove(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn cli_remove(&self) {
         let path = SETTINGS.read().unwrap().packages_dir.join(&self.name);
-
-        remove_dir_all(path).await?;
-
+        remove_dir_all(path).await.unwrap();
         println!("Removed: {}", self.name);
+    }
 
-        Ok(())
+    pub fn take(&mut self) -> Self {
+        mem::take(self)
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
+impl Default for Package {
+    fn default() -> Self {
+        Package {
+            version: String::default(),
+            name: String::default(),
+            build: Build::Archived,
+            date: NaiveDateTime::new(
+                NaiveDate::from_ymd(1999, 12, 31),
+                NaiveTime::from_hms(23, 59, 59),
+            ),
+            commit: String::default(),
+            url: String::default(),
+            os: Os::Linux,
+            changelog: Vec::default(),
+            state: PackageState::default(),
+            status: PackageStatus::default(),
+        }
+    }
+}
+
+impl Eq for Package {}
+
+impl Ord for Package {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.build {
+            Build::Daily(_) | Build::Branched(_) => self
+                .build
+                .cmp(&other.build)
+                .then(self.date.cmp(&other.date).reverse()),
+            Build::Stable | Build::Lts | Build::Archived => {
+                natord::compare_ignore_case(&self.version, &other.version).reverse()
+            }
+        }
+    }
+}
+
+impl PartialEq for Package {
+    // TODO: Consider what to do in case of having the same package name but different date.
+    // Not really to be solved here, but I remember once where there were no commits in the
+    // daily build for an entire day so it was the same package name but with a different date.
+    // This would only bring trouble when trying to have both of them installed, but ultimately
+    // being the same package means the worst that could happen is that it updates for no gain
+    // whatsoever, removing the older package.
+    fn eq(&self, other: &Self) -> bool {
+        match self.build {
+            Build::Daily(_) | Build::Branched(_) => {
+                self.build == other.build && self.date == other.date
+            }
+            Build::Stable | Build::Lts | Build::Archived => {
+                self.name == other.name && self.date == other.date
+            }
+        }
+    }
+}
+
+impl PartialOrd for Package {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum Build {
-    Archived,
-    Stable,
-    LTS,
     Daily(String),
     Branched(String),
-    None,
+    Stable,
+    Lts,
+    Archived,
 }
 
 impl std::fmt::Display for Build {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let printable = match self {
-            Build::Archived => "Archived Release",
-            Build::Stable => "Stable Release",
-            Build::LTS => "LTS Release",
             Build::Daily(s) | Build::Branched(s) => s,
-            Build::None => unreachable!("Unexpected build type"),
+            Build::Stable => "Stable Release",
+            Build::Lts => "LTS Release",
+            Build::Archived => "Archived Release",
         };
         write!(f, "{}", printable)
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum Os {
+    Linux,
+    Windows,
+    MacOs,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Change {
     pub text: String,
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq, Clone)]
-pub enum Os {
-    Linux,
-    Windows,
-    MacOs,
-    None,
+#[derive(Clone, Debug)]
+pub enum PackageState {
+    Fetched {
+        install_button: button::State,
+    },
+    Downloading {
+        // TODO: Add cancel_button.
+        progress: f32,
+    },
+    Extracting {
+        // TODO: Add cancel_button.
+        progress: f32,
+    },
+    Installed {
+        open_button: button::State,
+        open_file_button: button::State,
+        set_default_button: button::State,
+        remove_button: button::State,
+    },
+    Errored {
+        retry_button: button::State,
+    },
+}
+
+impl PackageState {
+    pub fn default_installed() -> Self {
+        PackageState::Installed {
+            open_button: Default::default(),
+            open_file_button: Default::default(),
+            set_default_button: Default::default(),
+            remove_button: Default::default(),
+        }
+    }
+}
+
+impl Default for PackageState {
+    fn default() -> Self {
+        Self::Fetched {
+            install_button: button::State::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum PackageStatus {
+    Update,
+    New,
+    Old,
+}
+
+impl Default for PackageStatus {
+    fn default() -> Self {
+        Self::Old
+    }
 }

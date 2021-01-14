@@ -1,21 +1,20 @@
-//#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables)]
-use crate::{gui::*, helpers::*, installed::*, releases::*, settings::*};
+use crate::{
+    gui::GuiFlags,
+    helpers::{cli_install, cli_list_narrow, cli_list_wide, is_time_to_update, process_bool_arg},
+    releases::{ReleaseType, Releases},
+    settings::{ModifierKey, LAUNCH_GUI, ONLY_CLI, SETTINGS},
+};
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
     SubCommand,
 };
 use device_query::{DeviceQuery, DeviceState};
-use std::{error::Error, str::FromStr, sync::atomic::Ordering};
+use std::{str::FromStr, sync::atomic::Ordering};
 use tokio::fs::remove_dir_all;
 
-pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
-    let mut updates = None;
-
-    let mut releases = Releases::new();
-    releases.load()?;
-
-    let mut installed = Installed::new()?;
+pub async fn run_cli() -> GuiFlags {
+    let mut releases = Releases::init().await;
 
     // Workaround for 'clap' not supporting colours on Windows,
     // even though 'indicatif' does display colours on Windows.
@@ -39,7 +38,10 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
     let help_default_package = format!(
         "Select default package to use for opening .blend files [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().default_package,
+        match SETTINGS.read().unwrap().default_package.clone() {
+            Some(package) => package.name,
+            None => String::default(),
+        },
         right_ansi_code
     );
     let help_bypass_launcher = format!(
@@ -319,6 +321,12 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help("Fetch branched packages"),
                 )
                 .arg(
+                    Arg::with_name("stable")
+                        .short("s")
+                        .long("stable")
+                        .help("Fetch stable packages"),
+                )
+                .arg(
                     Arg::with_name("lts")
                         .short("l")
                         .long("lts")
@@ -330,15 +338,9 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .long("archived")
                         .help("Fetch archived packages"),
                 )
-                .arg(
-                    Arg::with_name("stable")
-                        .short("s")
-                        .long("stable")
-                        .help("Fetch stable packages"),
-                )
                 .group(
                     ArgGroup::with_name("fetch_group")
-                        .args(&["all", "daily", "branched", "lts", "archived", "stable"])
+                        .args(&["all", "daily", "branched", "stable", "lts", "archived"])
                         .required(true)
                         .multiple(true)
                 ),
@@ -403,6 +405,26 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         ),
                 )
                 .subcommand(
+                    SubCommand::with_name("stable")
+                        .setting(AppSettings::ArgRequiredElseHelp)
+                        .about("Install stable packages")
+                        .help_message("Print help and exit")
+                        .arg(
+                            Arg::with_name("id")
+                                .value_name("ID")
+                                .required(true)
+                                .multiple(true)
+                                .help("A list of packages to install"),
+                        )
+                        .arg(
+                            Arg::with_name("name")
+                                .short("n")
+                                .long("name")
+                                .help("Use the name of the package instead of the ID")
+                                .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
+                        ),
+                )
+                .subcommand(
                     SubCommand::with_name("lts")
                         .setting(AppSettings::ArgRequiredElseHelp)
                         .about("Install LTS packages")
@@ -426,26 +448,6 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                     SubCommand::with_name("archived")
                         .setting(AppSettings::ArgRequiredElseHelp)
                         .about("Install archived packages")
-                        .help_message("Print help and exit")
-                        .arg(
-                            Arg::with_name("id")
-                                .value_name("ID")
-                                .required(true)
-                                .multiple(true)
-                                .help("A list of packages to install"),
-                        )
-                        .arg(
-                            Arg::with_name("name")
-                                .short("n")
-                                .long("name")
-                                .help("Use the name of the package instead of the ID")
-                                .long_help("Use the name of the package instead of the ID. This can be useful for scripting, since the ID may change but the name will not."),
-                        ),
-                )
-                .subcommand(
-                    SubCommand::with_name("stable")
-                        .setting(AppSettings::ArgRequiredElseHelp)
-                        .about("Install stable packages")
                         .help_message("Print help and exit")
                         .arg(
                             Arg::with_name("id")
@@ -495,8 +497,8 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help_message("Print help and exit"),
                 )
                 .subcommand(
-                    SubCommand::with_name("installed")
-                        .about("List installed packages")
+                    SubCommand::with_name("stable")
+                        .about("List stable packages")
                         .help_message("Print help and exit"),
                 )
                 .subcommand(
@@ -510,8 +512,8 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                         .help_message("Print help and exit"),
                 )
                 .subcommand(
-                    SubCommand::with_name("stable")
-                        .about("List stable packages")
+                    SubCommand::with_name("installed")
+                        .about("List installed packages")
                         .help_message("Print help and exit"),
                 ),
         )
@@ -588,7 +590,7 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
 
     match args.subcommand() {
         ("config", Some(a)) => {
-            process_bool_arg(a, "bypass_launcher")?;
+            process_bool_arg(a, "bypass_launcher");
 
             if a.is_present("modifier_key") {
                 let new_arg = a.value_of("modifier_key").unwrap();
@@ -611,8 +613,8 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 }
             }
 
-            process_bool_arg(a, "use_latest_as_default")?;
-            process_bool_arg(a, "check_updates_at_launch")?;
+            process_bool_arg(a, "use_latest_as_default");
+            process_bool_arg(a, "check_updates_at_launch");
 
             if a.is_present("minutes_between_updates") {
                 let new_arg =
@@ -631,61 +633,64 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                 }
             }
 
-            process_bool_arg(a, "update_daily")?;
-            process_bool_arg(a, "update_branched")?;
-            process_bool_arg(a, "update_stable")?;
-            process_bool_arg(a, "update_lts")?;
-            process_bool_arg(a, "keep_only_latest_daily")?;
-            process_bool_arg(a, "keep_only_latest_branched")?;
-            process_bool_arg(a, "keep_only_latest_stable")?;
-            process_bool_arg(a, "keep_only_latest_lts")?;
+            process_bool_arg(a, "update_daily");
+            process_bool_arg(a, "update_branched");
+            process_bool_arg(a, "update_stable");
+            process_bool_arg(a, "update_lts");
+            process_bool_arg(a, "keep_only_latest_daily");
+            process_bool_arg(a, "keep_only_latest_branched");
+            process_bool_arg(a, "keep_only_latest_stable");
+            process_bool_arg(a, "keep_only_latest_lts");
 
             SETTINGS.read().unwrap().save();
         }
         ("fetch", Some(a)) => {
             if a.is_present("all") {
-                println!("Fetching all packages...");
-                releases.fetch_daily().await?;
-                releases.fetch_branched().await?;
-                releases.fetch_lts().await?;
-                releases.fetch_archived().await?;
-                releases.fetch_stable().await?;
-                println!("Done.");
+                releases.daily = Releases::check_daily_updates(releases.daily).await.1;
+                releases.daily.save();
+                releases.branched = Releases::check_branched_updates(releases.branched).await.1;
+                releases.branched.save();
+                releases.stable = Releases::check_stable_updates(releases.stable).await.1;
+                releases.stable.save();
+                releases.lts = Releases::check_lts_updates(releases.lts).await.1;
+                releases.lts.save();
+                releases.archived = Releases::check_archived_updates(releases.archived).await.1;
+                releases.archived.save();
             } else {
                 if a.is_present("daily") {
-                    println!("Fetching daily packages...");
-                    releases.fetch_daily().await?;
+                    releases.daily = Releases::check_daily_updates(releases.daily.take()).await.1;
+                    releases.daily.save();
                 }
-
                 if a.is_present("branched") {
-                    println!("Fetching branched packages...");
-                    releases.fetch_branched().await?;
+                    releases.branched = Releases::check_branched_updates(releases.branched.take())
+                        .await
+                        .1;
+                    releases.branched.save();
                 }
-
-                if a.is_present("lts") {
-                    println!("Fetching LTS packages...");
-                    releases.fetch_lts().await?;
-                }
-
-                if a.is_present("archived") {
-                    println!("Fetching archived packages...");
-                    releases.fetch_archived().await?;
-                }
-
                 if a.is_present("stable") {
-                    println!("Fetching stable packages...");
-                    releases.fetch_stable().await?;
+                    releases.stable = Releases::check_stable_updates(releases.stable.take())
+                        .await
+                        .1;
+                    releases.stable.save();
                 }
-
-                println!("Done.");
+                if a.is_present("lts") {
+                    releases.lts = Releases::check_lts_updates(releases.lts.take()).await.1;
+                    releases.lts.save();
+                }
+                if a.is_present("archived") {
+                    releases.archived = Releases::check_archived_updates(releases.archived.take())
+                        .await
+                        .1;
+                    releases.archived.save();
+                }
             }
         }
         ("install", Some(a)) => match a.subcommand() {
-            ("daily", Some(b)) => cli_install(b, &releases.daily, "daily").await?,
-            ("branched", Some(b)) => cli_install(b, &releases.branched, "branched").await?,
-            ("lts", Some(b)) => cli_install(b, &releases.lts, "LTS").await?,
-            ("archived", Some(b)) => cli_install(b, &releases.archived, "archived").await?,
-            ("stable", Some(b)) => cli_install(b, &releases.stable, "stable").await?,
+            ("daily", Some(b)) => cli_install(b, &releases.daily, "daily").await,
+            ("branched", Some(b)) => cli_install(b, &releases.branched, "branched").await,
+            ("stable", Some(b)) => cli_install(b, &releases.stable, "stable").await,
+            ("lts", Some(b)) => cli_install(b, &releases.lts, "LTS").await,
+            ("archived", Some(b)) => cli_install(b, &releases.archived, "archived").await,
             _ => unreachable!("Install subcommand"),
         },
         ("list", Some(a)) => match a.subcommand() {
@@ -703,11 +708,11 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                     cli_list_narrow(&releases.branched, "branched", b.is_present("invert"));
                 }
             }
-            ("installed", Some(b)) => {
+            ("stable", Some(b)) => {
                 if b.is_present("wide") {
-                    cli_list_wide(&installed, "installed", b.is_present("invert"));
+                    cli_list_wide(&releases.stable, "stable", b.is_present("invert"));
                 } else {
-                    cli_list_narrow(&installed, "installed", b.is_present("invert"));
+                    cli_list_narrow(&releases.stable, "stable", b.is_present("invert"));
                 }
             }
             ("lts", Some(b)) => {
@@ -724,29 +729,33 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                     cli_list_narrow(&releases.archived, "archived", b.is_present("invert"));
                 }
             }
-            ("stable", Some(b)) => {
+            ("installed", Some(b)) => {
                 if b.is_present("wide") {
-                    cli_list_wide(&releases.stable, "stable", b.is_present("invert"));
+                    cli_list_wide(&releases.installed, "installed", b.is_present("invert"));
                 } else {
-                    cli_list_narrow(&releases.stable, "stable", b.is_present("invert"));
+                    cli_list_narrow(&releases.installed, "installed", b.is_present("invert"));
                 }
             }
             _ => unreachable!("List subcommand"),
         },
         ("remove", Some(a)) => {
             if a.is_present("cache") {
-                remove_dir_all(SETTINGS.read().unwrap().cache_dir.clone()).await?;
+                remove_dir_all(SETTINGS.read().unwrap().cache_dir.clone())
+                    .await
+                    .unwrap();
 
                 println!("Removed all cache files.");
             }
 
             if a.is_present("packages") {
-                remove_dir_all(SETTINGS.read().unwrap().packages_dir.clone()).await?;
+                remove_dir_all(SETTINGS.read().unwrap().packages_dir.clone())
+                    .await
+                    .unwrap();
 
                 println!("Removed all packages.");
 
-                if !SETTINGS.read().unwrap().default_package.is_empty() {
-                    SETTINGS.write().unwrap().default_package = String::new();
+                if !SETTINGS.read().unwrap().default_package.is_none() {
+                    SETTINGS.write().unwrap().default_package = None;
                     SETTINGS.read().unwrap().save();
 
                     println!("All packages removed. Please install and select a new package.");
@@ -763,18 +772,27 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                     values.push(build.to_string());
 
                     if a.is_present("name") {
-                        match installed.iter().find(|p| p.name == build) {
-                            Some(a) => a.cli_remove().await?,
+                        match releases
+                            .installed
+                            .iter()
+                            .find(|package| package.name == build)
+                        {
+                            Some(a) => a.cli_remove().await,
                             None => {
                                 println!("No installed package named '{}' found.", build);
                                 continue;
                             }
                         };
                     } else {
-                        let build = usize::from_str(build)?;
+                        let build = usize::from_str(build).unwrap();
 
-                        match installed.iter().enumerate().find(|(i, _)| *i == build) {
-                            Some(a) => a.1.cli_remove().await?,
+                        match releases
+                            .installed
+                            .iter()
+                            .enumerate()
+                            .find(|(index, _)| *index == build)
+                        {
+                            Some(a) => a.1.cli_remove().await,
                             None => {
                                 println!("No installed package with ID '{}' found.", build);
                                 continue;
@@ -783,18 +801,23 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
                     }
                 }
 
-                if !SETTINGS.read().unwrap().default_package.is_empty() {
-                    installed.check()?;
+                if SETTINGS.read().unwrap().default_package.is_some() {
+                    releases.installed.fetch();
 
-                    let old_default = SETTINGS.read().unwrap().default_package.clone();
+                    let old_default = SETTINGS.read().unwrap().default_package.clone().unwrap();
 
-                    if installed.iter().find(|p| p.name == old_default).is_none() {
-                        SETTINGS.write().unwrap().default_package = String::new();
+                    if releases
+                        .installed
+                        .iter()
+                        .find(|package| package.name == old_default.name)
+                        .is_none()
+                    {
+                        SETTINGS.write().unwrap().default_package = None;
                         SETTINGS.read().unwrap().save();
 
                         println!(
                             "Default package '{}' was removed. Please select a new package.",
-                            old_default
+                            old_default.name
                         );
                     }
                 }
@@ -802,51 +825,89 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         }
         ("select", Some(a)) => {
             if a.is_present("unset") {
-                SETTINGS.write().unwrap().default_package = String::new();
-                SETTINGS.read().unwrap().save();
-                println!("Default package was unset.");
+                match SETTINGS.read().unwrap().default_package.clone() {
+                    Some(package) => {
+                        SETTINGS.write().unwrap().default_package = None;
+                        SETTINGS.read().unwrap().save();
+                        println!("Default package '{}' was unset.", package.name);
+                    }
+                    None => {
+                        println!("No default package to unset.");
+                    }
+                }
             } else {
                 SETTINGS.write().unwrap().default_package = {
                     if a.is_present("name") {
-                        match installed
+                        match releases
+                            .installed
                             .iter()
-                            .find(|p| p.name == a.value_of("id").unwrap())
+                            .find(|package| package.name == a.value_of("id").unwrap())
                         {
-                            Some(a) => a.name.clone(),
-                            None => Err("No installed package with this name found")?,
+                            Some(package) => Some(package.clone()),
+                            None => panic!("No installed package with this name found"),
                         }
                     } else {
-                        let id = usize::from_str(a.value_of("id").unwrap())?;
+                        let id = usize::from_str(a.value_of("id").unwrap()).unwrap();
 
-                        match installed.iter().enumerate().find(|(i, _)| *i == id) {
-                            Some(a) => a.1.name.clone(),
-                            None => Err("No installed package with this ID found")?,
+                        match releases
+                            .installed
+                            .iter()
+                            .enumerate()
+                            .find(|(index, _)| *index == id)
+                        {
+                            Some((_, package)) => Some(package.clone()),
+                            None => panic!("No installed package with this ID found"),
                         }
                     }
                 };
 
                 SETTINGS.read().unwrap().save();
-                println!("Selected: {}", SETTINGS.read().unwrap().default_package);
+                println!(
+                    "Selected: {}",
+                    SETTINGS
+                        .read()
+                        .unwrap()
+                        .default_package
+                        .clone()
+                        .unwrap()
+                        .name
+                );
             }
         }
         ("update", Some(_a)) => {
-            let packages_found = installed.check_for_updates(&mut releases).await?;
-            installed.cli_update(packages_found).await?
+            let packages = Releases::check_updates(releases.take()).await;
+
+            if packages.0 {
+                releases.add_new_packages(packages);
+                releases.daily.save();
+                releases.branched.save();
+                releases.stable.save();
+                releases.lts.save();
+                releases.cli_install_updates().await;
+            } else {
+                releases.add_new_packages(packages);
+                releases.cli_install_updates().await;
+            }
         }
         _ => {
             ONLY_CLI.store(false, Ordering::Relaxed);
 
             if SETTINGS.read().unwrap().check_updates_at_launch {
                 if is_time_to_update() {
-                    let packages_found = installed.check_for_updates(&mut releases).await?;
+                    let packages = Releases::check_updates(releases.take()).await;
 
-                    if !packages_found.is_empty() {
+                    if packages.0 {
+                        // This only launches the GUI when new packages were found for the firs time.
+                        // Meaning it won't pop the GUI again if the user chose to ignore them.
                         LAUNCH_GUI.store(true, Ordering::Relaxed);
+                        releases.add_new_packages(packages);
+                        releases.daily.save();
+                        releases.branched.save();
+                        releases.stable.save();
+                        releases.lts.save();
                     } else {
-                        println!("No new packages found.");
+                        releases.add_new_packages(packages);
                     }
-
-                    updates = Some(packages_found);
                 } else {
                     println!("Not the time to check for updates yet.");
                 }
@@ -865,14 +926,12 @@ pub async fn run_cli() -> Result<GuiArgs, Box<dyn Error>> {
         }
     }
 
-    Ok(GuiArgs {
+    GuiFlags {
         releases,
-        installed,
-        updates,
         file_path: if args.is_present("path") {
             Some(String::from(args.value_of("path").unwrap()))
         } else {
             None
         },
-    })
+    }
 }

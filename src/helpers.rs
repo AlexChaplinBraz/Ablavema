@@ -1,6 +1,8 @@
-//#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 //#![allow(dead_code, unused_imports, unused_variables, unused_macros)]
-use crate::{package::*, settings::*};
+use crate::{
+    package::{Build, Package, PackageState},
+    settings::{CAN_CONNECT, SETTINGS},
+};
 use clap::ArgMatches;
 use indicatif::MultiProgress;
 use lazy_static::lazy_static;
@@ -9,9 +11,73 @@ use prettytable::{
     format::{self, FormatBuilder},
     row, table, Table,
 };
-use std::{collections::HashMap, error::Error, path::Path, process::Command, str::FromStr};
+use reqwest::{self, ClientBuilder};
+use select::document::Document;
+use std::{
+    collections::HashMap, path::Path, process::Command, str::FromStr, sync::atomic::Ordering,
+    time::Duration,
+};
 
-pub fn open_blender(package: String, file_path: Option<String>) -> Result<(), Box<dyn Error>> {
+/// The idea is to test whether there's a working connection to the download sites,
+/// using the resulting boolean to disable related functionality and avoid crashing the program.
+pub async fn _check_connection() {
+    // TODO: Investigate why this sometimes, very rarely, returns `false`.
+    // Even though it then proceeds to download just fine.
+    // I remember getting an "Unable to reach" type error in the browser for url1 a few times
+    // that would be fixed if I just refreshed right away, so it might be due to that.
+    // In which case, it may be better to make this function retry a few times or be more lenient.
+    // TODO: Consider running this function at multiple points,
+    // just in case the connection is restored to re-enable functionality (or disable it).
+    // This may be a solution to the above problem.
+    let url1 = "https://ftp.nluug.nl/pub/graphics/blender/release/";
+    let url2 = "https://builder.blender.org/download/";
+    let url3 = "https://www.blender.org/download/";
+
+    let client = ClientBuilder::new()
+        .connect_timeout(Duration::from_secs(1))
+        .build()
+        .unwrap();
+
+    match client.get(url1).send().await {
+        Ok(response) => {
+            if response.status().is_client_error() || response.status().is_server_error() {
+                CAN_CONNECT.store(false, Ordering::Relaxed);
+            }
+        }
+        Err(_) => CAN_CONNECT.store(false, Ordering::Relaxed),
+    }
+
+    if CAN_CONNECT.load(Ordering::Relaxed) {
+        match client.get(url2).send().await {
+            Ok(response) => {
+                if response.status().is_client_error() || response.status().is_server_error() {
+                    CAN_CONNECT.store(false, Ordering::Relaxed);
+                }
+            }
+            Err(_) => CAN_CONNECT.store(false, Ordering::Relaxed),
+        }
+    }
+
+    if CAN_CONNECT.load(Ordering::Relaxed) {
+        match client.get(url3).send().await {
+            Ok(response) => {
+                if response.status().is_client_error() || response.status().is_server_error() {
+                    CAN_CONNECT.store(false, Ordering::Relaxed);
+                }
+            }
+            Err(_) => CAN_CONNECT.store(false, Ordering::Relaxed),
+        }
+    }
+}
+
+pub async fn get_document(url: &str) -> Document {
+    let resp = reqwest::get(url).await.unwrap();
+    assert!(resp.status().is_success());
+    let resp = resp.bytes().await.unwrap();
+    Document::from_read(&resp[..]).unwrap()
+}
+
+pub fn open_blender(package: String, file_path: Option<String>) {
     // TODO: Investigate why it's not working on Windows.
     // The problem seems to be with the thread spawning, since it works without it.
     // But I need to spawn it somehow so I can close the launcher after opening a package.
@@ -48,11 +114,9 @@ pub fn open_blender(package: String, file_path: Option<String>) -> Result<(), Bo
             .unwrap();
         }),
     };
-
-    Ok(())
 }
 
-pub fn process_bool_arg(arg: &ArgMatches, name: &str) -> Result<(), Box<dyn Error>> {
+pub fn process_bool_arg(arg: &ArgMatches<'_>, name: &str) {
     if arg.is_present(name) {
         let new_arg = expand_bool(arg.value_of(name).unwrap());
         let old_arg = read_bool_setting(name);
@@ -72,8 +136,6 @@ pub fn process_bool_arg(arg: &ArgMatches, name: &str) -> Result<(), Box<dyn Erro
             );
         }
     }
-
-    Ok(())
 }
 
 fn expand_bool(boolean: &str) -> bool {
@@ -147,11 +209,7 @@ pub fn is_time_to_update() -> bool {
     }
 }
 
-pub async fn cli_install(
-    args: &ArgMatches<'_>,
-    packages: &Vec<Package>,
-    name: &str,
-) -> Result<(), Box<dyn Error>> {
+pub async fn cli_install(args: &ArgMatches<'_>, packages: &Vec<Package>, name: &str) {
     let multi_progress = MultiProgress::new();
     let flags = (args.is_present("reinstall"), args.is_present("redownload"));
     let mut values = Vec::new();
@@ -163,18 +221,22 @@ pub async fn cli_install(
         values.push(build.to_string());
 
         if args.is_present("name") {
-            match packages.iter().find(|p| p.name == build) {
-                Some(a) => a.cli_install(&multi_progress, &flags).await?,
+            match packages.iter().find(|package| package.name == build) {
+                Some(a) => a.cli_install(&multi_progress, &flags).await,
                 None => {
                     println!("No {} package named '{}' found.", name, build);
                     continue;
                 }
             }
         } else {
-            let build = usize::from_str(build)?;
+            let build = usize::from_str(build).unwrap();
 
-            match packages.iter().enumerate().find(|(i, _)| *i == build) {
-                Some(a) => a.1.cli_install(&multi_progress, &flags).await?,
+            match packages
+                .iter()
+                .enumerate()
+                .find(|(index, _)| *index == build)
+            {
+                Some(a) => a.1.cli_install(&multi_progress, &flags).await,
                 None => {
                     println!("No {} package with ID '{}' found.", name, build);
                     continue;
@@ -184,25 +246,25 @@ pub async fn cli_install(
     }
 
     multi_progress.join().unwrap();
-
-    Ok(())
 }
 
 pub fn cli_list_narrow(packages: &Vec<Package>, name: &str, invert: bool) {
     let mut table = Table::new();
     table.set_titles(row!["ID", "Package"]);
 
-    for (i, p) in packages.iter().enumerate() {
-        // This is a workaround for the issue of prettytable having a weird behaviour when a cell
-        // has hspan > 1, affecting the other cells and making them uneven based on the content
-        // length of the cell with hspan > 1.
-        let details = format!("{} | {} | {}", p.date, p.version, p.build);
-        let mut package = table!([p.name], [details]);
+    for (index, package) in packages.iter().enumerate() {
+        if !matches!(package.state, PackageState::Installed { .. }) {
+            // This is a workaround for the issue of prettytable having a weird behaviour when a cell
+            // has hspan > 1, affecting the other cells and making them uneven based on the content
+            // length of the cell with hspan > 1.
+            let details = format!("{} | {} | {}", package.date, package.version, package.build);
+            let mut package = table!([package.name], [details]);
 
-        let inner_format = FormatBuilder::new().padding(0, 0).build();
-        package.set_format(inner_format);
+            let inner_format = FormatBuilder::new().padding(0, 0).build();
+            package.set_format(inner_format);
 
-        table.add_row(row![i, package]);
+            table.add_row(row![index, package]);
+        }
     }
 
     if table.is_empty() {
@@ -226,8 +288,16 @@ pub fn cli_list_wide(packages: &Vec<Package>, name: &str, invert: bool) {
     table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
 
-    for (i, p) in packages.iter().enumerate() {
-        table.add_row(row![i, p.name, p.version, p.build, p.date]);
+    for (index, package) in packages.iter().enumerate() {
+        if !matches!(package.state, PackageState::Installed { .. }) {
+            table.add_row(row![
+                index,
+                package.name,
+                package.version,
+                package.build,
+                package.date
+            ]);
+        }
     }
 
     if table.is_empty() {
@@ -244,6 +314,31 @@ pub fn cli_list_wide(packages: &Vec<Package>, name: &str, invert: bool) {
         inverted_table.printstd();
     } else {
         table.printstd();
+    }
+}
+
+/// Handles cases where the extracted directory isn't named the same
+/// as the downloaded archive from which the name of the package is taken.
+pub fn get_extracted_name(package: &Package) -> &str {
+    match EXTRACTED_NAMES.get(&package.name.as_ref()) {
+        Some(s) => *s,
+        None => {
+            if package.build == Build::Archived {
+                package.name.trim_end_matches("-archived")
+            } else {
+                &package.name
+            }
+        }
+    }
+}
+
+/// Handles getting the hardcoded entry count for archives. Exists mostly because there's
+/// no length method for tar archives and calculating it is too costly (up to 30 seconds).
+/// This deals mainly with older packages and gives an approximate default for newer ones.
+pub fn get_count(file: &str) -> u64 {
+    match ARCHIVE_ITEM_COUNT.get(file) {
+        Some(v) => *v,
+        None => 4800,
     }
 }
 
@@ -286,24 +381,6 @@ lazy_static! {
     .iter()
     .copied()
     .collect();
-}
-
-/// Handles cases where the extracted directory isn't named the same
-/// as the downloaded archive from which the name of the package is taken.
-pub fn get_extracted_name(package: &Package) -> &str {
-    match EXTRACTED_NAMES.get(&package.name.as_ref()) {
-        Some(s) => *s,
-        None => {
-            if package.build == Build::Archived {
-                package.name.trim_end_matches("-archived")
-            } else {
-                &package.name
-            }
-        }
-    }
-}
-
-lazy_static! {
     static ref ARCHIVE_ITEM_COUNT: HashMap<&'static str, u64> = [
         ("blender1.80a-linux-glibc2.1.2-i386.tar.gz", 51),
         ("blender1.80-linux-glibc2.1.3-alpha.tar.gz", 47),
@@ -537,14 +614,4 @@ lazy_static! {
     .iter()
     .copied()
     .collect();
-}
-
-/// Handles getting the hardcoded entry count for archives. Exists mostly because there's
-/// no length method for tar archives and calculating it is too costly (up to 30 seconds).
-/// This deals mainly with older packages and gives an approximate default for newer ones.
-pub fn get_count(file: &str) -> u64 {
-    match ARCHIVE_ITEM_COUNT.get(file) {
-        Some(v) => *v,
-        None => 4800,
-    }
 }

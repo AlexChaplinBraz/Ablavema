@@ -1,16 +1,19 @@
-//#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
+#![warn(rust_2018_idioms)]
 //#![allow(dead_code, unused_imports, unused_variables)]
 mod cli;
 mod gui;
 mod helpers;
-mod installed;
 mod package;
 mod releases;
 mod settings;
-mod style;
-use crate::{cli::*, gui::*, helpers::*, settings::*};
+use crate::{
+    cli::run_cli,
+    gui::Gui,
+    helpers::open_blender,
+    settings::{LAUNCH_GUI, ONLY_CLI, SETTINGS},
+};
 use iced::Application;
-use std::{error::Error, process::exit, sync::atomic::Ordering};
+use std::sync::atomic::Ordering;
 
 // TODO: Find a better way of not showing the console on Windows.
 // This option practically disables the CLI. Can't have that.
@@ -21,22 +24,15 @@ use std::{error::Error, process::exit, sync::atomic::Ordering};
 
 #[tokio::main]
 async fn main() {
-    if let Err(e) = run().await {
-        eprintln!("Error: {}.", e);
-
-        if !ONLY_CLI.load(Ordering::Relaxed) {
-            msgbox::create("BlenderLauncher", &e.to_string(), msgbox::IconType::Error).unwrap();
-        }
-
-        exit(1);
-    }
+    // TODO: Error handling.
+    run().await;
 }
 
-async fn run() -> Result<(), Box<dyn Error>> {
-    let gui_args = run_cli().await?;
+async fn run() {
+    let gui_args = run_cli().await;
 
     if !ONLY_CLI.load(Ordering::Relaxed) {
-        if LAUNCH_GUI.load(Ordering::Relaxed) || SETTINGS.read().unwrap().default_package.is_empty()
+        if LAUNCH_GUI.load(Ordering::Relaxed) || SETTINGS.read().unwrap().default_package.is_none()
         {
             let mut window = iced::window::Settings::default();
             window.size = (1100, 600);
@@ -52,17 +48,30 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 antialiasing: default_settings.antialiasing,
             };
 
-            Gui::run(settings)?;
+            Gui::run(settings).unwrap();
         } else {
             match &gui_args.file_path {
                 Some(file_path) => open_blender(
-                    SETTINGS.read().unwrap().default_package.clone(),
+                    SETTINGS
+                        .read()
+                        .unwrap()
+                        .default_package
+                        .clone()
+                        .unwrap()
+                        .name,
                     Some(file_path.to_owned()),
-                )?,
-                None => open_blender(SETTINGS.read().unwrap().default_package.clone(), None)?,
+                ),
+                None => open_blender(
+                    SETTINGS
+                        .read()
+                        .unwrap()
+                        .default_package
+                        .clone()
+                        .unwrap()
+                        .name,
+                    None,
+                ),
             }
         }
     }
-
-    Ok(())
 }
