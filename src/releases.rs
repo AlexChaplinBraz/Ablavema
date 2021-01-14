@@ -81,70 +81,22 @@ impl Releases {
     pub fn sync(&mut self) {
         self.installed.fetch();
 
-        for package in self.daily.iter_mut() {
-            if matches!(package.state, PackageState::Installed { .. }) {
-                package.state = PackageState::default();
-            }
-            if self.installed.contains(package) {
-                package.state = PackageState::default_installed();
-            }
-        }
-        if SETTINGS.read().unwrap().update_daily {
-            self.daily.refresh_status();
-        } else {
-            self.daily.unset_status();
-        }
+        self.daily.refresh_state(&self.installed);
+        self.daily
+            .refresh_status(SETTINGS.read().unwrap().update_daily);
 
-        for package in self.branched.iter_mut() {
-            if matches!(package.state, PackageState::Installed { .. }) {
-                package.state = PackageState::default();
-            }
-            if self.installed.contains(package) {
-                package.state = PackageState::default_installed();
-            }
-        }
-        if SETTINGS.read().unwrap().update_branched {
-            self.branched.refresh_status();
-        } else {
-            self.branched.unset_status();
-        }
+        self.branched.refresh_state(&self.installed);
+        self.branched
+            .refresh_status(SETTINGS.read().unwrap().update_branched);
 
-        for package in self.stable.iter_mut() {
-            if matches!(package.state, PackageState::Installed { .. }) {
-                package.state = PackageState::default();
-            }
-            if self.installed.contains(package) {
-                package.state = PackageState::default_installed();
-            }
-        }
-        if SETTINGS.read().unwrap().update_stable {
-            self.stable.refresh_status();
-        } else {
-            self.stable.unset_status();
-        }
+        self.stable.refresh_state(&self.installed);
+        self.stable
+            .refresh_status(SETTINGS.read().unwrap().update_stable);
 
-        for package in self.lts.iter_mut() {
-            if matches!(package.state, PackageState::Installed { .. }) {
-                package.state = PackageState::default();
-            }
-            if self.installed.contains(package) {
-                package.state = PackageState::default_installed();
-            }
-        }
-        if SETTINGS.read().unwrap().update_lts {
-            self.lts.refresh_status();
-        } else {
-            self.lts.unset_status();
-        }
+        self.lts.refresh_state(&self.installed);
+        self.lts.refresh_status(SETTINGS.read().unwrap().update_lts);
 
-        for package in self.archived.iter_mut() {
-            if matches!(package.state, PackageState::Installed { .. }) {
-                package.state = PackageState::default();
-            }
-            if self.installed.contains(package) {
-                package.state = PackageState::default_installed();
-            }
-        }
+        self.archived.refresh_state(&self.installed);
     }
 
     /// Check for new packages. This returns a tuple where the first item is a boolean
@@ -464,6 +416,17 @@ pub trait ReleaseType:
         self.sort();
     }
 
+    fn refresh_state(&mut self, installed: &Installed) {
+        for package in self.iter_mut() {
+            if matches!(package.state, PackageState::Installed { .. }) {
+                package.state = PackageState::default();
+            }
+            if installed.contains(package) {
+                package.state = PackageState::default_installed();
+            }
+        }
+    }
+
     fn unset_status(&mut self) {
         for package in self.iter_mut() {
             if package.status == PackageStatus::Update {
@@ -472,37 +435,39 @@ pub trait ReleaseType:
         }
     }
 
-    fn refresh_status(&mut self) {
+    fn refresh_status(&mut self, refresh: bool) {
         self.unset_status();
 
-        let mut installed_packages: Vec<Package> = Vec::new();
-        for package in self.iter() {
-            if matches!(package.state, PackageState::Installed { .. }) {
-                match package.build {
-                    Build::Daily(_) | Build::Branched(_) => {
-                        match installed_packages
-                            .iter()
-                            .find(|installed_package| installed_package.build == package.build)
-                        {
-                            Some(_) => break,
-                            None => installed_packages.push(package.clone()),
+        if refresh {
+            let mut installed_packages: Vec<Package> = Vec::new();
+            for package in self.iter() {
+                if matches!(package.state, PackageState::Installed { .. }) {
+                    match package.build {
+                        Build::Daily(_) | Build::Branched(_) => {
+                            match installed_packages
+                                .iter()
+                                .find(|installed_package| installed_package.build == package.build)
+                            {
+                                Some(_) => break,
+                                None => installed_packages.push(package.clone()),
+                            }
                         }
-                    }
-                    Build::Stable | Build::Lts | Build::Archived => {
-                        installed_packages.push(package.clone());
-                        break;
+                        Build::Stable | Build::Lts | Build::Archived => {
+                            installed_packages.push(package.clone());
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        for installed_package in installed_packages {
-            if let Some(package) = self
-                .iter_mut()
-                .find(|package| package.build == installed_package.build)
-            {
-                if package.date > installed_package.date {
-                    package.status = PackageStatus::Update;
+            for installed_package in installed_packages {
+                if let Some(package) = self
+                    .iter_mut()
+                    .find(|package| package.build == installed_package.build)
+                {
+                    if package.date > installed_package.date {
+                        package.status = PackageStatus::Update;
+                    }
                 }
             }
         }
