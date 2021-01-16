@@ -10,10 +10,12 @@ use clap::{
     SubCommand,
 };
 use device_query::{DeviceQuery, DeviceState};
+use lazy_static::initialize;
 use std::{str::FromStr, sync::atomic::Ordering};
 use tokio::fs::remove_dir_all;
 
 pub async fn run_cli() -> GuiFlags {
+    initialize(&SETTINGS);
     let mut releases = Releases::init().await;
 
     // Workaround for 'clap' not supporting colours on Windows,
