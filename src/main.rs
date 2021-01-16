@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 #![warn(rust_2018_idioms)]
 //#![allow(dead_code, unused_imports, unused_variables)]
 mod cli;
@@ -15,15 +16,17 @@ use crate::{
 use iced::Application;
 use std::sync::atomic::Ordering;
 
-// TODO: Find a better way of not showing the console on Windows.
-// This option practically disables the CLI. Can't have that.
-// Also, this option doesn't solve the issue of the window spawning south-east of the centre,
-// same placement with and without this option. For some reason it cascades anyway.
-// So a custom solution will probably solve both these issues.
-//#![windows_subsystem = "windows"]
+// TODO: Fix window cascading on Windows. This will involve creating our own window which we'll
+// give to Iced.
 
 #[tokio::main]
 async fn main() {
+    #[cfg(target_os = "windows")]
+    {
+        use winapi::um::wincon;
+        unsafe { wincon::AttachConsole(wincon::ATTACH_PARENT_PROCESS) };
+    }
+
     // TODO: Error handling.
     run().await;
 }
