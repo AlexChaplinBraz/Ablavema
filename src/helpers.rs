@@ -14,7 +14,11 @@ use prettytable::{
 use reqwest::{self, ClientBuilder};
 use select::document::Document;
 use std::{
-    collections::HashMap, path::Path, process::Command, str::FromStr, sync::atomic::Ordering,
+    collections::HashMap,
+    path::Path,
+    process::{Command, Stdio},
+    str::FromStr,
+    sync::atomic::Ordering,
     time::Duration,
 };
 
@@ -78,42 +82,25 @@ pub async fn get_document(url: &str) -> Document {
 }
 
 pub fn open_blender(package: String, file_path: Option<String>) {
-    // TODO: Investigate why it's not working on Windows.
-    // The problem seems to be with the thread spawning, since it works without it.
-    // But I need to spawn it somehow so I can close the launcher after opening a package.
-    match file_path {
-        Some(path) => std::thread::spawn(move || {
-            Command::new(SETTINGS.read().unwrap().packages_dir.join(package).join({
-                if cfg!(target_os = "linux") {
-                    "blender"
-                } else if cfg!(target_os = "windows") {
-                    "blender.exe"
-                } else if cfg!(target_os = "macos") {
-                    todo!("macos executable");
-                } else {
-                    unreachable!("Unsupported OS");
-                }
-            }))
-            .arg(path)
-            .status()
-            .unwrap();
-        }),
-        None => std::thread::spawn(move || {
-            Command::new(SETTINGS.read().unwrap().packages_dir.join(package).join({
-                if cfg!(target_os = "linux") {
-                    "blender"
-                } else if cfg!(target_os = "windows") {
-                    "blender.exe"
-                } else if cfg!(target_os = "macos") {
-                    todo!("macos executable");
-                } else {
-                    unreachable!("Unsupported OS");
-                }
-            }))
-            .status()
-            .unwrap();
-        }),
-    };
+    let mut cmd = Command::new(SETTINGS.read().unwrap().packages_dir.join(package).join({
+        if cfg!(target_os = "linux") {
+            "blender"
+        } else if cfg!(target_os = "windows") {
+            "blender.exe"
+        } else if cfg!(target_os = "macos") {
+            todo!("macos executable");
+        } else {
+            unreachable!("Unsupported OS");
+        }
+    }));
+    if let Some(path) = file_path {
+        cmd.arg(path);
+    }
+    cmd.stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
 }
 
 pub fn process_bool_arg(arg: &ArgMatches<'_>, name: &str) {
