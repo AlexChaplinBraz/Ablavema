@@ -296,78 +296,8 @@ impl Releases {
             }
 
             self.installed.fetch();
-
-            if SETTINGS.read().unwrap().default_package.is_none() {
-                println!(
-                    "No default package found, please select a package to open .blend files with."
-                );
-            } else if SETTINGS.read().unwrap().use_latest_as_default {
-                let default_package = SETTINGS.read().unwrap().default_package.clone().unwrap();
-                let old_default = self
-                    .installed
-                    .iter()
-                    .find(|package| package.name == default_package.name)
-                    .unwrap();
-                let new_default = self
-                    .installed
-                    .iter()
-                    .find(|package| package.build == old_default.build)
-                    .unwrap();
-
-                if old_default == new_default {
-                    println!(
-                        "No updates found for the default package:\n{} | {}",
-                        old_default.name, old_default.date
-                    );
-                } else {
-                    SETTINGS.write().unwrap().default_package = Some(new_default.clone());
-                    SETTINGS.read().unwrap().save();
-
-                    println!(
-                        "Found an update for the default package, switched from:\n{} | {}\nTo:\n{} | {}",
-                        old_default.name, old_default.date, new_default.name, new_default.date
-                    );
-                }
-            }
-
-            let mut daily_count = Vec::new();
-            let mut branched_count = Vec::new();
-            let mut stable_count = 0;
-            let mut lts_count = 0;
-            for package in &*self.installed {
-                match &package.build {
-                    Build::Daily(s) => {
-                        daily_count.push(s.clone());
-                        if daily_count.iter().filter(|&n| n == s).count() > 1
-                            && SETTINGS.read().unwrap().keep_only_latest_daily
-                        {
-                            package.cli_remove().await;
-                        }
-                    }
-                    Build::Branched(s) => {
-                        branched_count.push(s.clone());
-                        if branched_count.iter().filter(|&n| n == s).count() > 1
-                            && SETTINGS.read().unwrap().keep_only_latest_branched
-                        {
-                            package.cli_remove().await;
-                        }
-                    }
-                    Build::Stable => {
-                        stable_count += 1;
-                        if stable_count > 1 && SETTINGS.read().unwrap().keep_only_latest_stable {
-                            package.cli_remove().await;
-                        }
-                    }
-                    Build::Lts => {
-                        lts_count += 1;
-                        if lts_count > 1 && SETTINGS.read().unwrap().keep_only_latest_lts {
-                            package.cli_remove().await;
-                        }
-                    }
-                    Build::Archived => continue,
-                }
-            }
-
+            self.installed.update_default();
+            self.installed.remove_old_packages();
             self.sync();
 
             if SETTINGS.read().unwrap().keep_only_latest_daily {

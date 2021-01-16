@@ -1,5 +1,8 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
-use crate::{package::Package, settings::SETTINGS};
+use crate::{
+    package::{Build, Package},
+    settings::SETTINGS,
+};
 use bincode;
 use derive_deref::{Deref, DerefMut};
 use std::fs::{read_dir, File};
@@ -26,5 +29,69 @@ impl Installed {
 
         self.sort_by_key(|x| x.date.clone());
         self.reverse();
+    }
+
+    pub fn update_default(&self) {
+        if SETTINGS.read().unwrap().use_latest_as_default
+            && SETTINGS.read().unwrap().default_package.is_some()
+        {
+            let default_package = SETTINGS.read().unwrap().default_package.clone().unwrap();
+            let new_default = self
+                .iter()
+                .find(|package| package.build == default_package.build)
+                .unwrap();
+
+            if new_default.date > default_package.date {
+                SETTINGS.write().unwrap().default_package = Some(new_default.clone());
+                SETTINGS.read().unwrap().save();
+
+                println!(
+                    "Installed an update for the default package, switched from:\n{} | {}\nTo:\n{} | {}",
+                    default_package.name, default_package.date, new_default.name, new_default.date
+                );
+            }
+        }
+    }
+
+    pub fn remove_old_packages(&self) {
+        if SETTINGS.read().unwrap().keep_only_latest_daily
+            || SETTINGS.read().unwrap().keep_only_latest_branched
+            || SETTINGS.read().unwrap().keep_only_latest_stable
+            || SETTINGS.read().unwrap().keep_only_latest_lts
+        {
+            let mut daily_count = Vec::new();
+            let mut branched_count = Vec::new();
+            let mut stable_count = 0;
+            let mut lts_count = 0;
+            for package in self.iter() {
+                match &package.build {
+                    Build::Daily(s) if SETTINGS.read().unwrap().keep_only_latest_daily => {
+                        daily_count.push(s.clone());
+                        if daily_count.iter().filter(|&n| n == s).count() > 1 {
+                            package.cli_remove();
+                        }
+                    }
+                    Build::Branched(s) if SETTINGS.read().unwrap().keep_only_latest_branched => {
+                        branched_count.push(s.clone());
+                        if branched_count.iter().filter(|&n| n == s).count() > 1 {
+                            package.cli_remove();
+                        }
+                    }
+                    Build::Stable if SETTINGS.read().unwrap().keep_only_latest_stable => {
+                        stable_count += 1;
+                        if stable_count > 1 {
+                            package.cli_remove();
+                        }
+                    }
+                    Build::Lts if SETTINGS.read().unwrap().keep_only_latest_lts => {
+                        lts_count += 1;
+                        if lts_count > 1 {
+                            package.cli_remove();
+                        }
+                    }
+                    _ => continue,
+                }
+            }
+        }
     }
 }

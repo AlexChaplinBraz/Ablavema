@@ -313,9 +313,9 @@ impl Package {
         Some(final_tasks)
     }
 
-    pub async fn cli_remove(&self) {
+    pub fn cli_remove(&self) {
         let path = SETTINGS.read().unwrap().packages_dir.join(&self.name);
-        remove_dir_all(path).await.unwrap();
+        std::fs::remove_dir_all(path).unwrap();
         println!("Removed: {}", self.name);
     }
 

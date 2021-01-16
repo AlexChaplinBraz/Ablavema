@@ -39,8 +39,8 @@ Will be available for Linux and Windows first, and maybe MacOS later once I get 
     - [X] Check for updates.
     - [X] Fetch packages.
     - [X] Install packages.
-    - [ ] When installing an update, if the build type is the same as the default package, set it as the new default (setting).
-    - [ ] When installing an update, remove old packages of the same build type (setting).
+    - [X] When installing an update, if the build type is the same as the default package, set it as the new default (setting).
+    - [X] When installing an update, remove old packages of the same build type (setting).
     - [X] Remove packages.
     - [X] Change configuration settings.
     - [ ] List recent files.

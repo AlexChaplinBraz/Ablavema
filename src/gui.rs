@@ -130,10 +130,85 @@ impl Application for Gui {
                     None => unreachable!("Index out of bounds"),
                 }
             }
-            Message::TryToInstall(package) => Command::perform(
-                Gui::check_availability(true, package),
-                Message::CheckAvailability,
-            ),
+            Message::TryToInstall(package) => {
+                let message = match package.build {
+                    Build::Daily(_) => {
+                        if SETTINGS.read().unwrap().keep_only_latest_daily
+                            && package.status != PackageStatus::Update
+                            && self
+                                .releases
+                                .installed
+                                .iter()
+                                .find(|p| p.build == package.build)
+                                .is_some()
+                        {
+                            "daily package of its build type"
+                        } else {
+                            ""
+                        }
+                    }
+                    Build::Branched(_) => {
+                        if SETTINGS.read().unwrap().keep_only_latest_branched
+                            && package.status != PackageStatus::Update
+                            && self
+                                .releases
+                                .installed
+                                .iter()
+                                .find(|p| p.build == package.build)
+                                .is_some()
+                        {
+                            "branched package of its build type"
+                        } else {
+                            ""
+                        }
+                    }
+                    Build::Stable => {
+                        if SETTINGS.read().unwrap().keep_only_latest_stable
+                            && package.status != PackageStatus::Update
+                            && self
+                                .releases
+                                .installed
+                                .iter()
+                                .find(|p| p.build == package.build)
+                                .is_some()
+                        {
+                            "stable package"
+                        } else {
+                            ""
+                        }
+                    }
+                    Build::Lts => {
+                        if SETTINGS.read().unwrap().keep_only_latest_lts
+                            && package.status != PackageStatus::Update
+                            && self
+                                .releases
+                                .installed
+                                .iter()
+                                .find(|p| p.build == package.build)
+                                .is_some()
+                        {
+                            "LTS package"
+                        } else {
+                            ""
+                        }
+                    }
+                    Build::Archived => "",
+                };
+                if message.is_empty() {
+                    Command::perform(
+                        Gui::check_availability(true, package),
+                        Message::CheckAvailability,
+                    )
+                } else {
+                    msgbox::create(
+                        "BlenderLauncher",
+                        &format!("Can't install '{}' because the setting to keep only latest {} is enabled.", package.name, message),
+                        msgbox::IconType::Info,
+                    )
+                    .unwrap();
+                    Command::none()
+                }
+            }
             Message::CheckAvailability(tuple) => {
                 let (available, for_install, package) = tuple;
                 if available {
@@ -222,8 +297,6 @@ impl Application for Gui {
                 Command::none()
             }
             Message::PackageInstalled(package) => {
-                // TODO: Changing the default package if a newer package is installed, if set.
-                // TODO: Removing older packages after installing an update, if set.
                 let index = self
                     .installing
                     .iter()
@@ -232,6 +305,9 @@ impl Application for Gui {
                     .unwrap()
                     .0;
                 self.installing.remove(index);
+                self.releases.installed.fetch();
+                self.releases.installed.update_default();
+                self.releases.installed.remove_old_packages();
                 self.releases.sync();
                 Command::none()
             }
@@ -776,7 +852,7 @@ impl Application for Gui {
                     ).push(
                         choice_setting!(
                             "Keep only newest daily package",
-                            "Remove all older daily packages when installing an update.",
+                            "Remove all older daily packages of its build type when installing an update.",
                             &Choice::ALL,
                             Some(choice(SETTINGS.read().unwrap().keep_only_latest_daily).unwrap()),
                             Message::KeepOnlyLatestDaily,
@@ -785,7 +861,7 @@ impl Application for Gui {
                     ).push(
                         choice_setting!(
                             "Keep only newest branched package",
-                            "Remove all older branched packages when installing an update.",
+                            "Remove all older branched packages of its build type when installing an update.",
                             &Choice::ALL,
                             Some(choice(SETTINGS.read().unwrap().keep_only_latest_branched).unwrap()),
                             Message::KeepOnlyLatestBranched,
@@ -1355,7 +1431,7 @@ impl Package {
     }
 
     async fn remove(package: Package) -> Package {
-        package.cli_remove().await;
+        package.cli_remove();
         package
     }
 
