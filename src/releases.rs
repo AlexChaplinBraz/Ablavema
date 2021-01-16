@@ -16,6 +16,7 @@ use crate::{
 use async_trait::async_trait;
 use bincode;
 use indicatif::MultiProgress;
+use lazy_static::initialize;
 use reqwest;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fs::File, iter, mem, ops, path::PathBuf, sync::atomic::Ordering, time::SystemTime};
@@ -33,6 +34,7 @@ pub struct Releases {
 impl Releases {
     /// Load databases and sync them with installed packages.
     pub async fn init() -> Releases {
+        initialize(&SETTINGS);
         let mut releases = Releases::default();
         releases.load_all().await;
         releases.sync();
