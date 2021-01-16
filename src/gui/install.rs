@@ -272,41 +272,40 @@ where
                             total,
                             extracted,
                         } => {
-                            if extracted == total - 1 {
+                            {
+                                let mut entry: ZipFile<'_> =
+                                    archive.by_index(extracted as usize).unwrap();
+                                let entry_name = entry.name().to_owned();
+
+                                if entry.is_dir() {
+                                    let extracted_dir_path = extraction_dir.join(entry_name);
+                                    create_dir_all(extracted_dir_path).unwrap();
+                                } else if entry.is_file() {
+                                    let mut buffer: Vec<u8> = Vec::new();
+                                    let _bytes_read = entry.read_to_end(&mut buffer).unwrap();
+                                    let extracted_file_path = extraction_dir.join(entry_name);
+                                    create_dir_all(extracted_file_path.parent().unwrap()).unwrap();
+                                    let mut file = File::create(extracted_file_path).unwrap();
+                                    file.write(&buffer).unwrap();
+                                }
+                            }
+
+                            let extracted = extracted + 1;
+                            let percentage = (extracted as f32 / total as f32) * 100.0;
+
+                            let archive = DownloadedArchive::Zip {
+                                archive,
+                                extraction_dir,
+                                total,
+                                extracted,
+                            };
+
+                            if extracted == total {
                                 Some((
                                     (index, Progress::FinishedExtracting),
                                     State::FinishedExtracting { package, index },
                                 ))
                             } else {
-                                {
-                                    let mut entry: ZipFile<'_> =
-                                        archive.by_index(extracted as usize).unwrap();
-                                    let entry_name = entry.name().to_owned();
-
-                                    if entry.is_dir() {
-                                        let extracted_dir_path = extraction_dir.join(entry_name);
-                                        create_dir_all(extracted_dir_path).unwrap();
-                                    } else if entry.is_file() {
-                                        let mut buffer: Vec<u8> = Vec::new();
-                                        let _bytes_read = entry.read_to_end(&mut buffer).unwrap();
-                                        let extracted_file_path = extraction_dir.join(entry_name);
-                                        create_dir_all(extracted_file_path.parent().unwrap())
-                                            .unwrap();
-                                        let mut file = File::create(extracted_file_path).unwrap();
-                                        file.write(&buffer).unwrap();
-                                    }
-                                }
-
-                                let extracted = extracted + 1;
-                                let percentage = (extracted as f32 / total as f32) * 100.0;
-
-                                let archive = DownloadedArchive::Zip {
-                                    archive,
-                                    extraction_dir,
-                                    total,
-                                    extracted,
-                                };
-
                                 Some((
                                     (index, Progress::ExtractionProgress(percentage)),
                                     State::Extracting {
