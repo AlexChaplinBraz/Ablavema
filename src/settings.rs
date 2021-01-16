@@ -125,6 +125,7 @@ impl Default for Settings {
             keep_only_latest_branched: false,
             keep_only_latest_stable: false,
             keep_only_latest_lts: false,
+            // TODO: Let the user change these locations.
             packages_dir: PROJECT_DIRS.data_local_dir().to_path_buf(),
             releases_db: PROJECT_DIRS.config_dir().join("releases_db.bin"),
             cache_dir: PROJECT_DIRS.cache_dir().to_path_buf(),

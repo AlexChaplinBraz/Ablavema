@@ -20,7 +20,7 @@ use iced::{
     Subscription, Text,
 };
 use reqwest;
-use std::{iter, process, thread};
+use std::{iter, process};
 
 #[derive(Debug)]
 pub struct Gui {
@@ -250,15 +250,10 @@ impl Application for Gui {
             }
             Message::OpenBlender(package) => {
                 open_blender(package.name, None);
-                // TODO: Check whether this solves the package launch problem on Windows.
-                thread::sleep(std::time::Duration::from_secs(1));
                 process::exit(0);
             }
             Message::OpenBlenderWithFile(package) => {
-                let file_path = self.file_path.clone().unwrap();
-                open_blender(package.name, Some(file_path));
-                // TODO: Extra time for this option to avoid recompiling just in case it needs longer.
-                thread::sleep(std::time::Duration::from_secs(5));
+                open_blender(package.name, Some(self.file_path.clone().unwrap()));
                 process::exit(0);
             }
             Message::UnsetDefault => {

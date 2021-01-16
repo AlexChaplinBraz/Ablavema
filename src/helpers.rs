@@ -14,11 +14,7 @@ use prettytable::{
 use reqwest::{self, ClientBuilder};
 use select::document::Document;
 use std::{
-    collections::HashMap,
-    path::Path,
-    process::{Command, Stdio},
-    str::FromStr,
-    sync::atomic::Ordering,
+    collections::HashMap, path::Path, process::Command, str::FromStr, sync::atomic::Ordering,
     time::Duration,
 };
 
@@ -96,11 +92,7 @@ pub fn open_blender(package: String, file_path: Option<String>) {
     if let Some(path) = file_path {
         cmd.arg(path);
     }
-    cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+    cmd.spawn().unwrap();
 }
 
 pub fn process_bool_arg(arg: &ArgMatches<'_>, name: &str) {
