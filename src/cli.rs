@@ -777,7 +777,7 @@ pub async fn run_cli() -> GuiFlags {
                             .iter()
                             .find(|package| package.name == build)
                         {
-                            Some(a) => a.cli_remove(),
+                            Some(a) => a.remove(),
                             None => {
                                 println!("No installed package named '{}' found.", build);
                                 continue;
@@ -792,7 +792,7 @@ pub async fn run_cli() -> GuiFlags {
                             .enumerate()
                             .find(|(index, _)| *index == build)
                         {
-                            Some(a) => a.1.cli_remove(),
+                            Some(a) => a.1.remove(),
                             None => {
                                 println!("No installed package with ID '{}' found.", build);
                                 continue;

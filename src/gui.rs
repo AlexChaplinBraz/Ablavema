@@ -49,7 +49,7 @@ impl Gui {
         }
     }
 
-    async fn install_package(package: Package) -> Package {
+    async fn pass_package(package: Package) -> Package {
         package
     }
 
@@ -200,6 +200,7 @@ impl Application for Gui {
                         Message::CheckAvailability,
                     )
                 } else {
+                    // TODO: Consider disabling the Install button instead of opening this msgbox.
                     msgbox::create(
                         "BlenderLauncher",
                         &format!("Can't install '{}' because the setting to keep only latest {} is enabled.", package.name, message),
@@ -213,7 +214,7 @@ impl Application for Gui {
                 let (available, for_install, package) = tuple;
                 if available {
                     if for_install {
-                        Command::perform(Gui::install_package(package), Message::InstallPackage)
+                        Command::perform(Gui::pass_package(package), Message::InstallPackage)
                     } else {
                         self.releases.sync();
                         Command::none()
@@ -337,10 +338,11 @@ impl Application for Gui {
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
-            Message::RemoveDefault => Command::perform(
-                Package::remove(SETTINGS.read().unwrap().default_package.clone().unwrap()),
-                Message::PackageRemoved,
-            ),
+            Message::RemoveDefault => {
+                let package = SETTINGS.read().unwrap().default_package.clone().unwrap();
+                package.remove();
+                Command::perform(Gui::pass_package(package), Message::PackageRemoved)
+            }
             Message::CheckForUpdates => Command::perform(
                 Gui::check_for_updates(self.releases.take()),
                 Message::UpdatesChecked,
@@ -674,6 +676,7 @@ impl Application for Gui {
                                 .enumerate()
                                 .filter(|(_, package)| filter.matches(package))
                                 .fold(Column::new(), |col, (index, package)| {
+                                    // TODO: Alternating row colours.
                                     let element = package.view(file_exists, theme);
                                     package_count += 1;
                                     col.push(element.map(move |message| {
@@ -1215,7 +1218,7 @@ impl Package {
     fn update(&mut self, message: PackageMessage) -> Command<Message> {
         match message {
             PackageMessage::Install => {
-                Command::perform(Package::install(self.clone()), Message::TryToInstall)
+                Command::perform(Gui::pass_package(self.clone()), Message::TryToInstall)
             }
             PackageMessage::InstallationProgress(progress) => match progress {
                 Progress::Started => {
@@ -1239,7 +1242,7 @@ impl Package {
                         set_default_button: Default::default(),
                         remove_button: Default::default(),
                     };
-                    Command::perform(Package::installed(self.clone()), Message::PackageInstalled)
+                    Command::perform(Gui::pass_package(self.clone()), Message::PackageInstalled)
                 }
                 Progress::Errored => {
                     self.state = PackageState::Errored {
@@ -1249,13 +1252,15 @@ impl Package {
                 }
             },
             PackageMessage::Remove => {
-                Command::perform(Package::remove(self.clone()), Message::PackageRemoved)
+                self.remove();
+                Command::perform(Gui::pass_package(self.clone()), Message::PackageRemoved)
             }
             PackageMessage::OpenBlender => {
-                Command::perform(Package::open_blender(self.clone()), Message::OpenBlender)
+                Command::perform(Gui::pass_package(self.clone()), Message::OpenBlender)
             }
+
             PackageMessage::OpenBlenderWithFile => Command::perform(
-                Package::open_blender_with_file(self.clone()),
+                Gui::pass_package(self.clone()),
                 Message::OpenBlenderWithFile,
             ),
             PackageMessage::SetDefault => {
@@ -1420,26 +1425,5 @@ impl Package {
                     .center_y(),
             )
             .into()
-    }
-
-    async fn install(package: Package) -> Package {
-        package
-    }
-
-    async fn installed(package: Package) -> Package {
-        package
-    }
-
-    async fn remove(package: Package) -> Package {
-        package.cli_remove();
-        package
-    }
-
-    async fn open_blender(package: Package) -> Package {
-        package
-    }
-
-    async fn open_blender_with_file(package: Package) -> Package {
-        package
     }
 }

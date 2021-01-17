@@ -68,25 +68,25 @@ impl Installed {
                     Build::Daily(s) if SETTINGS.read().unwrap().keep_only_latest_daily => {
                         daily_count.push(s.clone());
                         if daily_count.iter().filter(|&n| n == s).count() > 1 {
-                            package.cli_remove();
+                            package.remove();
                         }
                     }
                     Build::Branched(s) if SETTINGS.read().unwrap().keep_only_latest_branched => {
                         branched_count.push(s.clone());
                         if branched_count.iter().filter(|&n| n == s).count() > 1 {
-                            package.cli_remove();
+                            package.remove();
                         }
                     }
                     Build::Stable if SETTINGS.read().unwrap().keep_only_latest_stable => {
                         stable_count += 1;
                         if stable_count > 1 {
-                            package.cli_remove();
+                            package.remove();
                         }
                     }
                     Build::Lts if SETTINGS.read().unwrap().keep_only_latest_lts => {
                         lts_count += 1;
                         if lts_count > 1 {
-                            package.cli_remove();
+                            package.remove();
                         }
                     }
                     _ => continue,

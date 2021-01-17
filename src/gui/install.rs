@@ -273,6 +273,7 @@ where
                             extracted,
                         } => {
                             {
+                                // TODO: Show progress with bytes to avoid looking stuck.
                                 let mut entry: ZipFile<'_> =
                                     archive.by_index(extracted as usize).unwrap();
                                 let entry_name = entry.name().to_owned();

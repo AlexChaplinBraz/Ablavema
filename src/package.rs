@@ -313,7 +313,7 @@ impl Package {
         Some(final_tasks)
     }
 
-    pub fn cli_remove(&self) {
+    pub fn remove(&self) {
         let path = SETTINGS.read().unwrap().packages_dir.join(&self.name);
         std::fs::remove_dir_all(path).unwrap();
         println!("Removed: {}", self.name);
