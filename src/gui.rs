@@ -333,16 +333,6 @@ impl Application for Gui {
                 open_blender(package.name, Some(self.file_path.clone().unwrap()));
                 process::exit(0);
             }
-            Message::UnsetDefault => {
-                SETTINGS.write().unwrap().default_package = None;
-                SETTINGS.read().unwrap().save();
-                Command::none()
-            }
-            Message::RemoveDefault => {
-                let package = SETTINGS.read().unwrap().default_package.clone().unwrap();
-                package.remove();
-                Command::perform(Gui::pass_package(package), Message::PackageRemoved)
-            }
             Message::CheckForUpdates => Command::perform(
                 Gui::check_for_updates(self.releases.take()),
                 Message::UpdatesChecked,
@@ -579,79 +569,90 @@ impl Application for Gui {
 
         let body: Element<'_, Message> = match self.tab {
             Tab::Packages => {
-                let controls: Element<'_, Message> = Container::new(
+                // TODO: Use icons for the buttons.
+                // I could use just the icon here without text if the same icon is used
+                // on the packages but accompanied with text to teach the user what they represent.
+                // Tooltips would be nice too, if `iced` finally implements them.
+                let button = |label, package_message: Option<Message>, state| {
+                    let button = Button::new(
+                        state,
+                        Text::new(label)
+                            .size(18)
+                            .horizontal_alignment(HorizontalAlignment::Center),
+                    )
+                    .width(Length::Units(130))
+                    .style(theme);
+
+                    if package_message.is_some() {
+                        button.on_press(package_message.unwrap())
+                    } else {
+                        button
+                    }
+                };
+
+                let info: Element<'_, Message> = Container::new(
                     Column::new()
                         .padding(20)
                         .spacing(20)
                         .push(
                             Column::new()
-                                .width(Length::Fill)
                                 .spacing(5)
-                                .push(Text::new(match &self.file_path {
-                                    Some(file_path) => format!("File: {}", file_path),
-                                    None => format!("File: no .blend file to open"),
-                                }))
-                                .push(match SETTINGS.read().unwrap().default_package.clone() {
-                                    Some(package) => {
-                                        let button =
-                                            |label, package_message: Option<Message>, state| {
-                                                let button = Button::new(
-                                                    state,
-                                                    Text::new(label).size(18).horizontal_alignment(
-                                                        HorizontalAlignment::Center,
-                                                    ),
-                                                )
-                                                .width(Length::Fill)
-                                                .style(theme);
-
-                                                if package_message.is_some() {
-                                                    button.on_press(package_message.unwrap())
-                                                } else {
-                                                    button
+                                .push(
+                                    Row::new()
+                                        .spacing(10)
+                                        .align_items(Align::Center)
+                                        .push(button(
+                                            "Open default",
+                                            match SETTINGS.read().unwrap().default_package.clone() {
+                                                Some(package) => {
+                                                    Some(Message::OpenBlender(package))
                                                 }
-                                            };
-                                        let col = Column::new()
-                                            .spacing(5)
-                                            .push(Text::new(format!(
-                                                "Default package: {}",
-                                                package.name
-                                            )))
-                                            .push(
-                                                Row::new()
-                                                    .spacing(40)
-                                                    .push(button(
-                                                        "Open default",
-                                                        Some(Message::OpenBlender(package.clone())),
-                                                        &mut self.state.open_default_button,
-                                                    ))
-                                                    .push(button(
-                                                        "Open default with file",
-                                                        if file_exists {
-                                                            Some(Message::OpenBlenderWithFile(
-                                                                package.clone(),
-                                                            ))
-                                                        } else {
-                                                            None
-                                                        },
-                                                        &mut self
-                                                            .state
-                                                            .open_default_with_file_button,
-                                                    ))
-                                                    .push(button(
-                                                        "Unset default",
-                                                        Some(Message::UnsetDefault),
-                                                        &mut self.state.unset_default_button,
-                                                    ))
-                                                    .push(button(
-                                                        "Remove default",
-                                                        Some(Message::RemoveDefault),
-                                                        &mut self.state.remove_default_button,
-                                                    )),
-                                            );
-                                        Container::new(col)
-                                    }
-                                    None => Container::new(Text::new("Default package: not set")),
-                                }),
+                                                None => None,
+                                            },
+                                            &mut self.state.open_default_button,
+                                        ))
+                                        .push(Text::new(
+                                            match SETTINGS.read().unwrap().default_package.clone() {
+                                                Some(package) => {
+                                                    format!("Default package: {}", package.name)
+                                                }
+                                                None => String::from("Default package: not set"),
+                                            },
+                                        )),
+                                )
+                                .push(
+                                    Row::new()
+                                        .spacing(10)
+                                        .align_items(Align::Center)
+                                        .push(button(
+                                            "Open file",
+                                            if self.file_path.is_some()
+                                                && SETTINGS
+                                                    .read()
+                                                    .unwrap()
+                                                    .default_package
+                                                    .is_some()
+                                            {
+                                                Some(Message::OpenBlenderWithFile(
+                                                    SETTINGS
+                                                        .read()
+                                                        .unwrap()
+                                                        .default_package
+                                                        .clone()
+                                                        .unwrap(),
+                                                ))
+                                            } else {
+                                                None
+                                            },
+                                            &mut self.state.open_default_with_file_button,
+                                        ))
+                                        .push(Text::new(match &self.file_path {
+                                            Some(file_path) => {
+                                                format!("File: {}", file_path)
+                                            }
+                                            None => String::from("File: none"),
+                                        })),
+                                ),
                         )
                         .push(self.state.controls.view(
                             self.releases.count_updates(),
@@ -659,7 +660,6 @@ impl Application for Gui {
                             self.theme,
                         )),
                 )
-                .width(Length::Fill)
                 .style(self.theme.light_container())
                 .into();
 
@@ -725,7 +725,7 @@ impl Application for Gui {
                     }
                 };
 
-                Column::new().push(controls).push(packages).into()
+                Column::new().push(info).push(packages).into()
             }
             Tab::Settings => {
                 macro_rules! choice_setting {
@@ -941,8 +941,6 @@ pub enum Message {
     PackageRemoved(Package),
     OpenBlender(Package),
     OpenBlenderWithFile(Package),
-    UnsetDefault,
-    RemoveDefault,
     CheckForUpdates,
     UpdatesChecked((bool, Daily, Branched, Stable, Lts)),
     FetchDaily,
