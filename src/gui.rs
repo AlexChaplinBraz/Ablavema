@@ -575,7 +575,7 @@ impl Application for Gui {
         )
         .width(Length::Fill)
         .center_x()
-        .style(self.theme.darker_container());
+        .style(self.theme.lighter_container());
 
         let body: Element<'_, Message> = match self.tab {
             Tab::Packages => {
@@ -660,11 +660,11 @@ impl Application for Gui {
                         )),
                 )
                 .width(Length::Fill)
-                .style(self.theme.dark_container())
+                .style(self.theme.light_container())
                 .into();
 
                 let packages: Element<'_, Message> = {
-                    let mut package_count = 0;
+                    let mut package_count: u16 = 0;
                     let filtered_packages =
                         Container::new(
                             iter::empty()
@@ -676,16 +676,14 @@ impl Application for Gui {
                                 .enumerate()
                                 .filter(|(_, package)| filter.matches(package))
                                 .fold(Column::new(), |col, (index, package)| {
-                                    // TODO: Alternating row colours.
-                                    let element = package.view(file_exists, theme);
                                     package_count += 1;
+                                    let element =
+                                        package.view(file_exists, theme, package_count & 1 != 0);
                                     col.push(element.map(move |message| {
                                         Message::PackageMessage(index, message)
                                     }))
                                 })
-                                .width(Length::Fill)
-                                .spacing(10)
-                                .padding(20),
+                                .width(Length::Fill),
                         );
 
                     let scrollable = Scrollable::new(match self.filter {
@@ -764,6 +762,7 @@ impl Application for Gui {
                     false => Some(Choice::Disable),
                 };
 
+                // TODO: Rewrite descriptions to better explain the behaviour of checking for updates.
                 let settings = Column::new()
                     .padding(20)
                     .push(
@@ -1276,7 +1275,12 @@ impl Package {
         }
     }
 
-    fn view(&mut self, file_exists: bool, theme: Theme) -> Element<'_, PackageMessage> {
+    fn view(
+        &mut self,
+        file_exists: bool,
+        theme: Theme,
+        is_odd: bool,
+    ) -> Element<'_, PackageMessage> {
         let name = Text::new(&self.name).size(30);
 
         let details = Row::new()
@@ -1416,14 +1420,21 @@ impl Package {
             PackageState::Errored { retry_button: _ } => Text::new("Error").into(),
         };
 
-        Column::new()
-            .push(name)
-            .push(details)
-            .push(
+        Container::new(
+            Column::new().push(name).push(details).push(
                 Container::new(controls)
                     .height(Length::Units(40))
                     .center_y(),
-            )
-            .into()
+            ),
+        )
+        .style({
+            if is_odd {
+                theme.odd_container()
+            } else {
+                theme.even_container()
+            }
+        })
+        .padding(20)
+        .into()
     }
 }

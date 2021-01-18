@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// Lifted practically as is from the styling example of iced.
 /// Only thing I added was methods for getting darker versions of the container.
+/// TODO: Try to base it on Blender's light and dark themes.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum Theme {
     Light,
@@ -15,17 +16,31 @@ pub enum Theme {
 impl Theme {
     pub const ALL: [Theme; 2] = [Theme::Light, Theme::Dark];
 
-    pub fn dark_container(&self) -> Box<dyn container::StyleSheet> {
+    pub fn light_container(&self) -> Box<dyn container::StyleSheet> {
         match self {
-            Theme::Light => light::ContainerDark.into(),
-            Theme::Dark => dark::ContainerDark.into(),
+            Theme::Light => light::ContainerLight.into(),
+            Theme::Dark => dark::ContainerLight.into(),
         }
     }
 
-    pub fn darker_container(&self) -> Box<dyn container::StyleSheet> {
+    pub fn lighter_container(&self) -> Box<dyn container::StyleSheet> {
         match self {
-            Theme::Light => light::ContainerDarker.into(),
-            Theme::Dark => dark::ContainerDarker.into(),
+            Theme::Light => light::ContainerLighter.into(),
+            Theme::Dark => dark::ContainerLighter.into(),
+        }
+    }
+
+    pub fn odd_container(&self) -> Box<dyn container::StyleSheet> {
+        match self {
+            Theme::Light => light::ContainerOdd.into(),
+            Theme::Dark => dark::ContainerOdd.into(),
+        }
+    }
+
+    pub fn even_container(&self) -> Box<dyn container::StyleSheet> {
+        match self {
+            Theme::Light => light::ContainerEven.into(),
+            Theme::Dark => dark::ContainerEven.into(),
         }
     }
 }
@@ -120,23 +135,45 @@ impl From<Theme> for Box<dyn rule::StyleSheet> {
 mod light {
     use iced::{button, container, Color, Vector};
 
-    pub struct ContainerDark;
+    pub struct ContainerLight;
 
-    impl container::StyleSheet for ContainerDark {
+    impl container::StyleSheet for ContainerLight {
         fn style(&self) -> container::Style {
             container::Style {
-                background: Color::from_rgb8(220, 220, 220).into(),
+                background: Color::from_rgb8(166, 166, 166).into(),
                 ..container::Style::default()
             }
         }
     }
 
-    pub struct ContainerDarker;
+    pub struct ContainerLighter;
 
-    impl container::StyleSheet for ContainerDarker {
+    impl container::StyleSheet for ContainerLighter {
         fn style(&self) -> container::Style {
             container::Style {
-                background: Color::from_rgb8(160, 160, 160).into(),
+                background: Color::from_rgb8(179, 179, 179).into(),
+                ..container::Style::default()
+            }
+        }
+    }
+
+    pub struct ContainerOdd;
+
+    impl container::StyleSheet for ContainerOdd {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Color::from_rgb8(153, 153, 153).into(),
+                ..container::Style::default()
+            }
+        }
+    }
+
+    pub struct ContainerEven;
+
+    impl container::StyleSheet for ContainerEven {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Color::from_rgb8(159, 159, 159).into(),
                 ..container::Style::default()
             }
         }
@@ -200,31 +237,55 @@ pub mod dark {
     impl container::StyleSheet for Container {
         fn style(&self) -> container::Style {
             container::Style {
-                background: Color::from_rgb8(0x36, 0x39, 0x3F).into(),
+                background: Color::from_rgb8(56, 56, 56).into(),
                 text_color: Color::WHITE.into(),
                 ..container::Style::default()
             }
         }
     }
 
-    pub struct ContainerDark;
+    pub struct ContainerLight;
 
-    impl container::StyleSheet for ContainerDark {
+    impl container::StyleSheet for ContainerLight {
         fn style(&self) -> container::Style {
             container::Style {
-                background: Color::from_rgb8(46, 49, 54).into(),
+                background: Color::from_rgb8(56, 56, 56).into(),
                 text_color: Color::WHITE.into(),
                 ..container::Style::default()
             }
         }
     }
 
-    pub struct ContainerDarker;
+    pub struct ContainerLighter;
 
-    impl container::StyleSheet for ContainerDarker {
+    impl container::StyleSheet for ContainerLighter {
         fn style(&self) -> container::Style {
             container::Style {
-                background: Color::from_rgb8(37, 39, 43).into(),
+                background: Color::from_rgb8(66, 66, 66).into(),
+                text_color: Color::WHITE.into(),
+                ..container::Style::default()
+            }
+        }
+    }
+
+    pub struct ContainerOdd;
+
+    impl container::StyleSheet for ContainerOdd {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Color::from_rgb8(40, 40, 40).into(),
+                text_color: Color::WHITE.into(),
+                ..container::Style::default()
+            }
+        }
+    }
+
+    pub struct ContainerEven;
+
+    impl container::StyleSheet for ContainerEven {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Color::from_rgb8(45, 45, 45).into(),
                 text_color: Color::WHITE.into(),
                 ..container::Style::default()
             }
