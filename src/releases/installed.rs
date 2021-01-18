@@ -32,6 +32,9 @@ impl Installed {
     }
 
     pub fn update_default(&self) {
+        // TODO: Fix case where there's the same build but for different versions.
+        // Seen it happen for daily builds, where there were two Alpha packages,
+        // one for version 2.91.1 and another for 2.93.0 so it's something to consider.
         if SETTINGS.read().unwrap().use_latest_as_default
             && SETTINGS.read().unwrap().default_package.is_some()
         {

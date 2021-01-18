@@ -1374,43 +1374,41 @@ impl Package {
                 set_default_button,
                 remove_button,
             } => {
+                // TODO: Add button for adding package to favourites.
                 let button1 = Row::new().push(button(
-                    "Open package",
+                    "Open",
                     Some(PackageMessage::OpenBlender),
                     open_button,
                 ));
 
-                let button2;
-                if file_exists {
-                    button2 = button1.push(button(
-                        "Open file with package",
-                        Some(PackageMessage::OpenBlenderWithFile),
-                        open_file_button,
-                    ));
-                } else {
-                    button2 =
-                        button1.push(button("Open file with package", None, open_file_button));
-                }
+                let button2 = button1.push(button(
+                    "Open file",
+                    if file_exists {
+                        Some(PackageMessage::OpenBlenderWithFile)
+                    } else {
+                        None
+                    },
+                    open_file_button,
+                ));
 
-                let button3;
-                if is_default_package {
-                    button3 = button2.push(button(
-                        "Unset default",
-                        Some(PackageMessage::UnsetDefault),
-                        set_default_button,
-                    ));
-                } else {
-                    button3 = button2.push(button(
-                        "Set as default",
-                        Some(PackageMessage::SetDefault),
-                        set_default_button,
-                    ));
-                }
+                let button3 = button2.push(button(
+                    if is_default_package {
+                        "Unset default"
+                    } else {
+                        "Set as default"
+                    },
+                    if is_default_package {
+                        Some(PackageMessage::UnsetDefault)
+                    } else {
+                        Some(PackageMessage::SetDefault)
+                    },
+                    set_default_button,
+                ));
 
                 button3
                     .spacing(40)
                     .push(button(
-                        "Remove",
+                        "Uninstall",
                         Some(PackageMessage::Remove),
                         remove_button,
                     ))
