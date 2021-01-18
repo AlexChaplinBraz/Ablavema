@@ -32,9 +32,6 @@ impl Installed {
     }
 
     pub fn update_default(&self) {
-        // TODO: Fix case where there's the same build but for different versions.
-        // Seen it happen for daily builds, where there were two Alpha packages,
-        // one for version 2.91.1 and another for 2.93.0 so it's something to consider.
         if SETTINGS.read().unwrap().use_latest_as_default
             && SETTINGS.read().unwrap().default_package.is_some()
         {
@@ -44,7 +41,9 @@ impl Installed {
                 .find(|package| package.build == default_package.build)
                 .unwrap();
 
-            if new_default.date > default_package.date {
+            if new_default.version == default_package.version
+                && new_default.date > default_package.date
+            {
                 SETTINGS.write().unwrap().default_package = Some(new_default.clone());
                 SETTINGS.read().unwrap().save();
 
@@ -65,18 +64,28 @@ impl Installed {
             let mut daily_count = Vec::new();
             let mut branched_count = Vec::new();
             let mut stable_count = 0;
-            let mut lts_count = 0;
+            let mut lts_count = Vec::new();
             for package in self.iter() {
                 match &package.build {
                     Build::Daily(s) if SETTINGS.read().unwrap().keep_only_latest_daily => {
-                        daily_count.push(s.clone());
-                        if daily_count.iter().filter(|&n| n == s).count() > 1 {
+                        daily_count.push((package.version.clone(), s.clone()));
+                        if daily_count
+                            .iter()
+                            .filter(|(v, n)| v == &package.version && n == s)
+                            .count()
+                            > 1
+                        {
                             package.remove();
                         }
                     }
                     Build::Branched(s) if SETTINGS.read().unwrap().keep_only_latest_branched => {
-                        branched_count.push(s.clone());
-                        if branched_count.iter().filter(|&n| n == s).count() > 1 {
+                        branched_count.push((package.version.clone(), s.clone()));
+                        if branched_count
+                            .iter()
+                            .filter(|(v, n)| v == &package.version && n == s)
+                            .count()
+                            > 1
+                        {
                             package.remove();
                         }
                     }
@@ -87,8 +96,15 @@ impl Installed {
                         }
                     }
                     Build::Lts if SETTINGS.read().unwrap().keep_only_latest_lts => {
-                        lts_count += 1;
-                        if lts_count > 1 {
+                        // TODO: This might not work going forward when they move to 3.0.
+                        // Might be better to switch to the `version_compare` crate.
+                        lts_count.push(package.version[0..4].to_owned());
+                        if lts_count
+                            .iter()
+                            .filter(|&v| v == &package.version[0..4])
+                            .count()
+                            > 1
+                        {
                             package.remove();
                         }
                     }

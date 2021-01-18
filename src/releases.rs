@@ -376,29 +376,70 @@ pub trait ReleaseType:
                 if matches!(package.state, PackageState::Installed { .. }) {
                     match package.build {
                         Build::Daily(_) | Build::Branched(_) => {
-                            match installed_packages
-                                .iter()
-                                .find(|installed_package| installed_package.build == package.build)
-                            {
+                            match installed_packages.iter().find(|installed_package| {
+                                installed_package.version == package.version
+                                    && installed_package.build == package.build
+                            }) {
                                 Some(_) => break,
                                 None => installed_packages.push(package.clone()),
                             }
                         }
-                        Build::Stable | Build::Lts | Build::Archived => {
+                        Build::Stable => {
                             installed_packages.push(package.clone());
                             break;
+                        }
+                        Build::Lts => {
+                            // TODO: This might not work going forward when they move to 3.0.
+                            // Might be better to switch to the `version_compare` crate.
+                            match installed_packages.iter().find(|installed_package| {
+                                installed_package.version[0..4] == package.version[0..4]
+                            }) {
+                                Some(_) => break,
+                                None => installed_packages.push(package.clone()),
+                            }
+                        }
+                        Build::Archived => {
+                            continue;
                         }
                     }
                 }
             }
 
             for installed_package in installed_packages {
-                if let Some(package) = self
-                    .iter_mut()
-                    .find(|package| package.build == installed_package.build)
-                {
-                    if package.date > installed_package.date {
-                        package.status = PackageStatus::Update;
+                match installed_package.build {
+                    Build::Daily(_) | Build::Branched(_) => {
+                        if let Some(package) = self.iter_mut().find(|package| {
+                            installed_package.version == package.version
+                                && installed_package.build == package.build
+                        }) {
+                            if package.date > installed_package.date {
+                                package.status = PackageStatus::Update;
+                            }
+                        }
+                    }
+                    Build::Stable => {
+                        if let Some(package) = self
+                            .iter_mut()
+                            .find(|package| installed_package.build == package.build)
+                        {
+                            if package.date > installed_package.date {
+                                package.status = PackageStatus::Update;
+                            }
+                        }
+                    }
+                    Build::Lts => {
+                        // TODO: This might not work going forward when they move to 3.0.
+                        // Might be better to switch to the `version_compare` crate.
+                        if let Some(package) = self.iter_mut().find(|package| {
+                            installed_package.version[0..4] == package.version[0..4]
+                        }) {
+                            if package.date > installed_package.date {
+                                package.status = PackageStatus::Update;
+                            }
+                        }
+                    }
+                    Build::Archived => {
+                        continue;
                     }
                 }
             }
@@ -407,7 +448,7 @@ pub trait ReleaseType:
 
     /// This method tends to temporarily ban the user due to the large amount of requests sent
     /// over a short period of time, so it shouldn't be used in places like .sync().
-    /// It's better to check the availability of a package on clicking Install and Remove.
+    /// It's better to check the availability of a package on Un/Installing.
     async fn remove_dead_packages(&mut self) {
         if CAN_CONNECT.load(Ordering::Relaxed) {
             let mut checkables = Vec::new();
