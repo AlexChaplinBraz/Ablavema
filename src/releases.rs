@@ -243,22 +243,67 @@ impl Releases {
         }
     }
 
-    /// Returns the amount of updates if there are any.
-    pub fn count_updates(&self) -> Option<usize> {
-        let count = iter::empty()
-            .chain(self.daily.iter())
-            .chain(self.branched.iter())
-            .chain(self.stable.iter())
-            .chain(self.lts.iter())
-            .chain(self.archived.iter())
+    /// Returns the amount of updates for each build type if there are any.
+    /// The returned tuple of options is:
+    /// (all_count, daily_count, branched_count, stable_count, lts_count)
+    pub fn count_updates(
+        &self,
+    ) -> (
+        Option<usize>,
+        Option<usize>,
+        Option<usize>,
+        Option<usize>,
+        Option<usize>,
+    ) {
+        let daily_count = self
+            .daily
+            .iter()
             .filter(|package| package.status == PackageStatus::Update)
             .count();
+        let branched_count = self
+            .branched
+            .iter()
+            .filter(|package| package.status == PackageStatus::Update)
+            .count();
+        let stable_count = self
+            .stable
+            .iter()
+            .filter(|package| package.status == PackageStatus::Update)
+            .count();
+        let lts_count = self
+            .lts
+            .iter()
+            .filter(|package| package.status == PackageStatus::Update)
+            .count();
+        let all_count = daily_count + branched_count + stable_count + lts_count;
 
-        if count == 0 {
-            None
-        } else {
-            Some(count)
-        }
+        (
+            if all_count == 0 {
+                None
+            } else {
+                Some(all_count)
+            },
+            if daily_count == 0 {
+                None
+            } else {
+                Some(daily_count)
+            },
+            if branched_count == 0 {
+                None
+            } else {
+                Some(branched_count)
+            },
+            if stable_count == 0 {
+                None
+            } else {
+                Some(stable_count)
+            },
+            if lts_count == 0 {
+                None
+            } else {
+                Some(lts_count)
+            },
+        )
     }
 
     /// Installs the latest packages for each build, as long as there's one older package

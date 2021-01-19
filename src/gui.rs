@@ -15,11 +15,12 @@ use crate::{
     settings::{ModifierKey, SETTINGS},
 };
 use iced::{
-    button, scrollable, slider, Align, Application, Button, Column, Command, Container, Element,
-    Executor, HorizontalAlignment, Length, ProgressBar, Radio, Row, Rule, Scrollable, Slider,
-    Subscription, Text,
+    button, scrollable, slider, Align, Application, Button, Checkbox, Column, Command, Container,
+    Element, Executor, HorizontalAlignment, Length, ProgressBar, Radio, Row, Rule, Scrollable,
+    Slider, Subscription, Text,
 };
 use reqwest;
+use serde::{Deserialize, Serialize};
 use std::{iter, process};
 
 #[derive(Debug)]
@@ -29,7 +30,6 @@ pub struct Gui {
     installing: Vec<(Package, usize)>,
     state: GuiState,
     tab: Tab,
-    filter: Filter,
     theme: Theme,
 }
 
@@ -57,6 +57,23 @@ impl Gui {
         packages: (Daily, Branched, Stable, Lts),
     ) -> (bool, Daily, Branched, Stable, Lts) {
         Releases::check_updates(packages).await
+    }
+
+    async fn check_all(
+        daily: Daily,
+        branched: Branched,
+        stable: Stable,
+        lts: Lts,
+        archived: Archived,
+    ) -> (bool, Daily, Branched, Stable, Lts, Archived) {
+        (
+            true,
+            Releases::check_daily_updates(daily).await.1,
+            Releases::check_branched_updates(branched).await.1,
+            Releases::check_stable_updates(stable).await.1,
+            Releases::check_lts_updates(lts).await.1,
+            Releases::check_archived_updates(archived).await.1,
+        )
     }
 
     async fn check_daily(packages: Daily) -> (bool, Daily) {
@@ -93,7 +110,6 @@ impl Application for Gui {
                 installing: Vec::default(),
                 state: GuiState::new(),
                 tab: Tab::Packages,
-                filter: Filter::Installed,
                 theme: SETTINGS.read().unwrap().theme,
             },
             Command::none(),
@@ -103,7 +119,7 @@ impl Application for Gui {
     fn title(&self) -> String {
         format!(
             "BlenderLauncher{}",
-            match self.releases.count_updates() {
+            match self.releases.count_updates().0 {
                 Some(count) => format!(
                     " - {} {} available!",
                     count,
@@ -338,63 +354,127 @@ impl Application for Gui {
                 Message::UpdatesChecked,
             ),
             Message::UpdatesChecked(tuple) => {
-                // TODO: Add some feedback once completed.
-                // The packages disappear for a moment due to the use of take(), but that's only
-                // if the user is on the same filter. There's also an indication of a package
-                // being new or an update, but only if you're looking at them. It would be great
-                // if iced had tooltips. For now, maybe showing the number of new packages on its
-                // filter button may be best. But that still doesn't help with the fact that an
-                // update check with no new results doesn't have much feedback if you're not
-                // looking at the output in the terminal. Maybe use a msgbox.
                 self.releases.add_new_packages(tuple);
+                Command::none()
+            }
+            Message::FetchAll => Command::perform(
+                Gui::check_all(
+                    self.releases.daily.take(),
+                    self.releases.branched.take(),
+                    self.releases.stable.take(),
+                    self.releases.lts.take(),
+                    self.releases.archived.take(),
+                ),
+                Message::AllFetched,
+            ),
+            Message::AllFetched((_, daily, branched, stable, lts, archived)) => {
+                self.releases.daily = daily;
+                self.releases.branched = branched;
+                self.releases.stable = stable;
+                self.releases.lts = lts;
+                self.releases.archived = archived;
                 Command::none()
             }
             Message::FetchDaily => Command::perform(
                 Gui::check_daily(self.releases.daily.take()),
                 Message::DailyFetched,
             ),
-            Message::DailyFetched(tuple) => {
-                self.releases.daily = tuple.1;
+            Message::DailyFetched((_, daily)) => {
+                self.releases.daily = daily;
                 Command::none()
             }
             Message::FetchBranched => Command::perform(
                 Gui::check_branched(self.releases.branched.take()),
                 Message::BranchedFetched,
             ),
-            Message::BranchedFetched(tuple) => {
-                self.releases.branched = tuple.1;
+            Message::BranchedFetched((_, branched)) => {
+                self.releases.branched = branched;
                 Command::none()
             }
             Message::FetchStable => Command::perform(
                 Gui::check_stable(self.releases.stable.take()),
                 Message::StableFetched,
             ),
-            Message::StableFetched(tuple) => {
-                self.releases.stable = tuple.1;
+            Message::StableFetched((_, stable)) => {
+                self.releases.stable = stable;
                 Command::none()
             }
             Message::FetchLts => Command::perform(
                 Gui::check_lts(self.releases.lts.take()),
                 Message::LtsFetched,
             ),
-            Message::LtsFetched(tuple) => {
-                self.releases.lts = tuple.1;
+            Message::LtsFetched((_, lts)) => {
+                self.releases.lts = lts;
                 Command::none()
             }
             Message::FetchArchived => Command::perform(
                 Gui::check_archived(self.releases.archived.take()),
                 Message::ArchivedFetched,
             ),
-            Message::ArchivedFetched(tuple) => {
-                self.releases.archived = tuple.1;
+            Message::ArchivedFetched((_, archived)) => {
+                self.releases.archived = archived;
+                Command::none()
+            }
+            Message::FilterUpdatesChanged => {
+                self.state.controls.filters.updates = !self.state.controls.filters.updates;
+                SETTINGS.write().unwrap().filters = self.state.controls.filters;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::FilterInstalledChanged(change) => {
+                self.state.controls.filters.installed = change;
+                SETTINGS.write().unwrap().filters = self.state.controls.filters;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::FilterAllChanged(change) => {
+                self.state.controls.filters.all = change;
+                self.state.controls.filters.daily = change;
+                self.state.controls.filters.branched = change;
+                self.state.controls.filters.stable = change;
+                self.state.controls.filters.lts = change;
+                self.state.controls.filters.archived = change;
+                SETTINGS.write().unwrap().filters = self.state.controls.filters;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::FilterDailyChanged(change) => {
+                self.state.controls.filters.daily = change;
+                self.state.controls.filters.refresh_all();
+                SETTINGS.write().unwrap().filters = self.state.controls.filters;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::FilterBranchedChanged(change) => {
+                self.state.controls.filters.branched = change;
+                self.state.controls.filters.refresh_all();
+                SETTINGS.write().unwrap().filters = self.state.controls.filters;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::FilterStableChanged(change) => {
+                self.state.controls.filters.stable = change;
+                self.state.controls.filters.refresh_all();
+                SETTINGS.write().unwrap().filters = self.state.controls.filters;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::FilterLtsChanged(change) => {
+                self.state.controls.filters.lts = change;
+                self.state.controls.filters.refresh_all();
+                SETTINGS.write().unwrap().filters = self.state.controls.filters;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::FilterArchivedChanged(change) => {
+                self.state.controls.filters.archived = change;
+                self.state.controls.filters.refresh_all();
+                SETTINGS.write().unwrap().filters = self.state.controls.filters;
+                SETTINGS.read().unwrap().save();
                 Command::none()
             }
             Message::TabChanged(tab) => {
                 self.tab = tab;
-                Command::none()
-            }
-            Message::FilterChanged(filter) => {
-                self.filter = filter;
                 Command::none()
             }
             Message::BypassLauncher(choice) => {
@@ -523,8 +603,9 @@ impl Application for Gui {
     fn view(&mut self) -> Element<'_, Message> {
         let file_exists = self.file_path.is_some();
         let self_tab = self.tab;
-        let filter = self.filter;
+        let filters = self.state.controls.filters;
         let theme = self.theme;
+        let update_count = self.releases.count_updates();
 
         let top_button = |label, tab, state| {
             let button = Button::new(
@@ -580,7 +661,6 @@ impl Application for Gui {
                             .size(18)
                             .horizontal_alignment(HorizontalAlignment::Center),
                     )
-                    .width(Length::Units(130))
                     .style(theme);
 
                     if package_message.is_some() {
@@ -593,73 +673,59 @@ impl Application for Gui {
                 let info: Element<'_, Message> = Container::new(
                     Column::new()
                         .padding(20)
-                        .spacing(20)
+                        .spacing(5)
                         .push(
-                            Column::new()
-                                .spacing(5)
-                                .push(
-                                    Row::new()
-                                        .spacing(10)
-                                        .align_items(Align::Center)
-                                        .push(button(
-                                            "Open default",
-                                            match SETTINGS.read().unwrap().default_package.clone() {
-                                                Some(package) => {
-                                                    Some(Message::OpenBlender(package))
-                                                }
-                                                None => None,
-                                            },
-                                            &mut self.state.open_default_button,
-                                        ))
-                                        .push(Text::new(
-                                            match SETTINGS.read().unwrap().default_package.clone() {
-                                                Some(package) => {
-                                                    format!("Default package: {}", package.name)
-                                                }
-                                                None => String::from("Default package: not set"),
-                                            },
-                                        )),
-                                )
-                                .push(
-                                    Row::new()
-                                        .spacing(10)
-                                        .align_items(Align::Center)
-                                        .push(button(
-                                            "Open file",
-                                            if self.file_path.is_some()
-                                                && SETTINGS
-                                                    .read()
-                                                    .unwrap()
-                                                    .default_package
-                                                    .is_some()
-                                            {
-                                                Some(Message::OpenBlenderWithFile(
-                                                    SETTINGS
-                                                        .read()
-                                                        .unwrap()
-                                                        .default_package
-                                                        .clone()
-                                                        .unwrap(),
-                                                ))
-                                            } else {
-                                                None
-                                            },
-                                            &mut self.state.open_default_with_file_button,
-                                        ))
-                                        .push(Text::new(match &self.file_path {
-                                            Some(file_path) => {
-                                                format!("File: {}", file_path)
-                                            }
-                                            None => String::from("File: none"),
-                                        })),
-                                ),
+                            Row::new()
+                                .spacing(10)
+                                .align_items(Align::Center)
+                                .push(button(
+                                    "[=]",
+                                    match SETTINGS.read().unwrap().default_package.clone() {
+                                        Some(package) => Some(Message::OpenBlender(package)),
+                                        None => None,
+                                    },
+                                    &mut self.state.open_default_button,
+                                ))
+                                .push(Text::new(
+                                    match SETTINGS.read().unwrap().default_package.clone() {
+                                        Some(package) => {
+                                            format!("Default package: {}", package.name)
+                                        }
+                                        None => String::from("Default package: not set"),
+                                    },
+                                )),
                         )
-                        .push(self.state.controls.view(
-                            self.releases.count_updates(),
-                            self.filter,
-                            self.theme,
-                        )),
+                        .push(
+                            Row::new()
+                                .spacing(10)
+                                .align_items(Align::Center)
+                                .push(button(
+                                    "[+]",
+                                    if self.file_path.is_some()
+                                        && SETTINGS.read().unwrap().default_package.is_some()
+                                    {
+                                        Some(Message::OpenBlenderWithFile(
+                                            SETTINGS
+                                                .read()
+                                                .unwrap()
+                                                .default_package
+                                                .clone()
+                                                .unwrap(),
+                                        ))
+                                    } else {
+                                        None
+                                    },
+                                    &mut self.state.open_default_with_file_button,
+                                ))
+                                .push(Text::new(match &self.file_path {
+                                    Some(file_path) => {
+                                        format!("File: {}", file_path)
+                                    }
+                                    None => String::from("File: none"),
+                                })),
+                        ),
                 )
+                .width(Length::Fill)
                 .style(self.theme.light_container())
                 .into();
 
@@ -674,7 +740,7 @@ impl Application for Gui {
                                 .chain(&mut self.releases.lts.iter_mut())
                                 .chain(&mut self.releases.archived.iter_mut())
                                 .enumerate()
-                                .filter(|(_, package)| filter.matches(package))
+                                .filter(|(_, package)| filters.matches(package))
                                 .fold(Column::new(), |col, (index, package)| {
                                     package_count += 1;
                                     let element =
@@ -686,36 +752,18 @@ impl Application for Gui {
                                 .width(Length::Fill),
                         );
 
-                    let scrollable = Scrollable::new(match self.filter {
-                        Filter::Updates => &mut self.state.updates_scroll,
-                        Filter::Installed => &mut self.state.installed_scroll,
-                        Filter::Daily => &mut self.state.daily_scroll,
-                        Filter::Branched => &mut self.state.branched_scroll,
-                        Filter::Lts => &mut self.state.lts_scroll,
-                        Filter::Stable => &mut self.state.stable_scroll,
-                        Filter::Archived => &mut self.state.archived_scroll,
-                    })
-                    .push(filtered_packages);
+                    let scrollable =
+                        Scrollable::new(&mut self.state.packages_scroll).push(filtered_packages);
 
                     if package_count == 0 {
-                        Container::new(
-                            Text::new(match filter {
-                                Filter::Updates => "No updates found",
-                                Filter::Installed => "No installed packages",
-                                Filter::Daily => "No daily packages, please fetch first",
-                                Filter::Branched => "No branched packages, please fetch first",
-                                Filter::Lts => "No LTS packages, please fetch first",
-                                Filter::Stable => "No stable packages, please fetch first",
-                                Filter::Archived => "No archived packages, please fetch first",
-                            })
-                            .size(50),
-                        )
-                        .height(Length::Fill)
-                        .width(Length::Fill)
-                        .center_x()
-                        .center_y()
-                        .style(self.theme)
-                        .into()
+                        // TODO: Could show text pertaining to fetching when related booleans are added.
+                        Container::new(Text::new("No packages").size(50))
+                            .height(Length::Fill)
+                            .width(Length::Fill)
+                            .center_x()
+                            .center_y()
+                            .style(self.theme)
+                            .into()
                     } else {
                         Container::new(scrollable)
                             .height(Length::Fill)
@@ -725,7 +773,14 @@ impl Application for Gui {
                     }
                 };
 
-                Column::new().push(info).push(packages).into()
+                Column::new()
+                    .push(info)
+                    .push(
+                        Row::new()
+                            .push(self.state.controls.view(update_count, theme))
+                            .push(packages),
+                    )
+                    .into()
             }
             Tab::Settings => {
                 macro_rules! choice_setting {
@@ -912,6 +967,7 @@ impl Application for Gui {
                 .into(),
         };
 
+        // TODO: Add a small red banner at the bottom whenever there's no connection.
         Column::new().push(tabs).push(body).into()
     }
 }
@@ -943,6 +999,8 @@ pub enum Message {
     OpenBlenderWithFile(Package),
     CheckForUpdates,
     UpdatesChecked((bool, Daily, Branched, Stable, Lts)),
+    FetchAll,
+    AllFetched((bool, Daily, Branched, Stable, Lts, Archived)),
     FetchDaily,
     DailyFetched((bool, Daily)),
     FetchBranched,
@@ -953,8 +1011,15 @@ pub enum Message {
     LtsFetched((bool, Lts)),
     FetchArchived,
     ArchivedFetched((bool, Archived)),
+    FilterUpdatesChanged,
+    FilterInstalledChanged(bool),
+    FilterAllChanged(bool),
+    FilterDailyChanged(bool),
+    FilterBranchedChanged(bool),
+    FilterStableChanged(bool),
+    FilterLtsChanged(bool),
+    FilterArchivedChanged(bool),
     TabChanged(Tab),
-    FilterChanged(Filter),
     BypassLauncher(Choice),
     ModifierKey(ModifierKey),
     UseLatestAsDefault(Choice),
@@ -981,26 +1046,11 @@ pub struct GuiFlags {
 #[derive(Debug, Default)]
 struct GuiState {
     controls: Controls,
-    updates_scroll: scrollable::State,
-    installed_scroll: scrollable::State,
-    daily_scroll: scrollable::State,
-    branched_scroll: scrollable::State,
-    stable_scroll: scrollable::State,
-    lts_scroll: scrollable::State,
-    archived_scroll: scrollable::State,
+    packages_scroll: scrollable::State,
     settings_scroll: scrollable::State,
     about_scroll: scrollable::State,
     open_default_button: button::State,
     open_default_with_file_button: button::State,
-    unset_default_button: button::State,
-    remove_default_button: button::State,
-    updates_button: button::State,
-    installed_button: button::State,
-    daily_button: button::State,
-    branched_button: button::State,
-    stable_button: button::State,
-    lts_button: button::State,
-    archived_button: button::State,
     packages_button: button::State,
     settings_button: button::State,
     about_button: button::State,
@@ -1011,6 +1061,10 @@ struct GuiState {
 impl GuiState {
     fn new() -> Self {
         Self {
+            controls: Controls {
+                filters: SETTINGS.read().unwrap().filters,
+                ..Controls::default()
+            },
             minute_value: SETTINGS.read().unwrap().minutes_between_updates as f64,
             ..Self::default()
         }
@@ -1019,142 +1073,291 @@ impl GuiState {
 
 #[derive(Clone, Debug, Default)]
 struct Controls {
-    check_updates_button: button::State,
+    filters: Filters,
+    // TODO: Maybe add booleans for each button so when it's fetching
+    // the related buttons are disabled, maybe with some special styling.
+    check_for_updates_button: button::State,
+    show_updates_button: button::State,
+    return_to_filters_button: button::State,
+    fetch_all_button: button::State,
     fetch_daily_button: button::State,
     fetch_branched_button: button::State,
     fetch_stable_button: button::State,
     fetch_lts_button: button::State,
     fetch_archived_button: button::State,
-    updates_button: button::State,
-    installed_button: button::State,
-    daily_button: button::State,
-    branched_button: button::State,
-    lts_button: button::State,
-    stable_button: button::State,
-    archived_button: button::State,
 }
 
 impl Controls {
     fn view(
         &mut self,
-        update_count: Option<usize>,
-        filter: Filter,
+        update_count: (
+            Option<usize>,
+            Option<usize>,
+            Option<usize>,
+            Option<usize>,
+            Option<usize>,
+        ),
         theme: Theme,
     ) -> Container<'_, Message> {
-        let fetch_button = |state, label, message| {
-            let label = Text::new(label)
-                .size(16)
-                .horizontal_alignment(HorizontalAlignment::Center);
-            Button::new(state, label)
-                .width(Length::Fill)
-                .on_press(message)
-                .style(theme)
-        };
+        let button = |label, package_message: Option<Message>, state| {
+            let button = Button::new(
+                state,
+                Text::new(label)
+                    .size(18)
+                    .horizontal_alignment(HorizontalAlignment::Center),
+            )
+            .width(Length::Units(200))
+            .style(theme);
 
-        let filter_button = |state, label, filter, current_filter| {
-            let label = Text::new(label)
-                .size(16)
-                .horizontal_alignment(HorizontalAlignment::Center);
-            let button = Button::new(state, label).width(Length::Fill).style(theme);
-
-            if filter == current_filter {
-                button
+            if package_message.is_some() {
+                button.on_press(package_message.unwrap())
             } else {
-                button.on_press(Message::FilterChanged(filter))
+                button
             }
         };
 
-        Container::new(
-            Column::new()
-                .spacing(5)
+        let update_count_message = match update_count.0 {
+            Some(count) => {
+                if count == 1 {
+                    String::from("Show 1 update")
+                } else {
+                    format!("Show {} updates", count)
+                }
+            }
+            None => String::from("None to show"),
+        };
+
+        let updates = Column::new()
+            .spacing(10)
+            .push(button(
+                "[O] Check for updates",
+                Some(Message::CheckForUpdates),
+                &mut self.check_for_updates_button,
+            ))
+            .push({
+                if self.filters.updates {
+                    button(
+                        "Return to filters",
+                        Some(Message::FilterUpdatesChanged),
+                        &mut self.return_to_filters_button,
+                    )
+                } else {
+                    match update_count.0 {
+                        Some(_) => button(
+                            &update_count_message,
+                            Some(Message::FilterUpdatesChanged),
+                            &mut self.show_updates_button,
+                        ),
+                        None => button(&update_count_message, None, &mut self.show_updates_button),
+                    }
+                }
+            });
+
+        let filter_row = |filter,
+                          label,
+                          checkbox_message: fn(bool) -> Message,
+                          state,
+                          button_message: Option<Message>| {
+            let row = Row::new()
+                .height(Length::Units(30))
+                .align_items(Align::Center)
                 .push(
-                    Row::new()
+                    Checkbox::new(filter, label, checkbox_message)
                         .width(Length::Fill)
-                        .spacing(20)
-                        .push(fetch_button(
-                            &mut self.check_updates_button,
-                            "Check for updates",
-                            Message::CheckForUpdates,
-                        ))
-                        .push(fetch_button(
-                            &mut self.fetch_daily_button,
-                            "Fetch daily",
-                            Message::FetchDaily,
-                        ))
-                        .push(fetch_button(
-                            &mut self.fetch_branched_button,
-                            "Fetch branched",
-                            Message::FetchBranched,
-                        ))
-                        .push(fetch_button(
-                            &mut self.fetch_stable_button,
-                            "Fetch stable",
-                            Message::FetchStable,
-                        ))
-                        .push(fetch_button(
-                            &mut self.fetch_lts_button,
-                            "Fetch LTS",
-                            Message::FetchLts,
-                        ))
-                        .push(fetch_button(
-                            &mut self.fetch_archived_button,
-                            "Fetch archived",
-                            Message::FetchArchived,
-                        )),
-                )
-                .push(
-                    Row::new()
-                        .width(Length::Fill)
-                        .spacing(20)
-                        .push(filter_button(
-                            &mut self.updates_button,
-                            match update_count {
-                                Some(count) => format!("Updates [{}]", count),
-                                None => String::from("Updates"),
-                            },
-                            Filter::Updates,
-                            filter,
-                        ))
-                        .push(filter_button(
-                            &mut self.installed_button,
-                            String::from("Installed"),
-                            Filter::Installed,
-                            filter,
-                        ))
-                        .push(filter_button(
-                            &mut self.daily_button,
-                            String::from("Daily"),
-                            Filter::Daily,
-                            filter,
-                        ))
-                        .push(filter_button(
-                            &mut self.branched_button,
-                            String::from("Branched"),
-                            Filter::Branched,
-                            filter,
-                        ))
-                        .push(filter_button(
-                            &mut self.stable_button,
-                            String::from("Stable"),
-                            Filter::Stable,
-                            filter,
-                        ))
-                        .push(filter_button(
-                            &mut self.lts_button,
-                            String::from("LTS"),
-                            Filter::Lts,
-                            filter,
-                        ))
-                        .push(filter_button(
-                            &mut self.archived_button,
-                            String::from("Archived"),
-                            Filter::Archived,
-                            filter,
-                        )),
+                        .style(theme),
+                );
+            match state {
+                Some(state) => row.push(
+                    Button::new(
+                        state,
+                        Text::new("[O]")
+                            .size(16)
+                            .horizontal_alignment(HorizontalAlignment::Center),
+                    )
+                    .on_press(button_message.unwrap())
+                    .style(theme),
                 ),
-        )
-        .width(Length::Fill)
-        .center_x()
+                None => row,
+            }
+        };
+
+        let filters = Column::new()
+            .spacing(5)
+            .push(Text::new("Filters"))
+            .push(filter_row(
+                self.filters.installed,
+                String::from("Installed"),
+                Message::FilterInstalledChanged,
+                None,
+                None,
+            ))
+            .push(filter_row(
+                self.filters.all,
+                match update_count.0 {
+                    Some(count) => {
+                        format!("All [{}]", count)
+                    }
+                    None => String::from("All"),
+                },
+                Message::FilterAllChanged,
+                Some(&mut self.fetch_all_button),
+                Some(Message::FetchAll),
+            ))
+            .push(filter_row(
+                self.filters.daily,
+                match update_count.1 {
+                    Some(count) => {
+                        format!("Daily [{}]", count)
+                    }
+                    None => String::from("Daily"),
+                },
+                Message::FilterDailyChanged,
+                Some(&mut self.fetch_daily_button),
+                Some(Message::FetchDaily),
+            ))
+            .push(filter_row(
+                self.filters.branched,
+                match update_count.2 {
+                    Some(count) => {
+                        format!("Branched [{}]", count)
+                    }
+                    None => String::from("Branched"),
+                },
+                Message::FilterBranchedChanged,
+                Some(&mut self.fetch_branched_button),
+                Some(Message::FetchBranched),
+            ))
+            .push(filter_row(
+                self.filters.stable,
+                match update_count.3 {
+                    Some(count) => {
+                        format!("Stable [{}]", count)
+                    }
+                    None => String::from("Stable"),
+                },
+                Message::FilterStableChanged,
+                Some(&mut self.fetch_stable_button),
+                Some(Message::FetchStable),
+            ))
+            .push(filter_row(
+                self.filters.lts,
+                match update_count.4 {
+                    Some(count) => {
+                        format!("LTS [{}]", count)
+                    }
+                    None => String::from("LTS"),
+                },
+                Message::FilterLtsChanged,
+                Some(&mut self.fetch_lts_button),
+                Some(Message::FetchLts),
+            ))
+            .push(filter_row(
+                self.filters.archived,
+                String::from("Archived"),
+                Message::FilterArchivedChanged,
+                Some(&mut self.fetch_archived_button),
+                Some(Message::FetchArchived),
+            ));
+
+        // TODO: Add a "Sort by" dropdown.
+
+        Container::new({
+            if self.filters.updates {
+                Column::new().push(updates)
+            } else {
+                Column::new().spacing(30).push(updates).push(filters)
+            }
+        })
+        .padding(20)
+        .width(Length::Units(240))
+        .height(Length::Fill)
+        .style(theme.sidebar_container())
+        .into()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq)]
+pub struct Filters {
+    updates: bool,
+    installed: bool,
+    all: bool,
+    daily: bool,
+    branched: bool,
+    lts: bool,
+    stable: bool,
+    archived: bool,
+}
+
+impl Filters {
+    fn matches(&self, package: &Package) -> bool {
+        if self.updates {
+            if package.status == PackageStatus::Update {
+                true
+            } else {
+                false
+            }
+        } else if self.installed {
+            match package.build {
+                Build::Daily(_)
+                    if self.daily && matches!(package.state, PackageState::Installed { .. }) =>
+                {
+                    true
+                }
+                Build::Branched(_)
+                    if self.branched && matches!(package.state, PackageState::Installed { .. }) =>
+                {
+                    true
+                }
+                Build::Stable
+                    if self.stable && matches!(package.state, PackageState::Installed { .. }) =>
+                {
+                    true
+                }
+                Build::Lts
+                    if self.lts && matches!(package.state, PackageState::Installed { .. }) =>
+                {
+                    true
+                }
+                Build::Archived
+                    if self.archived && matches!(package.state, PackageState::Installed { .. }) =>
+                {
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            match package.build {
+                Build::Daily(_) if self.daily => true,
+                Build::Branched(_) if self.branched => true,
+                Build::Stable if self.stable => true,
+                Build::Lts if self.lts => true,
+                Build::Archived if self.archived => true,
+                _ => false,
+            }
+        }
+    }
+
+    fn refresh_all(&mut self) {
+        if self.daily && self.branched && self.stable && self.lts && self.archived {
+            self.all = true
+        } else {
+            self.all = false
+        }
+    }
+}
+
+impl Default for Filters {
+    fn default() -> Self {
+        Self {
+            updates: false,
+            installed: false,
+            all: true,
+            daily: true,
+            branched: true,
+            lts: true,
+            stable: true,
+            archived: true,
+        }
     }
 }
 
@@ -1163,31 +1366,6 @@ pub enum Tab {
     Packages,
     Settings,
     About,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Filter {
-    Updates,
-    Installed,
-    Daily,
-    Branched,
-    Lts,
-    Stable,
-    Archived,
-}
-
-impl Filter {
-    fn matches(&self, package: &Package) -> bool {
-        match self {
-            Filter::Updates => package.status == PackageStatus::Update,
-            Filter::Installed => matches!(package.state, PackageState::Installed { .. }),
-            Filter::Daily => matches!(package.build, Build::Daily { .. }),
-            Filter::Branched => matches!(package.build, Build::Branched { .. }),
-            Filter::Lts => package.build == Build::Lts,
-            Filter::Stable => package.build == Build::Stable,
-            Filter::Archived => package.build == Build::Archived,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1279,6 +1457,7 @@ impl Package {
         theme: Theme,
         is_odd: bool,
     ) -> Element<'_, PackageMessage> {
+        // TODO: Rethink how package are displayed.
         let name = Text::new(&self.name).size(30);
 
         let details = Row::new()
@@ -1294,6 +1473,7 @@ impl Package {
                     .push(Text::new(self.build.to_string()).size(20)),
             )
             .push(
+                // TODO: This eats into the `Build: ...` if window is too narrow and text too long.
                 Text::new(match self.status {
                     PackageStatus::Update => "UPDATE     ",
                     PackageStatus::New => "NEW     ",
@@ -1325,7 +1505,7 @@ impl Package {
         let controls: Element<'_, PackageMessage> = match &mut self.state {
             PackageState::Fetched { install_button } => Row::new()
                 .push(button(
-                    "Install",
+                    "[#] Install",
                     Some(PackageMessage::Install),
                     install_button,
                 ))
@@ -1374,13 +1554,13 @@ impl Package {
             } => {
                 // TODO: Add button for adding package to favourites.
                 let button1 = Row::new().push(button(
-                    "Open",
+                    "[=] Open",
                     Some(PackageMessage::OpenBlender),
                     open_button,
                 ));
 
                 let button2 = button1.push(button(
-                    "Open file",
+                    "[+] Open file",
                     if file_exists {
                         Some(PackageMessage::OpenBlenderWithFile)
                     } else {
@@ -1391,9 +1571,9 @@ impl Package {
 
                 let button3 = button2.push(button(
                     if is_default_package {
-                        "Unset default"
+                        "[U] Unset"
                     } else {
-                        "Set as default"
+                        "[S] Set"
                     },
                     if is_default_package {
                         Some(PackageMessage::UnsetDefault)
@@ -1406,7 +1586,7 @@ impl Package {
                 button3
                     .spacing(40)
                     .push(button(
-                        "Uninstall",
+                        "[X] Uninstall",
                         Some(PackageMessage::Remove),
                         remove_button,
                     ))

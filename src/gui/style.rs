@@ -30,6 +30,13 @@ impl Theme {
         }
     }
 
+    pub fn sidebar_container(&self) -> Box<dyn container::StyleSheet> {
+        match self {
+            Theme::Light => light::ContainerSidebar.into(),
+            Theme::Dark => dark::ContainerSidebar.into(),
+        }
+    }
+
     pub fn odd_container(&self) -> Box<dyn container::StyleSheet> {
         match self {
             Theme::Light => light::ContainerOdd.into(),
@@ -157,6 +164,17 @@ mod light {
         }
     }
 
+    pub struct ContainerSidebar;
+
+    impl container::StyleSheet for ContainerSidebar {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Color::from_rgb8(162, 162, 162).into(),
+                ..container::Style::default()
+            }
+        }
+    }
+
     pub struct ContainerOdd;
 
     impl container::StyleSheet for ContainerOdd {
@@ -262,6 +280,18 @@ pub mod dark {
         fn style(&self) -> container::Style {
             container::Style {
                 background: Color::from_rgb8(66, 66, 66).into(),
+                text_color: Color::WHITE.into(),
+                ..container::Style::default()
+            }
+        }
+    }
+
+    pub struct ContainerSidebar;
+
+    impl container::StyleSheet for ContainerSidebar {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Color::from_rgb8(51, 51, 51).into(),
                 text_color: Color::WHITE.into(),
                 ..container::Style::default()
             }

@@ -56,6 +56,8 @@ impl Installed {
     }
 
     pub fn remove_old_packages(&self) {
+        // TODO: Consider returning a (bool, bool) to indicate whether daily and branched
+        // had anything deleted and to avoid trying to remove dead packages if not.
         if SETTINGS.read().unwrap().keep_only_latest_daily
             || SETTINGS.read().unwrap().keep_only_latest_branched
             || SETTINGS.read().unwrap().keep_only_latest_stable

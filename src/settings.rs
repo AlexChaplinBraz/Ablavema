@@ -1,5 +1,8 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
-use crate::{gui::style::Theme, package::Package};
+use crate::{
+    gui::{style::Theme, Filters},
+    package::Package,
+};
 use bincode;
 use device_query::Keycode;
 use directories_next::ProjectDirs;
@@ -60,6 +63,7 @@ pub struct Settings {
     pub cache_dir: PathBuf,
     pub releases_db: PathBuf,
     pub last_update_time: SystemTime,
+    pub filters: Filters,
     pub theme: Theme,
 }
 
@@ -132,6 +136,7 @@ impl Default for Settings {
             last_update_time: SystemTime::now()
                 .checked_sub(Duration::from_secs(minutes_between_updates * 60))
                 .unwrap_or_else(|| SystemTime::now()),
+            filters: Filters::default(),
             theme: Theme::default(),
         }
     }

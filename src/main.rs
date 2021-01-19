@@ -38,8 +38,8 @@ async fn run() {
         if LAUNCH_GUI.load(Ordering::Relaxed) || SETTINGS.read().unwrap().default_package.is_none()
         {
             let mut window = iced::window::Settings::default();
-            window.size = (1100, 600);
-            window.min_size = Some((1100, 600));
+            window.size = (900, 600);
+            window.min_size = Some((900, 600));
 
             let default_settings = iced::Settings::<()>::default();
 
