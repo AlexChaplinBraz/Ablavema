@@ -416,14 +416,24 @@ impl Application for Gui {
                 self.releases.archived = archived;
                 Command::none()
             }
-            Message::FilterUpdatesChanged => {
-                self.state.controls.filters.updates = !self.state.controls.filters.updates;
+            Message::FilterUpdatesChanged(change) => {
+                if change {
+                    self.state.controls.filters.updates = true;
+                    self.state.controls.filters.installed = false;
+                } else {
+                    self.state.controls.filters.updates = false;
+                }
                 SETTINGS.write().unwrap().filters = self.state.controls.filters;
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
             Message::FilterInstalledChanged(change) => {
-                self.state.controls.filters.installed = change;
+                if change {
+                    self.state.controls.filters.installed = true;
+                    self.state.controls.filters.updates = false;
+                } else {
+                    self.state.controls.filters.installed = false;
+                }
                 SETTINGS.write().unwrap().filters = self.state.controls.filters;
                 SETTINGS.read().unwrap().save();
                 Command::none()
@@ -1020,7 +1030,7 @@ pub enum Message {
     LtsFetched((bool, Lts)),
     FetchArchived,
     ArchivedFetched((bool, Archived)),
-    FilterUpdatesChanged,
+    FilterUpdatesChanged(bool),
     FilterInstalledChanged(bool),
     FilterAllChanged(bool),
     FilterDailyChanged(bool),
@@ -1129,58 +1139,11 @@ impl Controls {
             }
         };
 
-        let update_count_message = match update_count.0 {
-            Some(count) => {
-                if count == 1 {
-                    String::from("Show 1 update")
-                } else {
-                    format!("Show {} updates", count)
-                }
-            }
-            None => String::from("None to show"),
-        };
-
-        let updates = Column::new()
-            .spacing(10)
-            .push(button(
-                "[O] Check for updates",
-                Some(Message::CheckForUpdates),
-                &mut self.check_for_updates_button,
-            ))
-            .push({
-                // TODO: Push this into the filters and make it turn off Installed and vice-versa.
-                // Now that sorting was added, it looks weird if you can't filter updates as well.
-                if self.filters.updates {
-                    button(
-                        "Return to filters",
-                        Some(Message::FilterUpdatesChanged),
-                        &mut self.return_to_filters_button,
-                    )
-                } else {
-                    match update_count.0 {
-                        Some(_) => button(
-                            &update_count_message,
-                            Some(Message::FilterUpdatesChanged),
-                            &mut self.show_updates_button,
-                        ),
-                        None => button(&update_count_message, None, &mut self.show_updates_button),
-                    }
-                }
-            });
-
-        let sorting = Row::new()
-            .spacing(10)
-            .align_items(Align::Center)
-            .push(Text::new("Sort by"))
-            .push(
-                PickList::new(
-                    &mut self.sorting_pick_list,
-                    &SortBy::ALL[..],
-                    Some(SETTINGS.read().unwrap().sort_by),
-                    Message::SortingChanged,
-                )
-                .style(theme),
-            );
+        let update = Column::new().spacing(10).push(button(
+            "[O] Check for updates",
+            Some(Message::CheckForUpdates),
+            &mut self.check_for_updates_button,
+        ));
 
         let filter_row = |filter,
                           label,
@@ -1214,6 +1177,18 @@ impl Controls {
             .spacing(5)
             .push(Text::new("Filters"))
             .push(filter_row(
+                self.filters.updates,
+                match update_count.0 {
+                    Some(count) => {
+                        format!("Updates [{}]", count)
+                    }
+                    None => String::from("Updates"),
+                },
+                Message::FilterUpdatesChanged,
+                None,
+                None,
+            ))
+            .push(filter_row(
                 self.filters.installed,
                 String::from("Installed"),
                 Message::FilterInstalledChanged,
@@ -1222,12 +1197,7 @@ impl Controls {
             ))
             .push(filter_row(
                 self.filters.all,
-                match update_count.0 {
-                    Some(count) => {
-                        format!("All [{}]", count)
-                    }
-                    None => String::from("All"),
-                },
+                String::from("All"),
                 Message::FilterAllChanged,
                 Some(&mut self.fetch_all_button),
                 Some(Message::FetchAll),
@@ -1288,17 +1258,27 @@ impl Controls {
                 Some(Message::FetchArchived),
             ));
 
-        Container::new({
-            if self.filters.updates {
-                Column::new().spacing(30).push(updates).push(sorting)
-            } else {
-                Column::new()
-                    .spacing(30)
-                    .push(updates)
-                    .push(sorting)
-                    .push(filters)
-            }
-        })
+        let sorting = Row::new()
+            .spacing(10)
+            .align_items(Align::Center)
+            .push(Text::new("Sort by"))
+            .push(
+                PickList::new(
+                    &mut self.sorting_pick_list,
+                    &SortBy::ALL[..],
+                    Some(SETTINGS.read().unwrap().sort_by),
+                    Message::SortingChanged,
+                )
+                .style(theme),
+            );
+
+        Container::new(
+            Column::new()
+                .spacing(30)
+                .push(update)
+                .push(filters)
+                .push(sorting),
+        )
         .padding(20)
         .width(Length::Units(240))
         .height(Length::Fill)
@@ -1322,10 +1302,15 @@ pub struct Filters {
 impl Filters {
     fn matches(&self, package: &Package) -> bool {
         if self.updates {
-            if package.status == PackageStatus::Update {
-                true
-            } else {
-                false
+            match package.build {
+                Build::Daily(_) if self.daily && package.status == PackageStatus::Update => true,
+                Build::Branched(_) if self.branched && package.status == PackageStatus::Update => {
+                    true
+                }
+                Build::Stable if self.stable && package.status == PackageStatus::Update => true,
+                Build::Lts if self.lts && package.status == PackageStatus::Update => true,
+                Build::Archived if self.archived && package.status == PackageStatus::Update => true,
+                _ => false,
             }
         } else if self.installed {
             match package.build {
