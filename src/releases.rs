@@ -399,8 +399,6 @@ pub trait ReleaseType:
         self.unset_status();
 
         if refresh {
-            // TODO: When both Alpha and Beta daily packages were marked as Update
-            // and I install one of them, the other doesn't keep marked as Update.
             let mut installed_packages: Vec<Package> = Vec::new();
             for package in self.iter() {
                 if matches!(package.state, PackageState::Installed { .. }) {
@@ -410,7 +408,7 @@ pub trait ReleaseType:
                                 installed_package.version == package.version
                                     && installed_package.build == package.build
                             }) {
-                                Some(_) => break,
+                                Some(_) => continue,
                                 None => installed_packages.push(package.clone()),
                             }
                         }
@@ -429,7 +427,7 @@ pub trait ReleaseType:
                             }
                         }
                         Build::Archived => {
-                            continue;
+                            break;
                         }
                     }
                 }
