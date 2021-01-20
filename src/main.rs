@@ -18,6 +18,7 @@ use std::sync::atomic::Ordering;
 
 // TODO: Fix window cascading on Windows. This will involve creating our own window which we'll
 // give to Iced.
+// TODO: Remember user's window size.
 
 #[tokio::main]
 async fn main() {

@@ -1530,29 +1530,44 @@ impl Package {
         theme: Theme,
         is_odd: bool,
     ) -> Element<'_, PackageMessage> {
-        // TODO: Rethink how package are displayed.
-        let name = Text::new(&self.name).size(30);
+        let name = Row::new()
+            .spacing(10)
+            .push(Text::new(&self.name).size(26).width(Length::Fill))
+            // TODO: Add favourites system.
+            .push(Text::new("[B]"));
 
-        let details = Row::new()
+        let details = Column::new()
             .push(
                 Row::new()
-                    .width(Length::Fill)
                     .align_items(Align::End)
                     .push(Text::new("Date: ").size(16))
-                    .push(Text::new(self.date.to_string()).size(20))
-                    .push(Text::new("        Version: ").size(16))
-                    .push(Text::new(&self.version).size(20))
-                    .push(Text::new("        Build: ").size(16))
-                    .push(Text::new(self.build.to_string()).size(20)),
+                    // TODO: Add how long ago it was released.
+                    // TODO: Format date-time nicely.
+                    .push(Text::new(self.date.to_string()).size(20)),
             )
             .push(
-                // TODO: This eats into the `Build: ...` if window is too narrow and text too long.
-                Text::new(match self.status {
-                    PackageStatus::Update => "UPDATE     ",
-                    PackageStatus::New => "NEW     ",
-                    PackageStatus::Old => "",
-                })
-                .size(20),
+                Row::new()
+                    .push(
+                        Row::new()
+                            .width(Length::Fill)
+                            .align_items(Align::End)
+                            .push(Text::new("Version: ").size(16))
+                            .push(Text::new(&self.version).size(20)),
+                    )
+                    .push(
+                        Text::new(match self.status {
+                            PackageStatus::Update => "UPDATE",
+                            PackageStatus::New => "NEW",
+                            PackageStatus::Old => "",
+                        })
+                        .size(20),
+                    ),
+            )
+            .push(
+                Row::new()
+                    .align_items(Align::End)
+                    .push(Text::new("Build: ").size(16))
+                    .push(Text::new(self.build.to_string()).size(20)),
             );
 
         let button = |label, package_message: Option<PackageMessage>, state| {
@@ -1593,6 +1608,7 @@ impl Package {
                         .width(Length::Fill)
                         .style(theme),
                 )
+                // TODO: Cancel functionality.
                 .into(),
             PackageState::Extracting { progress } => {
                 if cfg!(target_os = "linux") {
@@ -1625,7 +1641,6 @@ impl Package {
                 set_default_button,
                 remove_button,
             } => {
-                // TODO: Add button for adding package to favourites.
                 let button1 = Row::new().push(button(
                     "[=] Open",
                     Some(PackageMessage::OpenBlender),
@@ -1670,7 +1685,7 @@ impl Package {
         };
 
         Container::new(
-            Column::new().push(name).push(details).push(
+            Column::new().spacing(10).push(name).push(details).push(
                 Container::new(controls)
                     .height(Length::Units(40))
                     .center_y(),
