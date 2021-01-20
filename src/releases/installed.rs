@@ -5,7 +5,7 @@ use crate::{
 };
 use bincode;
 use derive_deref::{Deref, DerefMut};
-use std::fs::{read_dir, File};
+use std::fs::{read_dir, remove_dir_all, File};
 
 #[derive(Debug, Default, Deref, DerefMut)]
 pub struct Installed(Vec<Package>);
@@ -21,9 +21,14 @@ impl Installed {
 
             if package_info.exists() {
                 let file = File::open(&package_info).unwrap();
-                // TODO: Remove directory if package_info.bin failed to deserialize.
-                let package: Package = bincode::deserialize_from(file).unwrap();
-                self.push(package);
+                match bincode::deserialize_from(file) {
+                    Ok(package) => {
+                        self.push(package);
+                    }
+                    Err(_) => {
+                        remove_dir_all(package_info.parent().unwrap()).unwrap();
+                    }
+                }
             }
         }
 

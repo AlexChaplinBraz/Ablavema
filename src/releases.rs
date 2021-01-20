@@ -45,35 +45,50 @@ impl Releases {
     /// Load all databases, or initialise them if non-existent.
     async fn load_all(&mut self) {
         if self.daily.get_db_path().exists() {
-            self.daily.load();
+            if self.daily.load() {
+                self.daily.init().await;
+                self.daily.save();
+            }
         } else {
             self.daily.init().await;
             self.daily.save();
         }
 
         if self.branched.get_db_path().exists() {
-            self.branched.load();
+            if self.branched.load() {
+                self.branched.init().await;
+                self.branched.save();
+            }
         } else {
             self.branched.init().await;
             self.branched.save();
         }
 
         if self.stable.get_db_path().exists() {
-            self.stable.load();
+            if self.stable.load() {
+                self.stable.init().await;
+                self.stable.save();
+            }
         } else {
             self.stable.init().await;
             self.stable.save();
         }
 
         if self.lts.get_db_path().exists() {
-            self.lts.load();
+            if self.lts.load() {
+                self.lts.init().await;
+                self.lts.save();
+            }
         } else {
             self.lts.init().await;
             self.lts.save();
         }
 
         if self.archived.get_db_path().exists() {
-            self.archived.load();
+            if self.archived.load() {
+                self.archived.init().await;
+                self.archived.save();
+            }
         } else {
             self.archived.init().await;
             self.archived.save();
@@ -528,11 +543,15 @@ pub trait ReleaseType:
         bincode::serialize_into(file, self).unwrap();
     }
 
-    fn load(&mut self) {
-        if self.get_db_path().exists() {
-            let file = File::open(self.get_db_path()).unwrap();
-            let bin: Self = bincode::deserialize_from(file).unwrap();
-            *self = bin;
+    /// Returns true if Self changed in any way so it can be reinitialised.
+    fn load(&mut self) -> bool {
+        let file = File::open(self.get_db_path()).unwrap();
+        match bincode::deserialize_from(file) {
+            Ok(bin) => {
+                *self = bin;
+                false
+            }
+            Err(_) => true,
         }
     }
 }
