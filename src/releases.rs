@@ -340,14 +340,14 @@ impl Releases {
 
             self.installed.fetch();
             self.installed.update_default();
-            self.installed.remove_old_packages();
+            let (daily_removed, branched_removed) = self.installed.remove_old_packages();
             self.sync();
 
-            if SETTINGS.read().unwrap().keep_only_latest_daily {
+            if SETTINGS.read().unwrap().keep_only_latest_daily && daily_removed {
                 self.daily.remove_dead_packages().await;
             }
 
-            if SETTINGS.read().unwrap().keep_only_latest_branched {
+            if SETTINGS.read().unwrap().keep_only_latest_branched && branched_removed {
                 self.branched.remove_dead_packages().await;
             }
         }

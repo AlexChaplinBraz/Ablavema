@@ -60,9 +60,10 @@ impl Installed {
         }
     }
 
-    pub fn remove_old_packages(&self) {
-        // TODO: Consider returning a (bool, bool) to indicate whether daily and branched
-        // had anything deleted and to avoid trying to remove dead packages if not.
+    pub fn remove_old_packages(&self) -> (bool, bool) {
+        let mut daily_removed = false;
+        let mut branched_removed = false;
+
         if SETTINGS.read().unwrap().keep_only_latest_daily
             || SETTINGS.read().unwrap().keep_only_latest_branched
             || SETTINGS.read().unwrap().keep_only_latest_stable
@@ -83,6 +84,7 @@ impl Installed {
                             > 1
                         {
                             package.remove();
+                            daily_removed = true;
                         }
                     }
                     Build::Branched(s) if SETTINGS.read().unwrap().keep_only_latest_branched => {
@@ -94,6 +96,7 @@ impl Installed {
                             > 1
                         {
                             package.remove();
+                            branched_removed = true;
                         }
                     }
                     Build::Stable if SETTINGS.read().unwrap().keep_only_latest_stable => {
@@ -119,5 +122,7 @@ impl Installed {
                 }
             }
         }
+
+        (daily_removed, branched_removed)
     }
 }
