@@ -10,6 +10,7 @@ use self::{
     stable::Stable,
 };
 use crate::{
+    helpers::ReturnOption,
     package::{Build, Package, PackageState, PackageStatus},
     settings::{CAN_CONNECT, SETTINGS},
 };
@@ -278,31 +279,11 @@ impl Releases {
         let all_count = daily_count + branched_count + stable_count + lts_count;
 
         (
-            if all_count == 0 {
-                None
-            } else {
-                Some(all_count)
-            },
-            if daily_count == 0 {
-                None
-            } else {
-                Some(daily_count)
-            },
-            if branched_count == 0 {
-                None
-            } else {
-                Some(branched_count)
-            },
-            if stable_count == 0 {
-                None
-            } else {
-                Some(stable_count)
-            },
-            if lts_count == 0 {
-                None
-            } else {
-                Some(lts_count)
-            },
+            all_count.return_option(),
+            daily_count.return_option(),
+            branched_count.return_option(),
+            stable_count.return_option(),
+            lts_count.return_option(),
         )
     }
 

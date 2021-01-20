@@ -298,6 +298,18 @@ pub fn cli_list_wide(packages: &Vec<Package>, name: &str, invert: bool) {
     }
 }
 
+pub trait ReturnOption: Default + PartialEq {
+    fn return_option(self) -> Option<Self> {
+        if self == Self::default() {
+            None
+        } else {
+            Some(self)
+        }
+    }
+}
+
+impl ReturnOption for usize {}
+
 /// Handles cases where the extracted directory isn't named the same
 /// as the downloaded archive from which the name of the package is taken.
 pub fn get_extracted_name(package: &Package) -> &str {
