@@ -4,9 +4,19 @@ use crate::{helpers::get_extracted_name, package::Package, settings::SETTINGS};
 use bincode;
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
-use iced_futures::futures;
+use iced_futures::{
+    futures::stream::{unfold, BoxStream},
+    subscription,
+};
 use reqwest;
-use std::{fs::create_dir_all, fs::File, io::Read, io::Write, path::PathBuf};
+use std::{
+    fs::create_dir_all,
+    fs::File,
+    hash::{Hash, Hasher},
+    io::Read,
+    io::Write,
+    path::PathBuf,
+};
 use tar::Archive;
 use tokio::fs::{remove_dir_all, remove_file};
 use xz2::read::XzDecoder;
@@ -25,25 +35,20 @@ impl Install {
     }
 }
 
-impl<H, I> iced_native::subscription::Recipe<H, I> for Install
+impl<H, I> subscription::Recipe<H, I> for Install
 where
-    H: std::hash::Hasher,
+    H: Hasher,
 {
     type Output = (usize, Progress);
 
     fn hash(&self, state: &mut H) {
-        use std::hash::Hash;
-
         std::any::TypeId::of::<Self>().hash(state);
         self.package.name.hash(state);
         self.package.date.hash(state);
     }
 
-    fn stream(
-        self: Box<Self>,
-        _input: futures::stream::BoxStream<'static, I>,
-    ) -> futures::stream::BoxStream<'static, Self::Output> {
-        Box::pin(futures::stream::unfold(
+    fn stream(self: Box<Self>, _input: BoxStream<'static, I>) -> BoxStream<'static, Self::Output> {
+        Box::pin(unfold(
             State::ReadyToInstall {
                 package: self.package,
                 index: self.index,

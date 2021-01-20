@@ -1,6 +1,6 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 use crate::{
-    gui::{style::Theme, Filters},
+    gui::{style::Theme, Filters, SortBy},
     package::Package,
 };
 use bincode;
@@ -64,6 +64,7 @@ pub struct Settings {
     pub releases_db: PathBuf,
     pub last_update_time: SystemTime,
     pub filters: Filters,
+    pub sort_by: SortBy,
     pub theme: Theme,
 }
 
@@ -137,6 +138,7 @@ impl Default for Settings {
                 .checked_sub(Duration::from_secs(minutes_between_updates * 60))
                 .unwrap_or_else(|| SystemTime::now()),
             filters: Filters::default(),
+            sort_by: SortBy::default(),
             theme: Theme::default(),
         }
     }

@@ -1,6 +1,7 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 use iced::{
-    button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input,
+    button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
+    text_input,
 };
 use serde::{Deserialize, Serialize};
 
@@ -130,6 +131,15 @@ impl From<Theme> for Box<dyn checkbox::StyleSheet> {
     }
 }
 
+impl From<Theme> for Box<dyn pick_list::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        match theme {
+            Theme::Light => Default::default(),
+            Theme::Dark => dark::PickList.into(),
+        }
+    }
+}
+
 impl From<Theme> for Box<dyn rule::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
@@ -222,8 +232,8 @@ mod light {
 
 pub mod dark {
     use iced::{
-        button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input,
-        Color,
+        button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
+        text_input, Background, Color,
     };
 
     const SURFACE: Color = Color::from_rgb(
@@ -529,6 +539,39 @@ pub mod dark {
                 }
                 .into(),
                 ..self.active(is_checked)
+            }
+        }
+    }
+
+    pub struct PickList;
+
+    impl pick_list::StyleSheet for PickList {
+        fn menu(&self) -> pick_list::Menu {
+            pick_list::Menu {
+                text_color: Color::WHITE,
+                background: Background::Color(Color::BLACK),
+                border_width: 1.0,
+                border_color: ACTIVE,
+                selected_text_color: HOVERED,
+                selected_background: Background::Color(Color::BLACK),
+            }
+        }
+
+        fn active(&self) -> pick_list::Style {
+            pick_list::Style {
+                text_color: Color::WHITE,
+                background: Background::Color(Color::BLACK),
+                border_radius: 2.0,
+                border_width: 1.0,
+                border_color: ACTIVE,
+                ..Default::default()
+            }
+        }
+
+        fn hovered(&self) -> pick_list::Style {
+            pick_list::Style {
+                background: Color { a: 0.8, ..ACTIVE }.into(),
+                ..self.active()
             }
         }
     }

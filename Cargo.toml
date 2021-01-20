@@ -15,10 +15,10 @@ derive_deref = "1.1"
 device_query = "0.2"
 directories-next = "2.0"
 flate2 = "1.0"
-iced = { git = "https://github.com/hecrj/iced", rev = "92d647d1a6145e19ef9f540e02faef6a892f51fa" }
-iced_native = { git = "https://github.com/hecrj/iced", rev = "92d647d1a6145e19ef9f540e02faef6a892f51fa" }
-iced_futures = { git = "https://github.com/hecrj/iced", rev = "92d647d1a6145e19ef9f540e02faef6a892f51fa" }
+iced = { git = "https://github.com/hecrj/iced", rev = "9da0a3de54e8e7161d4a3405633bc574ce43eb2d" }
+iced_futures = { git = "https://github.com/hecrj/iced", rev = "9da0a3de54e8e7161d4a3405633bc574ce43eb2d" }
 indicatif = "0.15"
+itertools = "0.10"
 lazy_static = "1.4"
 msgbox = "0.6"
 natord = "1.0"

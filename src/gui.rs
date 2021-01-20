@@ -15,13 +15,14 @@ use crate::{
     settings::{ModifierKey, SETTINGS},
 };
 use iced::{
-    button, scrollable, slider, Align, Application, Button, Checkbox, Column, Command, Container,
-    Element, Executor, HorizontalAlignment, Length, ProgressBar, Radio, Row, Rule, Scrollable,
-    Slider, Subscription, Text,
+    button, pick_list, scrollable, slider, Align, Application, Button, Checkbox, Column, Command,
+    Container, Element, Executor, HorizontalAlignment, Length, PickList, ProgressBar, Radio, Row,
+    Rule, Scrollable, Slider, Subscription, Text,
 };
+use itertools::Itertools;
 use reqwest;
 use serde::{Deserialize, Serialize};
-use std::{iter, process};
+use std::{fmt::Display, iter, process};
 
 #[derive(Debug)]
 pub struct Gui {
@@ -473,6 +474,12 @@ impl Application for Gui {
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
+            Message::SortingChanged(sort_by) => {
+                self.state.controls.sort_by = sort_by;
+                SETTINGS.write().unwrap().sort_by = sort_by;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
             Message::TabChanged(tab) => {
                 self.tab = tab;
                 Command::none()
@@ -604,6 +611,7 @@ impl Application for Gui {
         let file_exists = self.file_path.is_some();
         let self_tab = self.tab;
         let filters = self.state.controls.filters;
+        let sort_by = self.state.controls.sort_by;
         let theme = self.theme;
         let update_count = self.releases.count_updates();
 
@@ -740,6 +748,7 @@ impl Application for Gui {
                                 .chain(&mut self.releases.lts.iter_mut())
                                 .chain(&mut self.releases.archived.iter_mut())
                                 .enumerate()
+                                .sorted_by(|a, b| sort_by.get_ordering(&a.1, &b.1))
                                 .filter(|(_, package)| filters.matches(package))
                                 .fold(Column::new(), |col, (index, package)| {
                                     package_count += 1;
@@ -1019,6 +1028,7 @@ pub enum Message {
     FilterStableChanged(bool),
     FilterLtsChanged(bool),
     FilterArchivedChanged(bool),
+    SortingChanged(SortBy),
     TabChanged(Tab),
     BypassLauncher(Choice),
     ModifierKey(ModifierKey),
@@ -1063,6 +1073,7 @@ impl GuiState {
         Self {
             controls: Controls {
                 filters: SETTINGS.read().unwrap().filters,
+                sort_by: SETTINGS.read().unwrap().sort_by,
                 ..Controls::default()
             },
             minute_value: SETTINGS.read().unwrap().minutes_between_updates as f64,
@@ -1071,9 +1082,11 @@ impl GuiState {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 struct Controls {
     filters: Filters,
+    sort_by: SortBy,
+    sorting_pick_list: pick_list::State<SortBy>,
     // TODO: Maybe add booleans for each button so when it's fetching
     // the related buttons are disabled, maybe with some special styling.
     check_for_updates_button: button::State,
@@ -1135,6 +1148,8 @@ impl Controls {
                 &mut self.check_for_updates_button,
             ))
             .push({
+                // TODO: Push this into the filters and make it turn off Installed and vice-versa.
+                // Now that sorting was added, it looks weird if you can't filter updates as well.
                 if self.filters.updates {
                     button(
                         "Return to filters",
@@ -1152,6 +1167,20 @@ impl Controls {
                     }
                 }
             });
+
+        let sorting = Row::new()
+            .spacing(10)
+            .align_items(Align::Center)
+            .push(Text::new("Sort by"))
+            .push(
+                PickList::new(
+                    &mut self.sorting_pick_list,
+                    &SortBy::ALL[..],
+                    Some(SETTINGS.read().unwrap().sort_by),
+                    Message::SortingChanged,
+                )
+                .style(theme),
+            );
 
         let filter_row = |filter,
                           label,
@@ -1259,13 +1288,15 @@ impl Controls {
                 Some(Message::FetchArchived),
             ));
 
-        // TODO: Add a "Sort by" dropdown.
-
         Container::new({
             if self.filters.updates {
-                Column::new().push(updates)
+                Column::new().spacing(30).push(updates).push(sorting)
             } else {
-                Column::new().spacing(30).push(updates).push(filters)
+                Column::new()
+                    .spacing(30)
+                    .push(updates)
+                    .push(sorting)
+                    .push(filters)
             }
         })
         .padding(20)
@@ -1358,6 +1389,63 @@ impl Default for Filters {
             stable: true,
             archived: true,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Deserialize, PartialEq, Serialize)]
+pub enum SortBy {
+    NameAscending,
+    NameDescending,
+    DateAscending,
+    DateDescending,
+    VersionAscending,
+    VersionDescending,
+}
+
+impl SortBy {
+    const ALL: [SortBy; 6] = [
+        SortBy::NameAscending,
+        SortBy::NameDescending,
+        SortBy::DateAscending,
+        SortBy::DateDescending,
+        SortBy::VersionAscending,
+        SortBy::VersionDescending,
+    ];
+
+    fn get_ordering(&self, a: &Package, b: &Package) -> std::cmp::Ordering {
+        match self {
+            SortBy::NameAscending => Ord::cmp(&a.name, &b.name),
+            SortBy::NameDescending => Ord::cmp(&a.name, &b.name).reverse(),
+            SortBy::DateAscending => Ord::cmp(&a.date, &b.date),
+            SortBy::DateDescending => Ord::cmp(&a.date, &b.date).reverse(),
+            SortBy::VersionAscending => natord::compare_ignore_case(&a.version, &b.version),
+            SortBy::VersionDescending => {
+                natord::compare_ignore_case(&a.version, &b.version).reverse()
+            }
+        }
+    }
+}
+
+impl Default for SortBy {
+    fn default() -> Self {
+        Self::VersionDescending
+    }
+}
+
+impl Display for SortBy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                SortBy::NameAscending => "Name [A]",
+                SortBy::NameDescending => "Name [D]",
+                SortBy::DateAscending => "Date [A]",
+                SortBy::DateDescending => "Date [D]",
+                SortBy::VersionAscending => "Version [A]",
+                SortBy::VersionDescending => "Version [D]",
+            }
+        )
     }
 }
 

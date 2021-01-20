@@ -397,6 +397,8 @@ pub trait ReleaseType:
         self.unset_status();
 
         if refresh {
+            // TODO: When both Alpha and Beta daily packages were marked as Update
+            // and I install one of them, the other doesn't keep marked as Update.
             let mut installed_packages: Vec<Package> = Vec::new();
             for package in self.iter() {
                 if matches!(package.state, PackageState::Installed { .. }) {
@@ -476,6 +478,11 @@ pub trait ReleaseType:
     /// over a short period of time, so it shouldn't be used in places like .sync().
     /// It's better to check the availability of a package on Un/Installing.
     async fn remove_dead_packages(&mut self) {
+        // TODO: Remove dead packages without user input but not too often.
+        // If the user has been checking for daily updates for days but not installing them
+        // there will be a lot of dead packages accumulated. Possibly solved by running this
+        // method whenever an actual new package is found, because that'd mean the older one
+        // is no longer available.
         if CAN_CONNECT.load(Ordering::Relaxed) {
             let mut checkables = Vec::new();
             for (index, package) in self.iter().enumerate() {

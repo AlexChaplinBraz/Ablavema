@@ -354,6 +354,7 @@ impl Ord for Package {
                 .cmp(&other.build)
                 .then(self.date.cmp(&other.date).reverse()),
             Build::Stable | Build::Lts | Build::Archived => {
+                // TODO: Change to the `version_compare` crate for the version.
                 natord::compare_ignore_case(&self.version, &other.version).reverse()
             }
         }
