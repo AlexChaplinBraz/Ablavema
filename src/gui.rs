@@ -1766,8 +1766,8 @@ impl Package {
                     )
                     .push(
                         Text::new(match self.status {
-                            PackageStatus::Update => "UPDATE",
-                            PackageStatus::New => "NEW",
+                            PackageStatus::Update => "UPDATE       ",
+                            PackageStatus::New => "NEW       ",
                             PackageStatus::Old => "",
                         })
                         .size(20),
