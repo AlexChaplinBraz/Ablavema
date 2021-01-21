@@ -1378,6 +1378,7 @@ impl Controls {
                 None,
                 None,
             ))
+            .push(Rule::horizontal(5).style(theme))
             .push(filter_row(
                 self.filters.all,
                 String::from("All"),
