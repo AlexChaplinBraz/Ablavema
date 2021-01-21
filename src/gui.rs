@@ -1109,6 +1109,8 @@ struct Controls {
     sorting_pick_list: pick_list::State<SortBy>,
     // TODO: Maybe add booleans for each button so when it's fetching
     // the related buttons are disabled, maybe with some special styling.
+    // Definitely needed, since spamming `Check for updates` can easily
+    // lead to a temp ban, apart from weird behaviour.
     check_for_updates_button: button::State,
     show_updates_button: button::State,
     return_to_filters_button: button::State,

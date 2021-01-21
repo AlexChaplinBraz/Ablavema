@@ -14,7 +14,7 @@ use std::{str::FromStr, sync::atomic::Ordering};
 use tokio::fs::remove_dir_all;
 
 pub async fn run_cli() -> GuiFlags {
-    let (mut releases, loaded) = Releases::init().await;
+    let (mut releases, initialised) = Releases::init().await;
 
     // Workaround for 'clap' not supporting colours on Windows,
     // even though 'indicatif' does display colours on Windows.
@@ -647,41 +647,31 @@ pub async fn run_cli() -> GuiFlags {
         ("fetch", Some(a)) => {
             if a.is_present("all") {
                 releases.daily = Releases::check_daily_updates(releases.daily).await.1;
-                releases.daily.save();
                 releases.branched = Releases::check_branched_updates(releases.branched).await.1;
-                releases.branched.save();
                 releases.stable = Releases::check_stable_updates(releases.stable).await.1;
-                releases.stable.save();
                 releases.lts = Releases::check_lts_updates(releases.lts).await.1;
-                releases.lts.save();
                 releases.archived = Releases::check_archived_updates(releases.archived).await.1;
-                releases.archived.save();
             } else {
                 if a.is_present("daily") {
                     releases.daily = Releases::check_daily_updates(releases.daily.take()).await.1;
-                    releases.daily.save();
                 }
                 if a.is_present("branched") {
                     releases.branched = Releases::check_branched_updates(releases.branched.take())
                         .await
                         .1;
-                    releases.branched.save();
                 }
                 if a.is_present("stable") {
                     releases.stable = Releases::check_stable_updates(releases.stable.take())
                         .await
                         .1;
-                    releases.stable.save();
                 }
                 if a.is_present("lts") {
                     releases.lts = Releases::check_lts_updates(releases.lts.take()).await.1;
-                    releases.lts.save();
                 }
                 if a.is_present("archived") {
                     releases.archived = Releases::check_archived_updates(releases.archived.take())
                         .await
                         .1;
-                    releases.archived.save();
                 }
             }
         }
@@ -876,38 +866,23 @@ pub async fn run_cli() -> GuiFlags {
         }
         ("update", Some(_a)) => {
             let packages = Releases::check_updates(releases.take()).await;
-
-            if packages.0 {
-                releases.add_new_packages(packages);
-                releases.daily.save();
-                releases.branched.save();
-                releases.stable.save();
-                releases.lts.save();
-                releases.cli_install_updates().await;
-            } else {
-                releases.add_new_packages(packages);
-                releases.cli_install_updates().await;
-            }
+            releases.add_new_packages(packages);
+            releases.cli_install_updates().await;
         }
         _ => {
             ONLY_CLI.store(false, Ordering::Relaxed);
 
-            if SETTINGS.read().unwrap().check_updates_at_launch && loaded {
+            if SETTINGS.read().unwrap().check_updates_at_launch && !initialised {
                 if is_time_to_update() {
                     let packages = Releases::check_updates(releases.take()).await;
 
+                    // This only launches the GUI when new packages were found for the first time.
+                    // Meaning it won't pop the GUI again if the user chose to ignore them.
                     if packages.0 {
-                        // This only launches the GUI when new packages were found for the firs time.
-                        // Meaning it won't pop the GUI again if the user chose to ignore them.
                         LAUNCH_GUI.store(true, Ordering::Relaxed);
-                        releases.add_new_packages(packages);
-                        releases.daily.save();
-                        releases.branched.save();
-                        releases.stable.save();
-                        releases.lts.save();
-                    } else {
-                        releases.add_new_packages(packages);
                     }
+
+                    releases.add_new_packages(packages);
                 } else {
                     println!("Not the time to check for updates yet.");
                 }

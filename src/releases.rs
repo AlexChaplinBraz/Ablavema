@@ -34,82 +34,62 @@ pub struct Releases {
 
 impl Releases {
     /// Load databases and sync them with installed packages,
-    /// Returning Releases and true if loaded without initialising.
+    /// returning Releases and true if initialised.
     pub async fn init() -> (Releases, bool) {
         initialize(&SETTINGS);
         let mut releases = Releases::default();
-        let loaded = releases.load_all().await;
+        let initialised = releases.load_all().await;
         releases.sync();
-        (releases, loaded)
+        (releases, initialised)
     }
 
     /// Load all databases, or initialise them if non-existent.
     /// Also reinitialises databases if the Package struct changed.
-    /// Returns true if loaded without initialising.
+    /// Returns true if initialised.
     async fn load_all(&mut self) -> bool {
-        let mut loaded = true;
+        let mut initialised = false;
 
         if self.daily.get_db_path().exists() {
             if self.daily.load() {
-                self.daily.init().await;
-                self.daily.save();
-                loaded = false;
+                initialised = self.daily.init().await;
             }
         } else {
-            self.daily.init().await;
-            self.daily.save();
-            loaded = false;
+            initialised = self.daily.init().await;
         }
 
         if self.branched.get_db_path().exists() {
             if self.branched.load() {
-                self.branched.init().await;
-                self.branched.save();
-                loaded = false;
+                initialised = self.branched.init().await;
             }
         } else {
-            self.branched.init().await;
-            self.branched.save();
-            loaded = false;
+            initialised = self.branched.init().await;
         }
 
         if self.stable.get_db_path().exists() {
             if self.stable.load() {
-                self.stable.init().await;
-                self.stable.save();
-                loaded = false;
+                initialised = self.stable.init().await;
             }
         } else {
-            self.stable.init().await;
-            self.stable.save();
-            loaded = false;
+            initialised = self.stable.init().await;
         }
 
         if self.lts.get_db_path().exists() {
             if self.lts.load() {
-                self.lts.init().await;
-                self.lts.save();
-                loaded = false;
+                initialised = self.lts.init().await;
             }
         } else {
-            self.lts.init().await;
-            self.lts.save();
-            loaded = false;
+            initialised = self.lts.init().await;
         }
 
         if self.archived.get_db_path().exists() {
             if self.archived.load() {
-                self.archived.init().await;
-                self.archived.save();
-                loaded = false;
+                initialised = self.archived.init().await;
             }
         } else {
-            self.archived.init().await;
-            self.archived.save();
-            loaded = false;
+            initialised = self.archived.init().await;
         }
 
-        loaded
+        initialised
     }
 
     /// Refreshes the state and status of all packages.
@@ -208,6 +188,7 @@ impl Releases {
                 println!("Found:");
                 daily.add_new_packages(new_packages);
                 daily.remove_dead_packages().await;
+                daily.save();
                 (true, daily)
             }
             None => {
@@ -224,6 +205,7 @@ impl Releases {
                 println!("Found:");
                 branched.add_new_packages(new_packages);
                 branched.remove_dead_packages().await;
+                branched.save();
                 (true, branched)
             }
             None => {
@@ -239,6 +221,7 @@ impl Releases {
             Some(new_packages) => {
                 println!("Found:");
                 stable.add_new_packages(new_packages);
+                stable.save();
                 (true, stable)
             }
             None => {
@@ -254,6 +237,7 @@ impl Releases {
             Some(new_packages) => {
                 println!("Found:");
                 lts.add_new_packages(new_packages);
+                lts.save();
                 (true, lts)
             }
             None => {
@@ -269,6 +253,7 @@ impl Releases {
             Some(new_packages) => {
                 println!("Found:");
                 archived.add_new_packages(new_packages);
+                archived.save();
                 (true, archived)
             }
             None => {
@@ -546,13 +531,16 @@ pub trait ReleaseType:
 
     fn get_name(&self) -> String;
 
-    async fn init(&mut self) {
+    /// Fetches packages and saves them. Always returns true.
+    async fn init(&mut self) -> bool {
         print!(
             "No database for {} packages found. Fetching... ",
             self.get_name()
         );
         *self = Self::fetch().await;
+        self.save();
         println!("Done");
+        true
     }
 
     fn get_db_path(&self) -> PathBuf;
