@@ -157,6 +157,91 @@ impl Application for Gui {
                     None => unreachable!("Index out of bounds"),
                 }
             }
+            Message::Bookmark(package) => {
+                match package.build {
+                    Build::Daily(_) => {
+                        match self
+                            .releases
+                            .daily
+                            .iter_mut()
+                            .find(|a_package| **a_package == package)
+                        {
+                            Some(found_package) => {
+                                found_package.bookmarked = !found_package.bookmarked;
+                                self.releases.daily.save();
+                            }
+                            None => {
+                                unreachable!("Couldn't find daily package to bookmark");
+                            }
+                        }
+                    }
+                    Build::Branched(_) => {
+                        match self
+                            .releases
+                            .branched
+                            .iter_mut()
+                            .find(|a_package| **a_package == package)
+                        {
+                            Some(found_package) => {
+                                found_package.bookmarked = !found_package.bookmarked;
+                                self.releases.branched.save();
+                            }
+                            None => {
+                                unreachable!("Couldn't find branched package to bookmark");
+                            }
+                        }
+                    }
+                    Build::Stable => {
+                        match self
+                            .releases
+                            .stable
+                            .iter_mut()
+                            .find(|a_package| **a_package == package)
+                        {
+                            Some(found_package) => {
+                                found_package.bookmarked = !found_package.bookmarked;
+                                self.releases.stable.save();
+                            }
+                            None => {
+                                unreachable!("Couldn't find stable package to bookmark");
+                            }
+                        }
+                    }
+                    Build::Lts => {
+                        match self
+                            .releases
+                            .lts
+                            .iter_mut()
+                            .find(|a_package| **a_package == package)
+                        {
+                            Some(found_package) => {
+                                found_package.bookmarked = !found_package.bookmarked;
+                                self.releases.lts.save();
+                            }
+                            None => {
+                                unreachable!("Couldn't find LTS package to bookmark");
+                            }
+                        }
+                    }
+                    Build::Archived => {
+                        match self
+                            .releases
+                            .archived
+                            .iter_mut()
+                            .find(|a_package| **a_package == package)
+                        {
+                            Some(found_package) => {
+                                found_package.bookmarked = !found_package.bookmarked;
+                                self.releases.archived.save();
+                            }
+                            None => {
+                                unreachable!("Couldn't find archived package to bookmark");
+                            }
+                        }
+                    }
+                }
+                Command::none()
+            }
             Message::TryToInstall(package) => {
                 let message = match package.build {
                     Build::Daily(_) => {
@@ -457,6 +542,7 @@ impl Application for Gui {
             Message::FilterUpdatesChanged(change) => {
                 if change {
                     self.state.controls.filters.updates = true;
+                    self.state.controls.filters.bookmarks = false;
                     self.state.controls.filters.installed = false;
                 } else {
                     self.state.controls.filters.updates = false;
@@ -465,10 +551,24 @@ impl Application for Gui {
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
+
+            Message::FilterBookmarksChanged(change) => {
+                if change {
+                    self.state.controls.filters.updates = false;
+                    self.state.controls.filters.bookmarks = true;
+                    self.state.controls.filters.installed = false;
+                } else {
+                    self.state.controls.filters.bookmarks = false;
+                }
+                SETTINGS.write().unwrap().filters = self.state.controls.filters;
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
             Message::FilterInstalledChanged(change) => {
                 if change {
-                    self.state.controls.filters.installed = true;
                     self.state.controls.filters.updates = false;
+                    self.state.controls.filters.bookmarks = false;
+                    self.state.controls.filters.installed = true;
                 } else {
                     self.state.controls.filters.installed = false;
                 }
@@ -1070,6 +1170,7 @@ impl Executor for GlobalTokio {
 #[derive(Clone, Debug)]
 pub enum Message {
     PackageMessage(usize, PackageMessage),
+    Bookmark(Package),
     TryToInstall(Package),
     CheckAvailability((bool, bool, Package)),
     InstallPackage(Package),
@@ -1092,6 +1193,7 @@ pub enum Message {
     FetchArchived,
     ArchivedFetched((bool, Archived)),
     FilterUpdatesChanged(bool),
+    FilterBookmarksChanged(bool),
     FilterInstalledChanged(bool),
     FilterAllChanged(bool),
     FilterDailyChanged(bool),
@@ -1263,6 +1365,13 @@ impl Controls {
                 None,
             ))
             .push(filter_row(
+                self.filters.bookmarks,
+                String::from("Bookmarks"),
+                Message::FilterBookmarksChanged,
+                None,
+                None,
+            ))
+            .push(filter_row(
                 self.filters.installed,
                 String::from("Installed"),
                 Message::FilterInstalledChanged,
@@ -1364,6 +1473,7 @@ impl Controls {
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct Filters {
     updates: bool,
+    bookmarks: bool,
     installed: bool,
     all: bool,
     daily: bool,
@@ -1384,6 +1494,15 @@ impl Filters {
                 Build::Stable if self.stable && package.status == PackageStatus::Update => true,
                 Build::Lts if self.lts && package.status == PackageStatus::Update => true,
                 Build::Archived if self.archived && package.status == PackageStatus::Update => true,
+                _ => false,
+            }
+        } else if self.bookmarks {
+            match package.build {
+                Build::Daily(_) if self.daily && package.bookmarked => true,
+                Build::Branched(_) if self.branched && package.bookmarked => true,
+                Build::Stable if self.stable && package.bookmarked => true,
+                Build::Lts if self.lts && package.bookmarked => true,
+                Build::Archived if self.archived && package.bookmarked => true,
                 _ => false,
             }
         } else if self.installed {
@@ -1440,6 +1559,7 @@ impl Default for Filters {
     fn default() -> Self {
         Self {
             updates: false,
+            bookmarks: false,
             installed: false,
             all: true,
             daily: true,
@@ -1534,6 +1654,7 @@ pub enum PackageMessage {
     OpenBlenderWithFile,
     SetDefault,
     UnsetDefault,
+    Bookmark,
 }
 
 impl Package {
@@ -1595,6 +1716,9 @@ impl Package {
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
+            PackageMessage::Bookmark => {
+                Command::perform(Gui::pass_package(self.clone()), Message::Bookmark)
+            }
         }
     }
 
@@ -1604,11 +1728,22 @@ impl Package {
         theme: Theme,
         is_odd: bool,
     ) -> Element<'_, PackageMessage> {
+        let is_default_package = SETTINGS.read().unwrap().default_package.is_some()
+            && SETTINGS.read().unwrap().default_package.clone().unwrap() == *self;
+
         let name = Row::new()
             .spacing(10)
             .push(Text::new(&self.name).size(26).width(Length::Fill))
-            // TODO: Add favourites system.
-            .push(Text::new("[B]"));
+            .push(
+                Button::new(
+                    &mut self.bookmark_button,
+                    Text::new(if self.bookmarked { "[B]" } else { "[M]" })
+                        .size(18)
+                        .horizontal_alignment(HorizontalAlignment::Center),
+                )
+                .on_press(PackageMessage::Bookmark)
+                .style(theme),
+            );
 
         let details = Column::new()
             .push(
@@ -1660,9 +1795,6 @@ impl Package {
                 button
             }
         };
-
-        let is_default_package = SETTINGS.read().unwrap().default_package.is_some()
-            && SETTINGS.read().unwrap().default_package.clone().unwrap() == *self;
 
         let controls: Element<'_, PackageMessage> = match &mut self.state {
             PackageState::Fetched { install_button } => Row::new()

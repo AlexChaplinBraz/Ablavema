@@ -35,6 +35,9 @@ pub struct Package {
     pub url: String,
     pub os: Os,
     pub changelog: Vec<Change>,
+    pub bookmarked: bool,
+    #[serde(skip)]
+    pub bookmark_button: button::State,
     #[serde(skip)]
     pub state: PackageState,
     #[serde(skip)]
@@ -338,6 +341,8 @@ impl Default for Package {
             url: String::default(),
             os: Os::Linux,
             changelog: Vec::default(),
+            bookmarked: false,
+            bookmark_button: Default::default(),
             state: PackageState::default(),
             status: PackageStatus::default(),
         }
