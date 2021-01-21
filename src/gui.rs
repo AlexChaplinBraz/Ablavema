@@ -104,9 +104,19 @@ impl Application for Gui {
     type Flags = GuiFlags;
 
     fn new(flags: Self::Flags) -> (Self, Command<Message>) {
+        let releases = flags.releases;
+
+        let default_package = SETTINGS.read().unwrap().default_package.clone();
+        if let Some(package) = default_package {
+            if !releases.installed.contains(&package) {
+                SETTINGS.write().unwrap().default_package = None;
+                SETTINGS.read().unwrap().save();
+            }
+        }
+
         (
             Gui {
-                releases: flags.releases,
+                releases,
                 file_path: flags.file_path,
                 installing: Vec::default(),
                 state: GuiState::new(),
