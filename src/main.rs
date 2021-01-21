@@ -13,6 +13,7 @@ use crate::{
     helpers::open_blender,
     settings::{LAUNCH_GUI, ONLY_CLI, SETTINGS},
 };
+use helpers::check_connection;
 use iced::Application;
 use std::sync::atomic::Ordering;
 
@@ -27,6 +28,8 @@ async fn main() {
         use winapi::um::wincon;
         unsafe { wincon::AttachConsole(wincon::ATTACH_PARENT_PROCESS) };
     }
+
+    check_connection().await;
 
     // TODO: Error handling.
     run().await;

@@ -20,7 +20,7 @@ use std::{
 
 /// The idea is to test whether there's a working connection to the download servers,
 /// using the resulting boolean to disable related functionality and avoid crashing the program.
-pub async fn _check_connection() {
+pub async fn check_connection() {
     // TODO: Investigate why this sometimes, very rarely, returns `false`.
     // Even though it then proceeds to download just fine.
     // I remember getting an "Unable to reach" type error in the browser for url1 a few times
@@ -31,9 +31,9 @@ pub async fn _check_connection() {
     // This may be a solution to the above problem.
     // TODO: Consider running this function every time a related button is pressed.
     // Just in case connection is lost while the launcher was open.
-    let url1 = "https://ftp.nluug.nl/pub/graphics/blender/release/";
-    let url2 = "https://builder.blender.org/download/";
-    let url3 = "https://www.blender.org/download/";
+    let url1 = "https://builder.blender.org/download/";
+    let url2 = "https://www.blender.org/download/";
+    let url3 = "https://ftp.nluug.nl/pub/graphics/blender/release/";
 
     let client = ClientBuilder::new()
         .connect_timeout(Duration::from_secs(1))
@@ -191,42 +191,46 @@ pub fn is_time_to_update() -> bool {
 }
 
 pub async fn cli_install(args: &ArgMatches<'_>, packages: &Vec<Package>, name: &str) {
-    let multi_progress = MultiProgress::new();
-    let flags = (args.is_present("reinstall"), args.is_present("redownload"));
-    let mut values = Vec::new();
+    if CAN_CONNECT.load(Ordering::Relaxed) {
+        let multi_progress = MultiProgress::new();
+        let flags = (args.is_present("reinstall"), args.is_present("redownload"));
+        let mut values = Vec::new();
 
-    for build in args.values_of("id").unwrap() {
-        if values.contains(&build.to_string()) {
-            continue;
+        for build in args.values_of("id").unwrap() {
+            if values.contains(&build.to_string()) {
+                continue;
+            }
+            values.push(build.to_string());
+
+            if args.is_present("name") {
+                match packages.iter().find(|package| package.name == build) {
+                    Some(a) => a.cli_install(&multi_progress, &flags).await,
+                    None => {
+                        println!("No {} package named '{}' found.", name, build);
+                        continue;
+                    }
+                }
+            } else {
+                let build = usize::from_str(build).unwrap();
+
+                match packages
+                    .iter()
+                    .enumerate()
+                    .find(|(index, _)| *index == build)
+                {
+                    Some(a) => a.1.cli_install(&multi_progress, &flags).await,
+                    None => {
+                        println!("No {} package with ID '{}' found.", name, build);
+                        continue;
+                    }
+                }
+            };
         }
-        values.push(build.to_string());
 
-        if args.is_present("name") {
-            match packages.iter().find(|package| package.name == build) {
-                Some(a) => a.cli_install(&multi_progress, &flags).await,
-                None => {
-                    println!("No {} package named '{}' found.", name, build);
-                    continue;
-                }
-            }
-        } else {
-            let build = usize::from_str(build).unwrap();
-
-            match packages
-                .iter()
-                .enumerate()
-                .find(|(index, _)| *index == build)
-            {
-                Some(a) => a.1.cli_install(&multi_progress, &flags).await,
-                None => {
-                    println!("No {} package with ID '{}' found.", name, build);
-                    continue;
-                }
-            }
-        };
+        multi_progress.join().unwrap();
+    } else {
+        println!("Error: Failed to connect to servers.");
     }
-
-    multi_progress.join().unwrap();
 }
 
 pub fn cli_list_narrow(packages: &Vec<Package>, name: &str, invert: bool) {

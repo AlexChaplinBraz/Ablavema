@@ -3,7 +3,7 @@ use crate::{
     gui::GuiFlags,
     helpers::{cli_install, cli_list_narrow, cli_list_wide, is_time_to_update, process_bool_arg},
     releases::{ReleaseType, Releases},
-    settings::{ModifierKey, LAUNCH_GUI, ONLY_CLI, SETTINGS},
+    settings::{ModifierKey, CAN_CONNECT, LAUNCH_GUI, ONLY_CLI, SETTINGS},
 };
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
@@ -645,34 +645,41 @@ pub async fn run_cli() -> GuiFlags {
             SETTINGS.read().unwrap().save();
         }
         ("fetch", Some(a)) => {
-            if a.is_present("all") {
-                releases.daily = Releases::check_daily_updates(releases.daily).await.1;
-                releases.branched = Releases::check_branched_updates(releases.branched).await.1;
-                releases.stable = Releases::check_stable_updates(releases.stable).await.1;
-                releases.lts = Releases::check_lts_updates(releases.lts).await.1;
-                releases.archived = Releases::check_archived_updates(releases.archived).await.1;
+            if CAN_CONNECT.load(Ordering::Relaxed) {
+                if a.is_present("all") {
+                    releases.daily = Releases::check_daily_updates(releases.daily).await.1;
+                    releases.branched = Releases::check_branched_updates(releases.branched).await.1;
+                    releases.stable = Releases::check_stable_updates(releases.stable).await.1;
+                    releases.lts = Releases::check_lts_updates(releases.lts).await.1;
+                    releases.archived = Releases::check_archived_updates(releases.archived).await.1;
+                } else {
+                    if a.is_present("daily") {
+                        releases.daily =
+                            Releases::check_daily_updates(releases.daily.take()).await.1;
+                    }
+                    if a.is_present("branched") {
+                        releases.branched =
+                            Releases::check_branched_updates(releases.branched.take())
+                                .await
+                                .1;
+                    }
+                    if a.is_present("stable") {
+                        releases.stable = Releases::check_stable_updates(releases.stable.take())
+                            .await
+                            .1;
+                    }
+                    if a.is_present("lts") {
+                        releases.lts = Releases::check_lts_updates(releases.lts.take()).await.1;
+                    }
+                    if a.is_present("archived") {
+                        releases.archived =
+                            Releases::check_archived_updates(releases.archived.take())
+                                .await
+                                .1;
+                    }
+                }
             } else {
-                if a.is_present("daily") {
-                    releases.daily = Releases::check_daily_updates(releases.daily.take()).await.1;
-                }
-                if a.is_present("branched") {
-                    releases.branched = Releases::check_branched_updates(releases.branched.take())
-                        .await
-                        .1;
-                }
-                if a.is_present("stable") {
-                    releases.stable = Releases::check_stable_updates(releases.stable.take())
-                        .await
-                        .1;
-                }
-                if a.is_present("lts") {
-                    releases.lts = Releases::check_lts_updates(releases.lts.take()).await.1;
-                }
-                if a.is_present("archived") {
-                    releases.archived = Releases::check_archived_updates(releases.archived.take())
-                        .await
-                        .1;
-                }
+                println!("Error: Failed to connect to server.");
             }
         }
         ("install", Some(a)) => match a.subcommand() {
@@ -865,24 +872,32 @@ pub async fn run_cli() -> GuiFlags {
             }
         }
         ("update", Some(_a)) => {
-            let packages = Releases::check_updates(releases.take()).await;
-            releases.add_new_packages(packages);
-            releases.cli_install_updates().await;
+            if CAN_CONNECT.load(Ordering::Relaxed) {
+                let packages = Releases::check_updates(releases.take()).await;
+                releases.add_new_packages(packages);
+                releases.cli_install_updates().await;
+            } else {
+                println!("Error: Failed to connect to server.");
+            }
         }
         _ => {
             ONLY_CLI.store(false, Ordering::Relaxed);
 
             if SETTINGS.read().unwrap().check_updates_at_launch && !initialised {
                 if is_time_to_update() {
-                    let packages = Releases::check_updates(releases.take()).await;
+                    if CAN_CONNECT.load(Ordering::Relaxed) {
+                        let packages = Releases::check_updates(releases.take()).await;
 
-                    // This only launches the GUI when new packages were found for the first time.
-                    // Meaning it won't pop the GUI again if the user chose to ignore them.
-                    if packages.0 {
-                        LAUNCH_GUI.store(true, Ordering::Relaxed);
+                        // This only launches the GUI when new packages were found for the first time.
+                        // Meaning it won't pop the GUI again if the user chose to ignore them.
+                        if packages.0 {
+                            LAUNCH_GUI.store(true, Ordering::Relaxed);
+                        }
+
+                        releases.add_new_packages(packages);
+                    } else {
+                        println!("Failed to connect to server and check for updates.");
                     }
-
-                    releases.add_new_packages(packages);
                 } else {
                     println!("Not the time to check for updates yet.");
                 }

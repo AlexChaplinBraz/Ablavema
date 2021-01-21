@@ -51,6 +51,13 @@ impl Theme {
             Theme::Dark => dark::ContainerEven.into(),
         }
     }
+
+    pub fn status_container(&self) -> Box<dyn container::StyleSheet> {
+        match self {
+            Theme::Light => light::ContainerStatus.into(),
+            Theme::Dark => dark::ContainerStatus.into(),
+        }
+    }
 }
 
 impl Default for Theme {
@@ -207,6 +214,18 @@ mod light {
         }
     }
 
+    pub struct ContainerStatus;
+
+    impl container::StyleSheet for ContainerStatus {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Color::from_rgb8(255, 0, 0).into(),
+                text_color: Color::WHITE.into(),
+                ..container::Style::default()
+            }
+        }
+    }
+
     pub struct Button;
 
     impl button::StyleSheet for Button {
@@ -326,6 +345,18 @@ pub mod dark {
         fn style(&self) -> container::Style {
             container::Style {
                 background: Color::from_rgb8(45, 45, 45).into(),
+                text_color: Color::WHITE.into(),
+                ..container::Style::default()
+            }
+        }
+    }
+
+    pub struct ContainerStatus;
+
+    impl container::StyleSheet for ContainerStatus {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Color::from_rgb8(255, 0, 0).into(),
                 text_color: Color::WHITE.into(),
                 ..container::Style::default()
             }

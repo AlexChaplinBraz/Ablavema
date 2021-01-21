@@ -12,7 +12,7 @@ use crate::{
         archived::Archived, branched::Branched, daily::Daily, lts::Lts, stable::Stable,
         ReleaseType, Releases,
     },
-    settings::{ModifierKey, SETTINGS},
+    settings::{ModifierKey, CAN_CONNECT, SETTINGS},
 };
 use iced::{
     button, pick_list, scrollable, slider, Align, Application, Button, Checkbox, Column, Command,
@@ -22,7 +22,7 @@ use iced::{
 use itertools::Itertools;
 use reqwest;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, iter, process};
+use std::{fmt::Display, iter, process, sync::atomic::Ordering};
 
 #[derive(Debug)]
 pub struct Gui {
@@ -802,14 +802,17 @@ impl Application for Gui {
                     }
                 };
 
-                Column::new()
-                    .push(info)
-                    .push(
+                Container::new(
+                    Column::new().push(info).push(
                         Row::new()
                             .push(self.state.controls.view(update_count, theme))
                             .push(packages),
-                    )
-                    .into()
+                    ),
+                )
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .style(theme)
+                .into()
             }
             Tab::Settings => {
                 macro_rules! choice_setting {
@@ -996,8 +999,22 @@ impl Application for Gui {
                 .into(),
         };
 
-        // TODO: Add a small red banner at the bottom whenever there's no connection.
-        Column::new().push(tabs).push(body).into()
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            Column::new().push(tabs).push(body).into()
+        } else {
+            Column::new()
+                .push(tabs)
+                .push(body)
+                .push(
+                    Container::new(Text::new("CANNOT CONNECT").size(10))
+                        .width(Length::Fill)
+                        .height(Length::Units(14))
+                        .center_x()
+                        .center_y()
+                        .style(self.theme.status_container()),
+                )
+                .into()
+        }
     }
 }
 
@@ -1134,7 +1151,7 @@ impl Controls {
         ),
         theme: Theme,
     ) -> Container<'_, Message> {
-        let button = |label, package_message: Option<Message>, state| {
+        let button = |label, button_message: Option<Message>, state| {
             let button = Button::new(
                 state,
                 Text::new(label)
@@ -1144,8 +1161,8 @@ impl Controls {
             .width(Length::Units(200))
             .style(theme);
 
-            if package_message.is_some() {
-                button.on_press(package_message.unwrap())
+            if button_message.is_some() && CAN_CONNECT.load(Ordering::Relaxed) {
+                button.on_press(button_message.unwrap())
             } else {
                 button
             }
@@ -1171,16 +1188,21 @@ impl Controls {
                         .style(theme),
                 );
             match state {
-                Some(state) => row.push(
-                    Button::new(
+                Some(state) => {
+                    let button = Button::new(
                         state,
                         Text::new("[O]")
                             .size(16)
                             .horizontal_alignment(HorizontalAlignment::Center),
                     )
-                    .on_press(button_message.unwrap())
-                    .style(theme),
-                ),
+                    .style(theme);
+
+                    if button_message.is_some() && CAN_CONNECT.load(Ordering::Relaxed) {
+                        row.push(button.on_press(button_message.unwrap()))
+                    } else {
+                        row.push(button)
+                    }
+                }
                 None => row,
             }
         };
@@ -1286,7 +1308,7 @@ impl Controls {
 
         Container::new(
             Column::new()
-                .spacing(30)
+                .spacing(20)
                 .push(update)
                 .push(filters)
                 .push(sorting),
@@ -1606,7 +1628,11 @@ impl Package {
             PackageState::Fetched { install_button } => Row::new()
                 .push(button(
                     "[#] Install",
-                    Some(PackageMessage::Install),
+                    if CAN_CONNECT.load(Ordering::Relaxed) {
+                        Some(PackageMessage::Install)
+                    } else {
+                        None
+                    },
                     install_button,
                 ))
                 .into(),

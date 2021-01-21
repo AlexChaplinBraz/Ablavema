@@ -21,7 +21,6 @@ use std::{
 
 const CONFIG_NAME: &str = "config.bin";
 static PORTABLE: AtomicBool = AtomicBool::new(false);
-// TODO: Use this to lock GUI buttons and CLI functionality.
 pub static CAN_CONNECT: AtomicBool = AtomicBool::new(true);
 pub static ONLY_CLI: AtomicBool = AtomicBool::new(true);
 pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
