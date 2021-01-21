@@ -33,66 +33,83 @@ pub struct Releases {
 }
 
 impl Releases {
-    /// Load databases and sync them with installed packages.
-    pub async fn init() -> Releases {
+    /// Load databases and sync them with installed packages,
+    /// Returning Releases and true if loaded without initialising.
+    pub async fn init() -> (Releases, bool) {
         initialize(&SETTINGS);
         let mut releases = Releases::default();
-        releases.load_all().await;
+        let loaded = releases.load_all().await;
         releases.sync();
-        releases
+        (releases, loaded)
     }
 
     /// Load all databases, or initialise them if non-existent.
-    async fn load_all(&mut self) {
+    /// Also reinitialises databases if the Package struct changed.
+    /// Returns true if loaded without initialising.
+    async fn load_all(&mut self) -> bool {
+        let mut loaded = true;
+
         if self.daily.get_db_path().exists() {
             if self.daily.load() {
                 self.daily.init().await;
                 self.daily.save();
+                loaded = false;
             }
         } else {
             self.daily.init().await;
             self.daily.save();
+            loaded = false;
         }
 
         if self.branched.get_db_path().exists() {
             if self.branched.load() {
                 self.branched.init().await;
                 self.branched.save();
+                loaded = false;
             }
         } else {
             self.branched.init().await;
             self.branched.save();
+            loaded = false;
         }
 
         if self.stable.get_db_path().exists() {
             if self.stable.load() {
                 self.stable.init().await;
                 self.stable.save();
+                loaded = false;
             }
         } else {
             self.stable.init().await;
             self.stable.save();
+            loaded = false;
         }
 
         if self.lts.get_db_path().exists() {
             if self.lts.load() {
                 self.lts.init().await;
                 self.lts.save();
+                loaded = false;
             }
         } else {
             self.lts.init().await;
             self.lts.save();
+            loaded = false;
         }
 
         if self.archived.get_db_path().exists() {
             if self.archived.load() {
                 self.archived.init().await;
                 self.archived.save();
+                loaded = false;
             }
         } else {
             self.archived.init().await;
             self.archived.save();
+            loaded = false;
         }
+
+        loaded
     }
 
     /// Refreshes the state and status of all packages.

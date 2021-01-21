@@ -14,7 +14,7 @@ use std::{str::FromStr, sync::atomic::Ordering};
 use tokio::fs::remove_dir_all;
 
 pub async fn run_cli() -> GuiFlags {
-    let mut releases = Releases::init().await;
+    let (mut releases, loaded) = Releases::init().await;
 
     // Workaround for 'clap' not supporting colours on Windows,
     // even though 'indicatif' does display colours on Windows.
@@ -892,7 +892,7 @@ pub async fn run_cli() -> GuiFlags {
         _ => {
             ONLY_CLI.store(false, Ordering::Relaxed);
 
-            if SETTINGS.read().unwrap().check_updates_at_launch {
+            if SETTINGS.read().unwrap().check_updates_at_launch && loaded {
                 if is_time_to_update() {
                     let packages = Releases::check_updates(releases.take()).await;
 
