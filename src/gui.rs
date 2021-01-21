@@ -360,70 +360,98 @@ impl Application for Gui {
                 open_blender(package.name, Some(self.file_path.clone().unwrap()));
                 process::exit(0);
             }
-            Message::CheckForUpdates => Command::perform(
-                Gui::check_for_updates(self.releases.take()),
-                Message::UpdatesChecked,
-            ),
+            Message::CheckForUpdates => {
+                self.state.controls.checking_for_updates = true;
+                Command::perform(
+                    Gui::check_for_updates(self.releases.take()),
+                    Message::UpdatesChecked,
+                )
+            }
             Message::UpdatesChecked(tuple) => {
                 self.releases.add_new_packages(tuple);
+                self.state.controls.checking_for_updates = false;
                 Command::none()
             }
-            Message::FetchAll => Command::perform(
-                Gui::check_all(
-                    self.releases.daily.take(),
-                    self.releases.branched.take(),
-                    self.releases.stable.take(),
-                    self.releases.lts.take(),
-                    self.releases.archived.take(),
-                ),
-                Message::AllFetched,
-            ),
+            Message::FetchAll => {
+                self.state.controls.checking_for_updates = true;
+                Command::perform(
+                    Gui::check_all(
+                        self.releases.daily.take(),
+                        self.releases.branched.take(),
+                        self.releases.stable.take(),
+                        self.releases.lts.take(),
+                        self.releases.archived.take(),
+                    ),
+                    Message::AllFetched,
+                )
+            }
             Message::AllFetched((_, daily, branched, stable, lts, archived)) => {
                 self.releases.daily = daily;
                 self.releases.branched = branched;
                 self.releases.stable = stable;
                 self.releases.lts = lts;
                 self.releases.archived = archived;
+                self.state.controls.checking_for_updates = false;
                 Command::none()
             }
-            Message::FetchDaily => Command::perform(
-                Gui::check_daily(self.releases.daily.take()),
-                Message::DailyFetched,
-            ),
+            Message::FetchDaily => {
+                self.state.controls.checking_for_updates = true;
+                Command::perform(
+                    Gui::check_daily(self.releases.daily.take()),
+                    Message::DailyFetched,
+                )
+            }
             Message::DailyFetched((_, daily)) => {
                 self.releases.daily = daily;
+                self.state.controls.checking_for_updates = false;
                 Command::none()
             }
-            Message::FetchBranched => Command::perform(
-                Gui::check_branched(self.releases.branched.take()),
-                Message::BranchedFetched,
-            ),
+            Message::FetchBranched => {
+                self.state.controls.checking_for_updates = true;
+                Command::perform(
+                    Gui::check_branched(self.releases.branched.take()),
+                    Message::BranchedFetched,
+                )
+            }
             Message::BranchedFetched((_, branched)) => {
                 self.releases.branched = branched;
+                self.state.controls.checking_for_updates = false;
                 Command::none()
             }
-            Message::FetchStable => Command::perform(
-                Gui::check_stable(self.releases.stable.take()),
-                Message::StableFetched,
-            ),
+            Message::FetchStable => {
+                self.state.controls.checking_for_updates = true;
+                Command::perform(
+                    Gui::check_stable(self.releases.stable.take()),
+                    Message::StableFetched,
+                )
+            }
             Message::StableFetched((_, stable)) => {
                 self.releases.stable = stable;
+                self.state.controls.checking_for_updates = false;
                 Command::none()
             }
-            Message::FetchLts => Command::perform(
-                Gui::check_lts(self.releases.lts.take()),
-                Message::LtsFetched,
-            ),
+            Message::FetchLts => {
+                self.state.controls.checking_for_updates = true;
+                Command::perform(
+                    Gui::check_lts(self.releases.lts.take()),
+                    Message::LtsFetched,
+                )
+            }
             Message::LtsFetched((_, lts)) => {
                 self.releases.lts = lts;
+                self.state.controls.checking_for_updates = false;
                 Command::none()
             }
-            Message::FetchArchived => Command::perform(
-                Gui::check_archived(self.releases.archived.take()),
-                Message::ArchivedFetched,
-            ),
+            Message::FetchArchived => {
+                self.state.controls.checking_for_updates = true;
+                Command::perform(
+                    Gui::check_archived(self.releases.archived.take()),
+                    Message::ArchivedFetched,
+                )
+            }
             Message::ArchivedFetched((_, archived)) => {
                 self.releases.archived = archived;
+                self.state.controls.checking_for_updates = false;
                 Command::none()
             }
             Message::FilterUpdatesChanged(change) => {
@@ -785,14 +813,20 @@ impl Application for Gui {
                         Scrollable::new(&mut self.state.packages_scroll).push(filtered_packages);
 
                     if package_count == 0 {
-                        // TODO: Could show text pertaining to fetching when related booleans are added.
-                        Container::new(Text::new("No packages").size(50))
-                            .height(Length::Fill)
-                            .width(Length::Fill)
-                            .center_x()
-                            .center_y()
-                            .style(self.theme)
-                            .into()
+                        Container::new(
+                            Text::new(if self.state.controls.checking_for_updates {
+                                "Checking for updates..."
+                            } else {
+                                "No packages"
+                            })
+                            .size(50),
+                        )
+                        .height(Length::Fill)
+                        .width(Length::Fill)
+                        .center_x()
+                        .center_y()
+                        .style(self.theme)
+                        .into()
                     } else {
                         Container::new(scrollable)
                             .height(Length::Fill)
@@ -1124,10 +1158,6 @@ struct Controls {
     filters: Filters,
     sort_by: SortBy,
     sorting_pick_list: pick_list::State<SortBy>,
-    // TODO: Maybe add booleans for each button so when it's fetching
-    // the related buttons are disabled, maybe with some special styling.
-    // Definitely needed, since spamming `Check for updates` can easily
-    // lead to a temp ban, apart from weird behaviour.
     check_for_updates_button: button::State,
     show_updates_button: button::State,
     return_to_filters_button: button::State,
@@ -1137,6 +1167,8 @@ struct Controls {
     fetch_stable_button: button::State,
     fetch_lts_button: button::State,
     fetch_archived_button: button::State,
+    // TODO: Use different style when checking.
+    checking_for_updates: bool,
 }
 
 impl Controls {
@@ -1151,6 +1183,8 @@ impl Controls {
         ),
         theme: Theme,
     ) -> Container<'_, Message> {
+        let checking_for_updates = self.checking_for_updates;
+
         let button = |label, button_message: Option<Message>, state| {
             let button = Button::new(
                 state,
@@ -1161,7 +1195,10 @@ impl Controls {
             .width(Length::Units(200))
             .style(theme);
 
-            if button_message.is_some() && CAN_CONNECT.load(Ordering::Relaxed) {
+            if button_message.is_some()
+                && CAN_CONNECT.load(Ordering::Relaxed)
+                && !checking_for_updates
+            {
                 button.on_press(button_message.unwrap())
             } else {
                 button
@@ -1197,7 +1234,10 @@ impl Controls {
                     )
                     .style(theme);
 
-                    if button_message.is_some() && CAN_CONNECT.load(Ordering::Relaxed) {
+                    if button_message.is_some()
+                        && CAN_CONNECT.load(Ordering::Relaxed)
+                        && !checking_for_updates
+                    {
                         row.push(button.on_press(button_message.unwrap()))
                     } else {
                         row.push(button)
