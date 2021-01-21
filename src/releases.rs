@@ -513,9 +513,11 @@ pub trait ReleaseType:
                 handles.push(handle);
             }
 
+            let mut deviation = 0;
             for handle in handles {
                 if let Some(index) = handle.await.unwrap() {
-                    self.remove(index);
+                    self.remove(index - deviation);
+                    deviation += 1;
                 }
             }
         }
