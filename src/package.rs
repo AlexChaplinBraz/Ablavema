@@ -17,7 +17,7 @@ use std::{
     mem,
 };
 use tar::Archive;
-use timeago;
+use timeago::{self, TimeUnit::Minutes};
 use tokio::{
     fs::{self, remove_dir_all, remove_file},
     io::AsyncWriteExt,
@@ -320,6 +320,7 @@ impl Package {
     pub fn get_formatted_date_time(&self) -> String {
         let mut formatter = timeago::Formatter::new();
         formatter.num_items(2);
+        formatter.min_unit(Minutes);
         let duration = Utc::now().naive_utc().signed_duration_since(self.date);
         let date_time_format = match self.build {
             Build::Daily(_) | Build::Branched(_) | Build::Archived => "%B %d, %Y - %T",
