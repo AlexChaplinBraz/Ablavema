@@ -3,7 +3,7 @@ use crate::{
     helpers::{get_document, get_file_stem},
     package::{Build, Change, Os, Package},
     releases::ReleaseType,
-    settings::PROJECT_DIRS,
+    settings::CONFIG_PATH,
 };
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
@@ -132,6 +132,6 @@ impl ReleaseType for Lts {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        PROJECT_DIRS.config_dir().to_path_buf().join("lts_db.bin")
+        CONFIG_PATH.parent().unwrap().join("lts_db.bin")
     }
 }

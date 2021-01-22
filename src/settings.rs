@@ -26,8 +26,7 @@ pub static ONLY_CLI: AtomicBool = AtomicBool::new(true);
 pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
-    pub static ref PROJECT_DIRS: ProjectDirs =
-        ProjectDirs::from("", "", "BlenderLauncher").unwrap();
+    static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "BlenderLauncher").unwrap();
     static ref PORTABLE_PATH: PathBuf = current_exe().unwrap().parent().unwrap().to_path_buf();
     pub static ref CONFIG_PATH: PathBuf = {
         if PORTABLE_PATH.join("portable").exists() {
