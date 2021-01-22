@@ -15,8 +15,8 @@ derive_deref = "1.1"
 device_query = "0.2"
 directories-next = "2.0"
 flate2 = "1.0"
-iced = { git = "https://github.com/hecrj/iced", rev = "9da0a3de54e8e7161d4a3405633bc574ce43eb2d" }
-iced_futures = { git = "https://github.com/hecrj/iced", rev = "9da0a3de54e8e7161d4a3405633bc574ce43eb2d" }
+iced = { git = "https://github.com/hecrj/iced", rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf" }
+iced_futures = { git = "https://github.com/hecrj/iced", rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf" }
 indicatif = "0.15"
 itertools = "0.10"
 lazy_static = "1.4"
@@ -28,6 +28,7 @@ reqwest = "0.11"
 select = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 tar = "0.4"
+timeago = "0.2"
 tokio = { version = "1.0", features = ["fs", "io-util", "macros", "rt-multi-thread"] }
 xz2 = "0.1"
 zip = "0.5"

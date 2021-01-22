@@ -20,8 +20,6 @@ impl ReleaseType for Daily {
     async fn fetch() -> Self {
         let document = get_document("https://builder.blender.org/download/").await;
         let mut daily = Daily::default();
-        let current_year = Utc::today().year();
-        let current_year = format!("-{}", current_year);
 
         for build in document.find(Class("os")) {
             let targ_os = if cfg!(target_os = "linux") {
@@ -56,7 +54,7 @@ impl ReleaseType for Daily {
 
             let mut date = build.find(Name("small")).next().unwrap().text();
             let mut date: String = date.drain(..date.find('-').unwrap()).collect();
-            date.push_str(&current_year);
+            date.push_str(&format!("-{}", Utc::today().year()));
             package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
 
             package.commit = build

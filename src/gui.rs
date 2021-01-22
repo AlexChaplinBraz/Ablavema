@@ -1732,6 +1732,8 @@ impl Package {
         let is_default_package = SETTINGS.read().unwrap().default_package.is_some()
             && SETTINGS.read().unwrap().default_package.clone().unwrap() == *self;
 
+        let date_time = self.get_formatted_date_time();
+
         let name = Row::new()
             .spacing(10)
             .push(Text::new(&self.name).size(26).width(Length::Fill))
@@ -1751,9 +1753,7 @@ impl Package {
                 Row::new()
                     .align_items(Align::End)
                     .push(Text::new("Date: ").size(16))
-                    // TODO: Add how long ago it was released.
-                    // TODO: Format date-time nicely.
-                    .push(Text::new(self.date.to_string()).size(20)),
+                    .push(Text::new(date_time).size(20).width(Length::Fill)),
             )
             .push(
                 Row::new()

@@ -5,7 +5,7 @@ use crate::{
 };
 use bincode;
 use bzip2::read::BzDecoder;
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use flate2::read::GzDecoder;
 use iced::button;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -17,6 +17,7 @@ use std::{
     mem,
 };
 use tar::Archive;
+use timeago;
 use tokio::{
     fs::{self, remove_dir_all, remove_file},
     io::AsyncWriteExt,
@@ -314,6 +315,25 @@ impl Package {
         });
 
         Some(final_tasks)
+    }
+
+    pub fn get_formatted_date_time(&self) -> String {
+        let mut formatter = timeago::Formatter::new();
+        formatter.num_items(2);
+        let duration = Utc::now().naive_utc().signed_duration_since(self.date);
+        let date_time_format = match self.build {
+            Build::Daily(_) | Build::Branched(_) | Build::Archived => "%B %d, %Y - %T",
+            // TODO: Get the date-time of stable and LTS packages from Archived.
+            // Right now it's always set to 00:00:00 because time isn't listed on their pages,
+            // but I could find these packages in Archives and clone their date.
+            // The problem is making this run only when necessary.
+            Build::Stable | Build::Lts => "%B %d, %Y",
+        };
+        format!(
+            "{} ({})",
+            self.date.format(date_time_format),
+            formatter.convert(duration.to_std().unwrap())
+        )
     }
 
     pub fn remove(&self) {
