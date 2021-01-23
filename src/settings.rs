@@ -24,6 +24,10 @@ static PORTABLE: AtomicBool = AtomicBool::new(false);
 pub static CAN_CONNECT: AtomicBool = AtomicBool::new(true);
 pub static ONLY_CLI: AtomicBool = AtomicBool::new(true);
 pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
+// TODO: Consider making the text size user-adjustable.
+// Would need for all elements and sizes to scale properly.
+// Another requirement is for the window to remember its size and position.
+pub const TEXT_SIZE: u16 = 16;
 
 lazy_static! {
     static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "BlenderLauncher").unwrap();

@@ -15,16 +15,25 @@ use crate::{
 };
 use helpers::check_connection;
 use iced::Application;
+use settings::TEXT_SIZE;
 use std::sync::atomic::Ordering;
 
 // TODO: Fix window cascading on Windows. This will involve creating our own window which we'll
 // give to Iced.
 // TODO: Remember user's window size.
+// TODO: Add self-update for Windows.
+// Might not be bad to have a separate version with it for Linux as well.
+// Or if it doesn't add much to the file size, just make it toggleable through the CLI.
+// TODO: Add Windows metadata.
+// TODO: Consider building custom window decorations.
+// Something along the lines of how browsers have tabs next to the window buttons.
 
 #[tokio::main]
 async fn main() {
     #[cfg(target_os = "windows")]
     {
+        // TODO: Investigate whether the console that's toggled by Blender
+        // can still receive output.
         use winapi::um::wincon;
         unsafe { wincon::AttachConsole(wincon::ATTACH_PARENT_PROCESS) };
     }
@@ -41,9 +50,10 @@ async fn run() {
     if !ONLY_CLI.load(Ordering::Relaxed) {
         if LAUNCH_GUI.load(Ordering::Relaxed) || SETTINGS.read().unwrap().default_package.is_none()
         {
+            // TODO: Add icon.
             let mut window = iced::window::Settings::default();
-            window.size = (900, 640);
-            window.min_size = Some((900, 640));
+            window.size = (650, 560);
+            window.min_size = Some((650, 560));
 
             let default_settings = iced::Settings::<()>::default();
 
@@ -51,7 +61,7 @@ async fn run() {
                 window,
                 flags: gui_args,
                 default_font: default_settings.default_font,
-                default_text_size: default_settings.default_text_size,
+                default_text_size: TEXT_SIZE,
                 antialiasing: default_settings.antialiasing,
             };
 

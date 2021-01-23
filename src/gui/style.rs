@@ -1,13 +1,28 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
-use iced::{
-    button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
-    text_input,
-};
+use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, slider, Color};
 use serde::{Deserialize, Serialize};
 
-/// Lifted practically as is from the styling example of iced.
-/// Only thing I added was methods for getting darker versions of the container.
-/// TODO: Try to base it on Blender's light and dark themes.
+/// Creates a const Color. Takes values from 0 to 255.
+/// First argument is the const name.
+/// Then Red, Green, Blue, and optionally Alpha.
+macro_rules! const_color {
+    ($const_name:ident, $red:expr, $green:expr, $blue:expr) => {
+        pub const $const_name: Color = Color::from_rgb(
+            $red as f32 / 255.0,
+            $green as f32 / 255.0,
+            $blue as f32 / 255.0,
+        );
+    };
+    ($const_name:ident, $red:expr, $green:expr, $blue:expr, $alpha:expr) => {
+        pub const $const_name: Color = Color::from_rgba(
+            $red as f32 / 255.0,
+            $green as f32 / 255.0,
+            $blue as f32 / 255.0,
+            $alpha as f32 / 255.0,
+        );
+    };
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum Theme {
     Light,
@@ -17,17 +32,24 @@ pub enum Theme {
 impl Theme {
     pub const ALL: [Theme; 2] = [Theme::Light, Theme::Dark];
 
-    pub fn light_container(&self) -> Box<dyn container::StyleSheet> {
+    pub fn tab_button(&self) -> Box<dyn button::StyleSheet> {
         match self {
-            Theme::Light => light::ContainerLight.into(),
-            Theme::Dark => dark::ContainerLight.into(),
+            Theme::Light => light::ButtonTab.into(),
+            Theme::Dark => dark::ButtonTab.into(),
         }
     }
 
-    pub fn lighter_container(&self) -> Box<dyn container::StyleSheet> {
+    pub fn tab_container(&self) -> Box<dyn container::StyleSheet> {
         match self {
-            Theme::Light => light::ContainerLighter.into(),
-            Theme::Dark => dark::ContainerLighter.into(),
+            Theme::Light => light::ContainerTab.into(),
+            Theme::Dark => dark::ContainerTab.into(),
+        }
+    }
+
+    pub fn info_container(&self) -> Box<dyn container::StyleSheet> {
+        match self {
+            Theme::Light => light::ContainerInfo.into(),
+            Theme::Dark => dark::ContainerInfo.into(),
         }
     }
 
@@ -58,6 +80,13 @@ impl Theme {
             Theme::Dark => dark::ContainerStatus.into(),
         }
     }
+
+    pub fn highlight_text(&self) -> Color {
+        match self {
+            Theme::Light => light::ACTIVE_TEXT,
+            Theme::Dark => dark::ACTIVE_TEXT,
+        }
+    }
 }
 
 impl Default for Theme {
@@ -69,7 +98,7 @@ impl Default for Theme {
 impl From<Theme> for Box<dyn container::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
-            Theme::Light => Default::default(),
+            Theme::Light => light::Container.into(),
             Theme::Dark => dark::Container.into(),
         }
     }
@@ -78,17 +107,8 @@ impl From<Theme> for Box<dyn container::StyleSheet> {
 impl From<Theme> for Box<dyn radio::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
-            Theme::Light => Default::default(),
+            Theme::Light => light::Radio.into(),
             Theme::Dark => dark::Radio.into(),
-        }
-    }
-}
-
-impl From<Theme> for Box<dyn text_input::StyleSheet> {
-    fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::TextInput.into(),
         }
     }
 }
@@ -102,19 +122,10 @@ impl From<Theme> for Box<dyn button::StyleSheet> {
     }
 }
 
-impl From<Theme> for Box<dyn scrollable::StyleSheet> {
-    fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::Scrollable.into(),
-        }
-    }
-}
-
 impl From<Theme> for Box<dyn slider::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
-            Theme::Light => Default::default(),
+            Theme::Light => light::Slider.into(),
             Theme::Dark => dark::Slider.into(),
         }
     }
@@ -123,7 +134,7 @@ impl From<Theme> for Box<dyn slider::StyleSheet> {
 impl From<Theme> for Box<dyn progress_bar::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
-            Theme::Light => Default::default(),
+            Theme::Light => light::ProgressBar.into(),
             Theme::Dark => dark::ProgressBar.into(),
         }
     }
@@ -132,7 +143,7 @@ impl From<Theme> for Box<dyn progress_bar::StyleSheet> {
 impl From<Theme> for Box<dyn checkbox::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
-            Theme::Light => Default::default(),
+            Theme::Light => light::Checkbox.into(),
             Theme::Dark => dark::Checkbox.into(),
         }
     }
@@ -141,7 +152,7 @@ impl From<Theme> for Box<dyn checkbox::StyleSheet> {
 impl From<Theme> for Box<dyn pick_list::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
-            Theme::Light => Default::default(),
+            Theme::Light => light::PickList.into(),
             Theme::Dark => dark::PickList.into(),
         }
     }
@@ -150,362 +161,273 @@ impl From<Theme> for Box<dyn pick_list::StyleSheet> {
 impl From<Theme> for Box<dyn rule::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
-            Theme::Light => Default::default(),
+            Theme::Light => light::Rule.into(),
             Theme::Dark => dark::Rule.into(),
         }
     }
 }
 
 mod light {
-    use iced::{button, container, Color, Vector};
-
-    pub struct ContainerLight;
-
-    impl container::StyleSheet for ContainerLight {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(166, 166, 166).into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerLighter;
-
-    impl container::StyleSheet for ContainerLighter {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(179, 179, 179).into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerSidebar;
-
-    impl container::StyleSheet for ContainerSidebar {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(162, 162, 162).into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerOdd;
-
-    impl container::StyleSheet for ContainerOdd {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(153, 153, 153).into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerEven;
-
-    impl container::StyleSheet for ContainerEven {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(159, 159, 159).into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerStatus;
-
-    impl container::StyleSheet for ContainerStatus {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(255, 0, 0).into(),
-                text_color: Color::WHITE.into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct Button;
-
-    impl button::StyleSheet for Button {
-        fn active(&self) -> button::Style {
-            button::Style {
-                background: Color::from_rgb(0.11, 0.42, 0.87).into(),
-                border_radius: 12.0,
-                shadow_offset: Vector::new(1.0, 1.0),
-                text_color: Color::from_rgb8(0xEE, 0xEE, 0xEE),
-                ..button::Style::default()
-            }
-        }
-
-        fn hovered(&self) -> button::Style {
-            button::Style {
-                text_color: Color::WHITE,
-                shadow_offset: Vector::new(1.0, 2.0),
-                ..self.active()
-            }
-        }
-    }
-}
-
-pub mod dark {
     use iced::{
-        button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
-        text_input, Background, Color,
+        button, checkbox, container, pick_list, progress_bar, radio, rule, slider, Color, Vector,
     };
 
-    const SURFACE: Color = Color::from_rgb(
-        0x40 as f32 / 255.0,
-        0x44 as f32 / 255.0,
-        0x4B as f32 / 255.0,
-    );
-
-    const ACCENT: Color = Color::from_rgb(
-        0x6F as f32 / 255.0,
-        0xFF as f32 / 255.0,
-        0xE9 as f32 / 255.0,
-    );
-
-    const ACTIVE: Color = Color::from_rgb(
-        0x72 as f32 / 255.0,
-        0x89 as f32 / 255.0,
-        0xDA as f32 / 255.0,
-    );
-
-    const HOVERED: Color = Color::from_rgb(
-        0x67 as f32 / 255.0,
-        0x7B as f32 / 255.0,
-        0xC4 as f32 / 255.0,
-    );
-
-    pub struct Container;
-
-    impl container::StyleSheet for Container {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(56, 56, 56).into(),
-                text_color: Color::WHITE.into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerLight;
-
-    impl container::StyleSheet for ContainerLight {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(56, 56, 56).into(),
-                text_color: Color::WHITE.into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerLighter;
-
-    impl container::StyleSheet for ContainerLighter {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(66, 66, 66).into(),
-                text_color: Color::WHITE.into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerSidebar;
-
-    impl container::StyleSheet for ContainerSidebar {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(51, 51, 51).into(),
-                text_color: Color::WHITE.into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerOdd;
-
-    impl container::StyleSheet for ContainerOdd {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(40, 40, 40).into(),
-                text_color: Color::WHITE.into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerEven;
-
-    impl container::StyleSheet for ContainerEven {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(45, 45, 45).into(),
-                text_color: Color::WHITE.into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct ContainerStatus;
-
-    impl container::StyleSheet for ContainerStatus {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Color::from_rgb8(255, 0, 0).into(),
-                text_color: Color::WHITE.into(),
-                ..container::Style::default()
-            }
-        }
-    }
-
-    pub struct Radio;
-
-    impl radio::StyleSheet for Radio {
-        fn active(&self) -> radio::Style {
-            radio::Style {
-                background: SURFACE.into(),
-                dot_color: ACTIVE,
-                border_width: 1.0,
-                border_color: ACTIVE,
-            }
-        }
-
-        fn hovered(&self) -> radio::Style {
-            radio::Style {
-                background: Color { a: 0.5, ..SURFACE }.into(),
-                ..self.active()
-            }
-        }
-    }
-
-    pub struct TextInput;
-
-    impl text_input::StyleSheet for TextInput {
-        fn active(&self) -> text_input::Style {
-            text_input::Style {
-                background: SURFACE.into(),
-                border_radius: 2.0,
-                border_width: 0.0,
-                border_color: Color::TRANSPARENT,
-            }
-        }
-
-        fn focused(&self) -> text_input::Style {
-            text_input::Style {
-                border_width: 1.0,
-                border_color: ACCENT,
-                ..self.active()
-            }
-        }
-
-        fn hovered(&self) -> text_input::Style {
-            text_input::Style {
-                border_width: 1.0,
-                border_color: Color { a: 0.3, ..ACCENT },
-                ..self.focused()
-            }
-        }
-
-        fn placeholder_color(&self) -> Color {
-            Color::from_rgb(0.4, 0.4, 0.4)
-        }
-
-        fn value_color(&self) -> Color {
-            Color::WHITE
-        }
-
-        fn selection_color(&self) -> Color {
-            ACTIVE
-        }
-    }
+    const_color!(ACTIVE_TAB, 190, 190, 190);
+    const_color!(HOVERED_TAB, 142, 142, 142);
+    const_color!(INACTIVE_TAB, 129, 129, 129);
+    const_color!(ACTIVE, 86, 128, 194);
+    const_color!(HOVERED, 241, 241, 241);
+    const_color!(INACTIVE, 219, 219, 219);
+    const_color!(CONTAINER_BACKGROUND, 166, 166, 166);
+    const_color!(TAB_BACKGROUND, 179, 179, 179);
+    const_color!(INFO_BACKGROUND, 169, 169, 169);
+    const_color!(SIDEBAR_BACKGROUND, 163, 163, 163);
+    const_color!(PICK_LIST_BACKGROUND, 213, 213, 213);
+    const_color!(ODD_BACKGROUND, 153, 153, 153);
+    const_color!(EVEN_BACKGROUND, 159, 159, 159);
+    const_color!(STATUS_BACKGROUND, 255, 0, 0);
+    const_color!(TEXT, 26, 26, 26);
+    const_color!(ACTIVE_TEXT, 0, 0, 0);
 
     pub struct Button;
-
     impl button::StyleSheet for Button {
         fn active(&self) -> button::Style {
             button::Style {
-                background: ACTIVE.into(),
-                border_radius: 3.0,
-                text_color: Color::WHITE,
-                ..button::Style::default()
+                shadow_offset: Vector::default(),
+                background: INACTIVE.into(),
+                border_radius: 5.0,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+                text_color: TEXT,
             }
         }
 
         fn hovered(&self) -> button::Style {
             button::Style {
                 background: HOVERED.into(),
-                text_color: Color::WHITE,
+                text_color: ACTIVE_TEXT,
                 ..self.active()
             }
         }
 
         fn pressed(&self) -> button::Style {
             button::Style {
-                border_width: 1.0,
-                border_color: Color::WHITE,
+                background: ACTIVE.into(),
                 ..self.hovered()
             }
         }
     }
 
-    pub struct Scrollable;
-
-    impl scrollable::StyleSheet for Scrollable {
-        fn active(&self) -> scrollable::Scrollbar {
-            scrollable::Scrollbar {
-                background: SURFACE.into(),
+    pub struct ButtonTab;
+    impl button::StyleSheet for ButtonTab {
+        fn active(&self) -> button::Style {
+            button::Style {
+                shadow_offset: Vector::default(),
+                background: INACTIVE_TAB.into(),
                 border_radius: 2.0,
                 border_width: 0.0,
                 border_color: Color::TRANSPARENT,
-                scroller: scrollable::Scroller {
-                    color: ACTIVE,
-                    border_radius: 2.0,
-                    border_width: 0.0,
-                    border_color: Color::TRANSPARENT,
-                },
+                text_color: TEXT,
             }
         }
 
-        fn hovered(&self) -> scrollable::Scrollbar {
-            let active = self.active();
-
-            scrollable::Scrollbar {
-                background: Color { a: 0.5, ..SURFACE }.into(),
-                scroller: scrollable::Scroller {
-                    color: HOVERED,
-                    ..active.scroller
-                },
-                ..active
+        fn hovered(&self) -> button::Style {
+            button::Style {
+                background: HOVERED_TAB.into(),
+                text_color: ACTIVE_TEXT,
+                ..self.active()
             }
         }
 
-        fn dragging(&self) -> scrollable::Scrollbar {
-            let hovered = self.hovered();
+        fn pressed(&self) -> button::Style {
+            self.hovered()
+        }
 
-            scrollable::Scrollbar {
-                scroller: scrollable::Scroller {
-                    color: Color::from_rgb(0.85, 0.85, 0.85),
-                    ..hovered.scroller
-                },
-                ..hovered
+        fn disabled(&self) -> button::Style {
+            button::Style {
+                background: ACTIVE_TAB.into(),
+                text_color: ACTIVE_TEXT,
+                ..self.active()
+            }
+        }
+    }
+
+    pub struct Checkbox;
+    impl checkbox::StyleSheet for Checkbox {
+        fn active(&self, is_checked: bool) -> checkbox::Style {
+            checkbox::Style {
+                background: if is_checked { ACTIVE } else { INACTIVE }.into(),
+                checkmark_color: TEXT,
+                border_radius: 5.0,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+            }
+        }
+
+        fn hovered(&self, is_checked: bool) -> checkbox::Style {
+            checkbox::Style {
+                background: if is_checked { ACTIVE } else { HOVERED }.into(),
+                checkmark_color: ACTIVE_TEXT,
+                ..self.active(is_checked)
+            }
+        }
+    }
+
+    pub struct Container;
+    impl container::StyleSheet for Container {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: CONTAINER_BACKGROUND.into(),
+                text_color: TEXT.into(),
+                border_radius: 0.0,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+            }
+        }
+    }
+
+    pub struct ContainerTab;
+    impl container::StyleSheet for ContainerTab {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: TAB_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerInfo;
+    impl container::StyleSheet for ContainerInfo {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: INFO_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerSidebar;
+    impl container::StyleSheet for ContainerSidebar {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: SIDEBAR_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerOdd;
+    impl container::StyleSheet for ContainerOdd {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: ODD_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerEven;
+    impl container::StyleSheet for ContainerEven {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: EVEN_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerStatus;
+    impl container::StyleSheet for ContainerStatus {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: STATUS_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct PickList;
+    impl pick_list::StyleSheet for PickList {
+        fn menu(&self) -> pick_list::Menu {
+            pick_list::Menu {
+                text_color: TEXT,
+                background: PICK_LIST_BACKGROUND.into(),
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+                selected_text_color: ACTIVE_TEXT,
+                selected_background: HOVERED.into(),
+            }
+        }
+
+        fn active(&self) -> pick_list::Style {
+            pick_list::Style {
+                text_color: ACTIVE_TEXT,
+                background: PICK_LIST_BACKGROUND.into(),
+                border_radius: 5.0,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+                icon_size: 0.4,
+            }
+        }
+
+        fn hovered(&self) -> pick_list::Style {
+            pick_list::Style {
+                background: HOVERED.into(),
+                ..self.active()
+            }
+        }
+    }
+
+    pub struct ProgressBar;
+    impl progress_bar::StyleSheet for ProgressBar {
+        fn style(&self) -> progress_bar::Style {
+            progress_bar::Style {
+                background: INACTIVE.into(),
+                bar: ACTIVE.into(),
+                border_radius: 5.0,
+            }
+        }
+    }
+
+    pub struct Radio;
+    impl radio::StyleSheet for Radio {
+        fn active(&self) -> radio::Style {
+            radio::Style {
+                background: INACTIVE.into(),
+                dot_color: ACTIVE,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+            }
+        }
+
+        fn hovered(&self) -> radio::Style {
+            radio::Style {
+                background: HOVERED.into(),
+                ..self.active()
+            }
+        }
+    }
+
+    pub struct Rule;
+    impl rule::StyleSheet for Rule {
+        fn style(&self) -> rule::Style {
+            rule::Style {
+                color: INACTIVE,
+                width: 2,
+                radius: 1.0,
+                fill_mode: rule::FillMode::Full,
             }
         }
     }
 
     pub struct Slider;
-
     impl slider::StyleSheet for Slider {
         fn active(&self) -> slider::Style {
             slider::Style {
-                rail_colors: (ACTIVE, Color { a: 0.1, ..ACTIVE }),
+                rail_colors: (ACTIVE, ACTIVE),
                 handle: slider::Handle {
                     shape: slider::HandleShape::Circle { radius: 9.0 },
-                    color: ACTIVE,
+                    color: INACTIVE,
                     border_width: 0.0,
                     border_color: Color::TRANSPARENT,
                 },
@@ -529,93 +451,303 @@ pub mod dark {
 
             slider::Style {
                 handle: slider::Handle {
-                    color: Color::from_rgb(0.85, 0.85, 0.85),
+                    color: ACTIVE,
                     ..active.handle
                 },
                 ..active
             }
         }
     }
+}
 
-    pub struct ProgressBar;
+mod dark {
+    use iced::{
+        button, checkbox, container, pick_list, progress_bar, radio, rule, slider, Color, Vector,
+    };
 
-    impl progress_bar::StyleSheet for ProgressBar {
-        fn style(&self) -> progress_bar::Style {
-            progress_bar::Style {
-                background: SURFACE.into(),
-                bar: ACTIVE.into(),
-                border_radius: 10.0,
+    const_color!(ACTIVE_TAB, 66, 66, 66);
+    const_color!(HOVERED_TAB, 52, 52, 52);
+    const_color!(INACTIVE_TAB, 43, 43, 43);
+    const_color!(ACTIVE, 83, 121, 180);
+    const_color!(HOVERED, 106, 106, 106);
+    const_color!(INACTIVE, 88, 88, 88);
+    const_color!(CONTAINER_BACKGROUND, 56, 56, 56);
+    const_color!(TAB_BACKGROUND, 35, 35, 35);
+    const_color!(INFO_BACKGROUND, 59, 59, 59);
+    const_color!(SIDEBAR_BACKGROUND, 51, 51, 51);
+    const_color!(PICK_LIST_BACKGROUND, 44, 44, 44);
+    const_color!(ODD_BACKGROUND, 40, 40, 40);
+    const_color!(EVEN_BACKGROUND, 45, 45, 45);
+    const_color!(STATUS_BACKGROUND, 255, 0, 0);
+    const_color!(TEXT, 217, 217, 217);
+    const_color!(ACTIVE_TEXT, 255, 255, 255);
+
+    pub struct Button;
+    impl button::StyleSheet for Button {
+        fn active(&self) -> button::Style {
+            button::Style {
+                shadow_offset: Vector::default(),
+                background: INACTIVE.into(),
+                border_radius: 5.0,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+                text_color: TEXT,
+            }
+        }
+
+        fn hovered(&self) -> button::Style {
+            button::Style {
+                background: HOVERED.into(),
+                text_color: ACTIVE_TEXT,
+                ..self.active()
+            }
+        }
+
+        fn pressed(&self) -> button::Style {
+            button::Style {
+                background: ACTIVE.into(),
+                ..self.hovered()
+            }
+        }
+    }
+
+    pub struct ButtonTab;
+    impl button::StyleSheet for ButtonTab {
+        fn active(&self) -> button::Style {
+            button::Style {
+                shadow_offset: Vector::default(),
+                background: INACTIVE_TAB.into(),
+                border_radius: 2.0,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+                text_color: TEXT,
+            }
+        }
+
+        fn hovered(&self) -> button::Style {
+            button::Style {
+                background: HOVERED_TAB.into(),
+                text_color: ACTIVE_TEXT,
+                ..self.active()
+            }
+        }
+
+        fn pressed(&self) -> button::Style {
+            self.hovered()
+        }
+
+        fn disabled(&self) -> button::Style {
+            button::Style {
+                background: ACTIVE_TAB.into(),
+                text_color: ACTIVE_TEXT,
+                ..self.active()
             }
         }
     }
 
     pub struct Checkbox;
-
     impl checkbox::StyleSheet for Checkbox {
         fn active(&self, is_checked: bool) -> checkbox::Style {
             checkbox::Style {
-                background: if is_checked { ACTIVE } else { SURFACE }.into(),
-                checkmark_color: Color::WHITE,
-                border_radius: 2.0,
-                border_width: 1.0,
-                border_color: ACTIVE,
+                background: if is_checked { ACTIVE } else { INACTIVE }.into(),
+                checkmark_color: TEXT,
+                border_radius: 5.0,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
             }
         }
 
         fn hovered(&self, is_checked: bool) -> checkbox::Style {
             checkbox::Style {
-                background: Color {
-                    a: 0.8,
-                    ..if is_checked { ACTIVE } else { SURFACE }
-                }
-                .into(),
+                background: if is_checked { ACTIVE } else { HOVERED }.into(),
+                checkmark_color: ACTIVE_TEXT,
                 ..self.active(is_checked)
             }
         }
     }
 
-    pub struct PickList;
+    pub struct Container;
+    impl container::StyleSheet for Container {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: CONTAINER_BACKGROUND.into(),
+                text_color: TEXT.into(),
+                border_radius: 0.0,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+            }
+        }
+    }
 
+    pub struct ContainerTab;
+    impl container::StyleSheet for ContainerTab {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: TAB_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerInfo;
+    impl container::StyleSheet for ContainerInfo {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: INFO_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerSidebar;
+    impl container::StyleSheet for ContainerSidebar {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: SIDEBAR_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerOdd;
+    impl container::StyleSheet for ContainerOdd {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: ODD_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerEven;
+    impl container::StyleSheet for ContainerEven {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: EVEN_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct ContainerStatus;
+    impl container::StyleSheet for ContainerStatus {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: STATUS_BACKGROUND.into(),
+                ..Container.style()
+            }
+        }
+    }
+
+    pub struct PickList;
     impl pick_list::StyleSheet for PickList {
         fn menu(&self) -> pick_list::Menu {
             pick_list::Menu {
-                text_color: Color::WHITE,
-                background: Background::Color(Color::BLACK),
-                border_width: 1.0,
-                border_color: ACTIVE,
-                selected_text_color: HOVERED,
-                selected_background: Background::Color(Color::BLACK),
+                text_color: TEXT,
+                background: PICK_LIST_BACKGROUND.into(),
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+                selected_text_color: ACTIVE_TEXT,
+                selected_background: HOVERED.into(),
             }
         }
 
         fn active(&self) -> pick_list::Style {
             pick_list::Style {
-                text_color: Color::WHITE,
-                background: Background::Color(Color::BLACK),
-                border_radius: 2.0,
-                border_width: 1.0,
-                border_color: ACTIVE,
-                ..Default::default()
+                text_color: ACTIVE_TEXT,
+                background: PICK_LIST_BACKGROUND.into(),
+                border_radius: 5.0,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+                icon_size: 0.4,
             }
         }
 
         fn hovered(&self) -> pick_list::Style {
             pick_list::Style {
-                background: Color { a: 0.8, ..ACTIVE }.into(),
+                background: HOVERED.into(),
+                ..self.active()
+            }
+        }
+    }
+
+    pub struct ProgressBar;
+    impl progress_bar::StyleSheet for ProgressBar {
+        fn style(&self) -> progress_bar::Style {
+            progress_bar::Style {
+                background: INACTIVE.into(),
+                bar: ACTIVE.into(),
+                border_radius: 5.0,
+            }
+        }
+    }
+
+    pub struct Radio;
+    impl radio::StyleSheet for Radio {
+        fn active(&self) -> radio::Style {
+            radio::Style {
+                background: INACTIVE.into(),
+                dot_color: ACTIVE,
+                border_width: 0.0,
+                border_color: Color::TRANSPARENT,
+            }
+        }
+
+        fn hovered(&self) -> radio::Style {
+            radio::Style {
+                background: HOVERED.into(),
                 ..self.active()
             }
         }
     }
 
     pub struct Rule;
-
     impl rule::StyleSheet for Rule {
         fn style(&self) -> rule::Style {
             rule::Style {
-                color: SURFACE,
+                color: INACTIVE,
                 width: 2,
                 radius: 1.0,
-                fill_mode: rule::FillMode::Padded(15),
+                fill_mode: rule::FillMode::Full,
+            }
+        }
+    }
+
+    pub struct Slider;
+    impl slider::StyleSheet for Slider {
+        fn active(&self) -> slider::Style {
+            slider::Style {
+                rail_colors: (ACTIVE, ACTIVE),
+                handle: slider::Handle {
+                    shape: slider::HandleShape::Circle { radius: 9.0 },
+                    color: INACTIVE,
+                    border_width: 0.0,
+                    border_color: Color::TRANSPARENT,
+                },
+            }
+        }
+
+        fn hovered(&self) -> slider::Style {
+            let active = self.active();
+
+            slider::Style {
+                handle: slider::Handle {
+                    color: HOVERED,
+                    ..active.handle
+                },
+                ..active
+            }
+        }
+
+        fn dragging(&self) -> slider::Style {
+            let active = self.active();
+
+            slider::Style {
+                handle: slider::Handle {
+                    color: ACTIVE,
+                    ..active.handle
+                },
+                ..active
             }
         }
     }

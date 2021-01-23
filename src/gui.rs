@@ -12,7 +12,7 @@ use crate::{
         archived::Archived, branched::Branched, daily::Daily, lts::Lts, stable::Stable,
         ReleaseType, Releases,
     },
-    settings::{ModifierKey, CAN_CONNECT, SETTINGS},
+    settings::{ModifierKey, CAN_CONNECT, SETTINGS, TEXT_SIZE},
 };
 use iced::{
     button, pick_list, scrollable, slider, Align, Application, Button, Checkbox, Column, Command,
@@ -763,15 +763,13 @@ impl Application for Gui {
         let theme = self.theme;
         let update_count = self.releases.count_updates();
 
-        let top_button = |label, tab, state| {
+        let tab_button = |label, tab, state| {
             let button = Button::new(
                 state,
-                Text::new(label)
-                    .size(16)
-                    .horizontal_alignment(HorizontalAlignment::Center),
+                Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
             )
             .width(Length::Units(100))
-            .style(theme);
+            .style(theme.tab_button());
 
             if tab == self_tab {
                 button
@@ -782,19 +780,19 @@ impl Application for Gui {
 
         let tabs = Container::new(
             Row::new()
-                .padding(5)
-                .spacing(40)
-                .push(top_button(
+                .padding(2)
+                .spacing(2)
+                .push(tab_button(
                     "Packages",
                     Tab::Packages,
                     &mut self.state.packages_button,
                 ))
-                .push(top_button(
+                .push(tab_button(
                     "Settings",
                     Tab::Settings,
                     &mut self.state.settings_button,
                 ))
-                .push(top_button(
+                .push(tab_button(
                     "About",
                     Tab::About,
                     &mut self.state.about_button,
@@ -802,7 +800,7 @@ impl Application for Gui {
         )
         .width(Length::Fill)
         .center_x()
-        .style(self.theme.lighter_container());
+        .style(self.theme.tab_container());
 
         let body: Element<'_, Message> = match self.tab {
             Tab::Packages => {
@@ -811,13 +809,7 @@ impl Application for Gui {
                 // on the packages but accompanied with text to teach the user what they represent.
                 // Tooltips would be nice too, if `iced` finally implements them.
                 let button = |label, package_message: Option<Message>, state| {
-                    let button = Button::new(
-                        state,
-                        Text::new(label)
-                            .size(18)
-                            .horizontal_alignment(HorizontalAlignment::Center),
-                    )
-                    .style(theme);
+                    let button = Button::new(state, Text::new(label)).style(theme);
 
                     if package_message.is_some() {
                         button.on_press(package_message.unwrap())
@@ -828,7 +820,7 @@ impl Application for Gui {
 
                 let info: Element<'_, Message> = Container::new(
                     Column::new()
-                        .padding(20)
+                        .padding(10)
                         .spacing(5)
                         .push(
                             Row::new()
@@ -842,14 +834,18 @@ impl Application for Gui {
                                     },
                                     &mut self.state.open_default_button,
                                 ))
-                                .push(Text::new(
-                                    match SETTINGS.read().unwrap().default_package.clone() {
-                                        Some(package) => {
-                                            format!("Default package: {}", package.name)
-                                        }
-                                        None => String::from("Default package: not set"),
-                                    },
-                                )),
+                                .push(Text::new("Default package:"))
+                                .push(
+                                    Text::new(
+                                        match SETTINGS.read().unwrap().default_package.clone() {
+                                            Some(package) => {
+                                                format!("{}", package.name)
+                                            }
+                                            None => String::from("not set"),
+                                        },
+                                    )
+                                    .color(theme.highlight_text()),
+                                ),
                         )
                         .push(
                             Row::new()
@@ -873,16 +869,20 @@ impl Application for Gui {
                                     },
                                     &mut self.state.open_default_with_file_button,
                                 ))
-                                .push(Text::new(match &self.file_path {
-                                    Some(file_path) => {
-                                        format!("File: {}", file_path)
-                                    }
-                                    None => String::from("File: none"),
-                                })),
+                                .push(Text::new("File:"))
+                                .push(
+                                    Text::new(match &self.file_path {
+                                        Some(file_path) => {
+                                            format!("{}", file_path)
+                                        }
+                                        None => String::from("none"),
+                                    })
+                                    .color(theme.highlight_text()),
+                                ),
                         ),
                 )
                 .width(Length::Fill)
-                .style(self.theme.light_container())
+                .style(self.theme.info_container())
                 .into();
 
                 let packages: Element<'_, Message> = {
@@ -919,7 +919,7 @@ impl Application for Gui {
                             } else {
                                 "No packages"
                             })
-                            .size(50),
+                            .size(TEXT_SIZE * 2),
                         )
                         .height(Length::Fill)
                         .width(Length::Fill)
@@ -958,7 +958,11 @@ impl Application for Gui {
                                 Column::new()
                                     .spacing(10)
                                     .width(Length::Fill)
-                                    .push(Text::new($title).size(30))
+                                    .push(
+                                        Text::new($title)
+                                            .color(theme.highlight_text())
+                                            .size(TEXT_SIZE * 2),
+                                    )
                                     .push(Text::new($description)),
                             )
                             .push($array.iter().fold(
@@ -984,8 +988,9 @@ impl Application for Gui {
                 };
 
                 // TODO: Rewrite descriptions to better explain the behaviour of checking for updates.
+                // Maybe try to group settings with a general description about them.
                 let settings = Column::new()
-                    .padding(20)
+                    .padding(10)
                     .push(
                         choice_setting!(
                             "Bypass launcher",
@@ -1024,7 +1029,9 @@ impl Application for Gui {
                     ).push(Rule::horizontal(20).style(self.theme)
                     ).push(Column::new()
                         .spacing(10)
-                        .push(Text::new("Delay between update checking").size(30))
+                        .push(Text::new("Delay between update checking")
+                            .color(theme.highlight_text())
+                            .size(TEXT_SIZE * 2))
                         .push(Text::new("Minutes to wait between update checks. Setting it to 0 will make it check every time. Maximum is 24 hours."))
                         .push(Row::new()
                             .push(Text::new(format!("Current: {}", self.state.minute_value)).width(Length::Units(130)))
@@ -1124,13 +1131,18 @@ impl Application for Gui {
                     .style(self.theme)
                     .into()
             }
-            Tab::About => Container::new(Text::new("About tab not yet implemented").size(50))
-                .height(Length::Fill)
-                .width(Length::Fill)
-                .center_x()
-                .center_y()
-                .style(theme)
-                .into(),
+            Tab::About => Container::new(
+                Text::new("About tab not yet implemented")
+                    .horizontal_alignment(HorizontalAlignment::Center)
+                    .width(Length::Fill)
+                    .size(TEXT_SIZE * 2),
+            )
+            .height(Length::Fill)
+            .width(Length::Fill)
+            .center_x()
+            .center_y()
+            .style(theme)
+            .into(),
         };
 
         if CAN_CONNECT.load(Ordering::Relaxed) {
@@ -1140,12 +1152,14 @@ impl Application for Gui {
                 .push(tabs)
                 .push(body)
                 .push(
-                    Container::new(Text::new("CANNOT CONNECT").size(10))
-                        .width(Length::Fill)
-                        .height(Length::Units(14))
-                        .center_x()
-                        .center_y()
-                        .style(self.theme.status_container()),
+                    Container::new(
+                        Container::new(Text::new("CANNOT CONNECT").size(TEXT_SIZE - 5)).padding(2),
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Shrink)
+                    .center_x()
+                    .center_y()
+                    .style(self.theme.status_container()),
                 )
                 .into()
         }
@@ -1257,20 +1271,18 @@ impl GuiState {
 
 #[derive(Debug, Default)]
 struct Controls {
-    filters: Filters,
-    sort_by: SortBy,
-    sorting_pick_list: pick_list::State<SortBy>,
     check_for_updates_button: button::State,
-    show_updates_button: button::State,
-    return_to_filters_button: button::State,
+    checking_for_updates: bool,
+    filters: Filters,
     fetch_all_button: button::State,
     fetch_daily_button: button::State,
     fetch_branched_button: button::State,
     fetch_stable_button: button::State,
     fetch_lts_button: button::State,
     fetch_archived_button: button::State,
-    // TODO: Use different style when checking.
-    checking_for_updates: bool,
+    sort_by: SortBy,
+    sorting_pick_list: pick_list::State<SortBy>,
+    scroll: scrollable::State,
 }
 
 impl Controls {
@@ -1287,31 +1299,19 @@ impl Controls {
     ) -> Container<'_, Message> {
         let checking_for_updates = self.checking_for_updates;
 
-        let button = |label, button_message: Option<Message>, state| {
+        let update_button = {
             let button = Button::new(
-                state,
-                Text::new(label)
-                    .size(18)
-                    .horizontal_alignment(HorizontalAlignment::Center),
+                &mut self.check_for_updates_button,
+                Text::new("[O] Check for updates"),
             )
-            .width(Length::Units(200))
             .style(theme);
 
-            if button_message.is_some()
-                && CAN_CONNECT.load(Ordering::Relaxed)
-                && !checking_for_updates
-            {
-                button.on_press(button_message.unwrap())
+            if CAN_CONNECT.load(Ordering::Relaxed) && !checking_for_updates {
+                button.on_press(Message::CheckForUpdates)
             } else {
                 button
             }
         };
-
-        let update = Column::new().spacing(10).push(button(
-            "[O] Check for updates",
-            Some(Message::CheckForUpdates),
-            &mut self.check_for_updates_button,
-        ));
 
         let filter_row = |filter,
                           label,
@@ -1328,13 +1328,7 @@ impl Controls {
                 );
             match state {
                 Some(state) => {
-                    let button = Button::new(
-                        state,
-                        Text::new("[O]")
-                            .size(16)
-                            .horizontal_alignment(HorizontalAlignment::Center),
-                    )
-                    .style(theme);
+                    let button = Button::new(state, Text::new("[O]")).style(theme);
 
                     if button_message.is_some()
                         && CAN_CONNECT.load(Ordering::Relaxed)
@@ -1443,7 +1437,7 @@ impl Controls {
             ));
 
         let sorting = Row::new()
-            .spacing(10)
+            .spacing(8)
             .align_items(Align::Center)
             .push(Text::new("Sort by"))
             .push(
@@ -1453,21 +1447,27 @@ impl Controls {
                     Some(SETTINGS.read().unwrap().sort_by),
                     Message::SortingChanged,
                 )
+                .width(Length::Fill)
                 .style(theme),
             );
 
-        Container::new(
+        let scrollable = Scrollable::new(&mut self.scroll).push(
             Column::new()
-                .spacing(20)
-                .push(update)
+                .spacing(10)
+                .padding(10)
+                .align_items(Align::Center)
+                .push(update_button)
                 .push(filters)
                 .push(sorting),
-        )
-        .padding(20)
-        .width(Length::Units(240))
-        .height(Length::Fill)
-        .style(theme.sidebar_container())
-        .into()
+        );
+
+        Container::new(scrollable)
+            // TODO: Can't get it to shrink aroind its content for some reason.
+            // It always fills the whole space unless I set a specific width.
+            .width(Length::Units(190))
+            .height(Length::Fill)
+            .style(theme.sidebar_container())
+            .into()
     }
 }
 
@@ -1618,12 +1618,12 @@ impl Display for SortBy {
             f,
             "{}",
             match self {
-                SortBy::NameAscending => "Name [A]",
-                SortBy::NameDescending => "Name [D]",
-                SortBy::DateAscending => "Date [A]",
-                SortBy::DateDescending => "Date [D]",
-                SortBy::VersionAscending => "Version [A]",
-                SortBy::VersionDescending => "Version [D]",
+                SortBy::NameAscending => " Name [A]",
+                SortBy::NameDescending => " Name [D]",
+                SortBy::DateAscending => " Date [A]",
+                SortBy::DateDescending => " Date [D]",
+                SortBy::VersionAscending => " Version [A]",
+                SortBy::VersionDescending => " Version [D]",
             }
         )
     }
@@ -1736,13 +1736,16 @@ impl Package {
 
         let name = Row::new()
             .spacing(10)
-            .push(Text::new(&self.name).size(26).width(Length::Fill))
+            .push(
+                Text::new(&self.name)
+                    .color(theme.highlight_text())
+                    .size(TEXT_SIZE + 10)
+                    .width(Length::Fill),
+            )
             .push(
                 Button::new(
                     &mut self.bookmark_button,
-                    Text::new(if self.bookmarked { "[B]" } else { "[M]" })
-                        .size(18)
-                        .horizontal_alignment(HorizontalAlignment::Center),
+                    Text::new(if self.bookmarked { "[B]" } else { "[M]" }),
                 )
                 .on_press(PackageMessage::Bookmark)
                 .style(theme),
@@ -1752,8 +1755,12 @@ impl Package {
             .push(
                 Row::new()
                     .align_items(Align::End)
-                    .push(Text::new("Date: ").size(16))
-                    .push(Text::new(date_time).size(20).width(Length::Fill)),
+                    .push(Text::new("Date: ").size(TEXT_SIZE - 4))
+                    .push(
+                        Text::new(date_time)
+                            .color(theme.highlight_text())
+                            .width(Length::Fill),
+                    ),
             )
             .push(
                 Row::new()
@@ -1761,31 +1768,30 @@ impl Package {
                         Row::new()
                             .width(Length::Fill)
                             .align_items(Align::End)
-                            .push(Text::new("Version: ").size(16))
-                            .push(Text::new(&self.version).size(20)),
+                            .push(Text::new("Version: ").size(TEXT_SIZE - 4))
+                            .push(Text::new(&self.version).color(theme.highlight_text())),
                     )
                     .push(
                         Text::new(match self.status {
-                            PackageStatus::Update => "UPDATE       ",
-                            PackageStatus::New => "NEW       ",
+                            PackageStatus::Update => "UPDATE   ",
+                            PackageStatus::New => "NEW   ",
                             PackageStatus::Old => "",
                         })
-                        .size(20),
+                        .color(theme.highlight_text())
+                        .size(TEXT_SIZE + 4),
                     ),
             )
             .push(
                 Row::new()
                     .align_items(Align::End)
-                    .push(Text::new("Build: ").size(16))
-                    .push(Text::new(self.build.to_string()).size(20)),
+                    .push(Text::new("Build: ").size(TEXT_SIZE - 4))
+                    .push(Text::new(self.build.to_string()).color(theme.highlight_text())),
             );
 
         let button = |label, package_message: Option<PackageMessage>, state| {
             let button = Button::new(
                 state,
-                Text::new(label)
-                    .size(18)
-                    .horizontal_alignment(HorizontalAlignment::Center),
+                Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
             )
             .width(Length::Fill)
             .style(theme);
@@ -1810,10 +1816,9 @@ impl Package {
                 ))
                 .into(),
             PackageState::Downloading { progress } => Row::new()
+                .spacing(10)
                 .align_items(Align::Center)
-                .push(
-                    Text::new(format!("Downloading... {:.2}%", progress)).width(Length::Units(220)),
-                )
+                .push(Text::new(format!("Downloading... {:.2}%", progress)))
                 .push(
                     ProgressBar::new(0.0..=100.0, *progress)
                         .width(Length::Fill)
@@ -1833,11 +1838,9 @@ impl Package {
                         .into()
                 } else {
                     Row::new()
+                        .spacing(10)
                         .align_items(Align::Center)
-                        .push(
-                            Text::new(format!("Extracting... {:.2}%", progress))
-                                .width(Length::Units(220)),
-                        )
+                        .push(Text::new(format!("Extracting... {:.2}%", progress)))
                         .push(
                             ProgressBar::new(0.0..=100.0, *progress)
                                 .width(Length::Fill)
@@ -1883,7 +1886,7 @@ impl Package {
                 ));
 
                 button3
-                    .spacing(40)
+                    .spacing(10)
                     .push(button(
                         "[X] Uninstall",
                         Some(PackageMessage::Remove),
@@ -1909,7 +1912,7 @@ impl Package {
                 theme.even_container()
             }
         })
-        .padding(20)
+        .padding(10)
         .into()
     }
 }
