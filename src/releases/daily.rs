@@ -52,20 +52,16 @@ impl ReleaseType for Daily {
                 .unwrap()
                 .to_string();
 
-            let mut date = build.find(Name("small")).next().unwrap().text();
-            let mut date: String = date.drain(..date.find('-').unwrap()).collect();
-            date.push_str(&format!("-{}", Utc::today().year()));
-            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
-
-            package.commit = build
-                .find(Name("small"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .last()
-                .unwrap()
-                .to_string();
+            let small_subtext = build.find(Name("small")).next().unwrap().text();
+            if small_subtext.contains('-') {
+                let sides: Vec<&str> = small_subtext.split_terminator('-').collect();
+                let date = format!("{}-{}", sides[0], Utc::today().year());
+                package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
+                package.commit = sides[1].to_owned();
+            } else {
+                let date = format!("{}-{}", small_subtext, Utc::today().year());
+                package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
+            }
 
             package.url = format!(
                 "https://builder.blender.org{}",

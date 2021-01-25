@@ -74,6 +74,10 @@ where
                                     // if the install was canceled. Though it's possible the file
                                     // will still be left there if the program crashed, so having
                                     // both is recommended.
+                                    // Also worth considering not deleting the entry from the
+                                    // database if there's a valid downloaded archive, so the user
+                                    // can reinstall it even if it becomes unavailable like is the
+                                    // case with daily and branched packages.
                                     if file.exists() {
                                         remove_file(&file).await.unwrap();
                                     }
@@ -162,6 +166,7 @@ where
                     } => {
                         // TODO: Figure out a way to show extraction progress on Linux.
                         // I can't pass it around due to the use of Cell and the like inside it.
+                        // TODO: Restrict compilation of these packages to specific targets.
                         let archive = if file.extension().unwrap() == "xz" {
                             DownloadedArchive::TarXz
                         } else if file.extension().unwrap() == "bz2" {
@@ -170,6 +175,9 @@ where
                             DownloadedArchive::TarGz
                         } else if file.extension().unwrap() == "zip" {
                             let zip = File::open(&file).unwrap();
+                            // TODO: Figure out why extraction panics here with:
+                            // InvalidArchive("Could not find central directory end")
+                            // on some packages. Especially old ones, but not all of them.
                             let archive = ZipArchive::new(zip).unwrap();
 
                             // This handles some archives that don't have an inner directory.

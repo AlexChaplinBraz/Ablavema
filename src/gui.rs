@@ -1152,6 +1152,7 @@ impl Application for Gui {
                 .push(tabs)
                 .push(body)
                 .push(
+                    // TODO: Add button for checking connection.
                     Container::new(
                         Container::new(Text::new("CANNOT CONNECT").size(TEXT_SIZE - 5)).padding(2),
                     )
