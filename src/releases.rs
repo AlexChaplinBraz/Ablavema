@@ -550,6 +550,10 @@ pub trait ReleaseType:
         bincode::serialize_into(file, self).unwrap();
     }
 
+    // TODO: Add method to purge database.
+    // Would be useful in case there's an available daily package even though it's
+    // no longer listed on the website. Happened with the 2.83.12 Candidate.
+
     /// Returns true if Self changed in any way so it can be reinitialised.
     fn load(&mut self) -> bool {
         let file = File::open(self.get_db_path()).unwrap();

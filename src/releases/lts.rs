@@ -48,16 +48,19 @@ impl ReleaseType for Lts {
                 .next()
                 .unwrap();
 
-            let mut date = section
+            let mut date = match section
                 .find(Name("p"))
                 .next()
                 .unwrap()
                 .text()
                 .strip_prefix("Released on ")
-                .unwrap()
-                .strip_suffix(".")
-                .unwrap()
-                .to_string();
+            {
+                Some(a) => a,
+                None => continue,
+            }
+            .strip_suffix(".")
+            .unwrap()
+            .to_string();
             date.push_str("-00:00:00");
             package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap();
 
