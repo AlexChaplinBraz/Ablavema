@@ -4,26 +4,34 @@ use crate::{
     settings::SETTINGS,
 };
 use bincode;
-use bzip2::read::BzDecoder;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use flate2::read::GzDecoder;
 use iced::button;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
-use std::{
-    fs::{create_dir_all, File},
-    io::{Read, Write},
-    mem,
-};
-use tar::Archive;
+use std::{fs::File, mem};
 use timeago::{self, TimeUnit::Minutes};
 use tokio::{
     fs::{self, remove_dir_all, remove_file},
     io::AsyncWriteExt,
     task::JoinHandle,
 };
+
+#[cfg(target_os = "linux")]
+use bzip2::read::BzDecoder;
+#[cfg(target_os = "linux")]
+use flate2::read::GzDecoder;
+#[cfg(target_os = "linux")]
+use tar::Archive;
+#[cfg(target_os = "linux")]
 use xz2::read::XzDecoder;
+
+#[cfg(target_os = "windows")]
+use std::{
+    fs::create_dir_all,
+    io::{Read, Write},
+};
+#[cfg(target_os = "windows")]
 use zip::{read::ZipFile, ZipArchive};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -191,95 +199,107 @@ impl Package {
                 .unwrap();
                 */
 
-                let tar_xz = File::open(&file).unwrap();
-                let tar = XzDecoder::new(tar_xz);
-                let mut archive = Archive::new(tar);
+                #[cfg(target_os = "linux")]
+                {
+                    let tar_xz = File::open(&file).unwrap();
+                    let tar = XzDecoder::new(tar_xz);
+                    let mut archive = Archive::new(tar);
 
-                for entry in archive.entries().unwrap() {
-                    progress_bar.inc(1);
-                    let mut file = entry.unwrap();
-                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
-                }
-
-                let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
-                progress_bar.finish_with_message(&msg);
-            } else if file.extension().unwrap() == "bz2" {
-                let tar_bz2 = File::open(&file).unwrap();
-                let tar = BzDecoder::new(tar_bz2);
-                let mut archive = Archive::new(tar);
-
-                for entry in archive.entries().unwrap() {
-                    progress_bar.inc(1);
-                    let mut file = entry.unwrap();
-                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
-                }
-
-                let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
-                progress_bar.finish_with_message(&msg);
-            } else if file.extension().unwrap() == "gz" {
-                let tar_gz = File::open(&file).unwrap();
-                let tar = GzDecoder::new(tar_gz);
-                let mut archive = Archive::new(tar);
-
-                for entry in archive.entries().unwrap() {
-                    progress_bar.inc(1);
-                    let mut file = entry.unwrap();
-                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
-                }
-
-                let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
-                progress_bar.finish_with_message(&msg);
-            } else if file.extension().unwrap() == "zip" {
-                // TODO: Improve extraction speed. The slowness is caused by Windows Defender
-                // and adding the program to the exclusions makes it extract around 6 times faster.
-                // Tried spawning threads for each file and it sped up by around 3 times,
-                // but it makes the progress bar meaningless. Possible clues for improvements here:
-                // https://github.com/rust-lang/rustup/pull/1850
-                let zip = File::open(&file).unwrap();
-                let mut archive = ZipArchive::new(zip).unwrap();
-
-                progress_bar.set_length(archive.len() as u64);
-
-                // This handles some archives that don't have an inner directory.
-                let extraction_dir = match file.file_name().unwrap().to_str().unwrap() {
-                    "blender-2.49-win64.zip" => SETTINGS
-                        .read()
-                        .unwrap()
-                        .cache_dir
-                        .join("blender-2.49-win64"),
-                    "blender-2.49a-win64-python26.zip" => SETTINGS
-                        .read()
-                        .unwrap()
-                        .cache_dir
-                        .join("blender-2.49a-win64-python26"),
-                    "blender-2.49b-win64-python26.zip" => SETTINGS
-                        .read()
-                        .unwrap()
-                        .cache_dir
-                        .join("blender-2.49b-win64-python26"),
-                    _ => SETTINGS.read().unwrap().cache_dir.clone(),
-                };
-
-                for file_index in 0..archive.len() {
-                    progress_bar.inc(1);
-                    let mut entry: ZipFile<'_> = archive.by_index(file_index).unwrap();
-                    let name = entry.name().to_owned();
-
-                    if entry.is_dir() {
-                        let extracted_dir_path = extraction_dir.join(name);
-                        create_dir_all(extracted_dir_path).unwrap();
-                    } else if entry.is_file() {
-                        let mut buffer: Vec<u8> = Vec::new();
-                        let _bytes_read = entry.read_to_end(&mut buffer).unwrap();
-                        let extracted_file_path = extraction_dir.join(name);
-                        create_dir_all(extracted_file_path.parent().unwrap()).unwrap();
-                        let mut file = File::create(extracted_file_path).unwrap();
-                        file.write(&buffer).unwrap();
+                    for entry in archive.entries().unwrap() {
+                        progress_bar.inc(1);
+                        let mut file = entry.unwrap();
+                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
                     }
-                }
 
-                let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
-                progress_bar.finish_with_message(&msg);
+                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
+                    progress_bar.finish_with_message(&msg);
+                }
+            } else if file.extension().unwrap() == "bz2" {
+                #[cfg(target_os = "linux")]
+                {
+                    let tar_bz2 = File::open(&file).unwrap();
+                    let tar = BzDecoder::new(tar_bz2);
+                    let mut archive = Archive::new(tar);
+
+                    for entry in archive.entries().unwrap() {
+                        progress_bar.inc(1);
+                        let mut file = entry.unwrap();
+                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                    }
+
+                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
+                    progress_bar.finish_with_message(&msg);
+                }
+            } else if file.extension().unwrap() == "gz" {
+                #[cfg(target_os = "linux")]
+                {
+                    let tar_gz = File::open(&file).unwrap();
+                    let tar = GzDecoder::new(tar_gz);
+                    let mut archive = Archive::new(tar);
+
+                    for entry in archive.entries().unwrap() {
+                        progress_bar.inc(1);
+                        let mut file = entry.unwrap();
+                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                    }
+
+                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
+                    progress_bar.finish_with_message(&msg);
+                }
+            } else if file.extension().unwrap() == "zip" {
+                #[cfg(target_os = "windows")]
+                {
+                    // TODO: Improve extraction speed. The slowness is caused by Windows Defender
+                    // and adding the program to the exclusions makes it extract around 6 times faster.
+                    // Tried spawning threads for each file and it sped up by around 3 times,
+                    // but it makes the progress bar meaningless. Possible clues for improvements here:
+                    // https://github.com/rust-lang/rustup/pull/1850
+                    let zip = File::open(&file).unwrap();
+                    let mut archive = ZipArchive::new(zip).unwrap();
+
+                    progress_bar.set_length(archive.len() as u64);
+
+                    // This handles some archives that don't have an inner directory.
+                    let extraction_dir = match file.file_name().unwrap().to_str().unwrap() {
+                        "blender-2.49-win64.zip" => SETTINGS
+                            .read()
+                            .unwrap()
+                            .cache_dir
+                            .join("blender-2.49-win64"),
+                        "blender-2.49a-win64-python26.zip" => SETTINGS
+                            .read()
+                            .unwrap()
+                            .cache_dir
+                            .join("blender-2.49a-win64-python26"),
+                        "blender-2.49b-win64-python26.zip" => SETTINGS
+                            .read()
+                            .unwrap()
+                            .cache_dir
+                            .join("blender-2.49b-win64-python26"),
+                        _ => SETTINGS.read().unwrap().cache_dir.clone(),
+                    };
+
+                    for file_index in 0..archive.len() {
+                        progress_bar.inc(1);
+                        let mut entry: ZipFile<'_> = archive.by_index(file_index).unwrap();
+                        let name = entry.name().to_owned();
+
+                        if entry.is_dir() {
+                            let extracted_dir_path = extraction_dir.join(name);
+                            create_dir_all(extracted_dir_path).unwrap();
+                        } else if entry.is_file() {
+                            let mut buffer: Vec<u8> = Vec::new();
+                            let _bytes_read = entry.read_to_end(&mut buffer).unwrap();
+                            let extracted_file_path = extraction_dir.join(name);
+                            create_dir_all(extracted_file_path.parent().unwrap()).unwrap();
+                            let mut file = File::create(extracted_file_path).unwrap();
+                            file.write(&buffer).unwrap();
+                        }
+                    }
+
+                    let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
+                    progress_bar.finish_with_message(&msg);
+                }
             } else if file.extension().unwrap() == "dmg" {
                 todo!("macos extraction");
             } else {

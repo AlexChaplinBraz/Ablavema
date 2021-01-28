@@ -2,24 +2,33 @@
 use super::{Message, PackageMessage};
 use crate::{helpers::get_extracted_name, package::Package, settings::SETTINGS};
 use bincode;
-use bzip2::read::BzDecoder;
-use flate2::read::GzDecoder;
 use iced_futures::{
     futures::stream::{unfold, BoxStream},
     subscription,
 };
 use reqwest;
 use std::{
-    fs::create_dir_all,
     fs::File,
     hash::{Hash, Hasher},
-    io::Read,
-    io::Write,
     path::PathBuf,
 };
-use tar::Archive;
 use tokio::fs::{remove_dir_all, remove_file};
+
+#[cfg(target_os = "linux")]
+use bzip2::read::BzDecoder;
+#[cfg(target_os = "linux")]
+use flate2::read::GzDecoder;
+#[cfg(target_os = "linux")]
+use tar::Archive;
+#[cfg(target_os = "linux")]
 use xz2::read::XzDecoder;
+
+#[cfg(target_os = "windows")]
+use std::{
+    fs::create_dir_all,
+    io::{Read, Write},
+};
+#[cfg(target_os = "windows")]
 use zip::{read::ZipFile, ZipArchive};
 
 pub struct Install {
@@ -166,47 +175,62 @@ where
                     } => {
                         // TODO: Figure out a way to show extraction progress on Linux.
                         // I can't pass it around due to the use of Cell and the like inside it.
-                        // TODO: Restrict compilation of these packages to specific targets.
+
                         let archive = if file.extension().unwrap() == "xz" {
+                            #[cfg(not(target_os = "linux"))]
+                            unreachable!("Linux extraction on non-Linux OS");
+                            #[cfg(target_os = "linux")]
                             DownloadedArchive::TarXz
                         } else if file.extension().unwrap() == "bz2" {
+                            #[cfg(not(target_os = "linux"))]
+                            unreachable!("Linux extraction on non-Linux OS");
+                            #[cfg(target_os = "linux")]
                             DownloadedArchive::TarBz
                         } else if file.extension().unwrap() == "gz" {
+                            #[cfg(not(target_os = "linux"))]
+                            unreachable!("Linux extraction on non-Linux OS");
+                            #[cfg(target_os = "linux")]
                             DownloadedArchive::TarGz
                         } else if file.extension().unwrap() == "zip" {
-                            let zip = File::open(&file).unwrap();
-                            // TODO: Figure out why extraction panics here with:
-                            // InvalidArchive("Could not find central directory end")
-                            // on some packages. Especially old ones, but not all of them.
-                            let archive = ZipArchive::new(zip).unwrap();
+                            #[cfg(not(target_os = "windows"))]
+                            unreachable!("Windows extraction on non-Windows OS");
+                            #[cfg(target_os = "windows")]
+                            {
+                                let zip = File::open(&file).unwrap();
+                                // TODO: Figure out why extraction panics here with:
+                                // InvalidArchive("Could not find central directory end")
+                                // on some packages. Especially old ones, but not all of them.
+                                let archive = ZipArchive::new(zip).unwrap();
 
-                            // This handles some archives that don't have an inner directory.
-                            let extraction_dir = match file.file_name().unwrap().to_str().unwrap() {
-                                "blender-2.49-win64.zip" => SETTINGS
-                                    .read()
-                                    .unwrap()
-                                    .cache_dir
-                                    .join("blender-2.49-win64"),
-                                "blender-2.49a-win64-python26.zip" => SETTINGS
-                                    .read()
-                                    .unwrap()
-                                    .cache_dir
-                                    .join("blender-2.49a-win64-python26"),
-                                "blender-2.49b-win64-python26.zip" => SETTINGS
-                                    .read()
-                                    .unwrap()
-                                    .cache_dir
-                                    .join("blender-2.49b-win64-python26"),
-                                _ => SETTINGS.read().unwrap().cache_dir.clone(),
-                            };
+                                // This handles some archives that don't have an inner directory.
+                                let extraction_dir =
+                                    match file.file_name().unwrap().to_str().unwrap() {
+                                        "blender-2.49-win64.zip" => SETTINGS
+                                            .read()
+                                            .unwrap()
+                                            .cache_dir
+                                            .join("blender-2.49-win64"),
+                                        "blender-2.49a-win64-python26.zip" => SETTINGS
+                                            .read()
+                                            .unwrap()
+                                            .cache_dir
+                                            .join("blender-2.49a-win64-python26"),
+                                        "blender-2.49b-win64-python26.zip" => SETTINGS
+                                            .read()
+                                            .unwrap()
+                                            .cache_dir
+                                            .join("blender-2.49b-win64-python26"),
+                                        _ => SETTINGS.read().unwrap().cache_dir.clone(),
+                                    };
 
-                            let total = archive.len() as u64;
+                                let total = archive.len() as u64;
 
-                            DownloadedArchive::Zip {
-                                archive,
-                                extraction_dir,
-                                total,
-                                extracted: 0,
+                                DownloadedArchive::Zip {
+                                    archive,
+                                    extraction_dir,
+                                    total,
+                                    extracted: 0,
+                                }
                             }
                         } else if file.extension().unwrap() == "dmg" {
                             todo!("macos extraction");
@@ -230,6 +254,7 @@ where
                         archive,
                         index,
                     } => match archive {
+                        #[cfg(target_os = "linux")]
                         DownloadedArchive::TarXz => {
                             let tar_xz = File::open(&file).unwrap();
                             let tar = XzDecoder::new(tar_xz);
@@ -245,6 +270,7 @@ where
                                 State::FinishedExtracting { package, index },
                             ))
                         }
+                        #[cfg(target_os = "linux")]
                         DownloadedArchive::TarBz => {
                             let tar_gz = File::open(&file).unwrap();
                             let tar = GzDecoder::new(tar_gz);
@@ -262,6 +288,7 @@ where
                                 State::FinishedExtracting { package, index },
                             ))
                         }
+                        #[cfg(target_os = "linux")]
                         DownloadedArchive::TarGz => {
                             let tar_bz2 = File::open(&file).unwrap();
                             let tar = BzDecoder::new(tar_bz2);
@@ -279,6 +306,7 @@ where
                                 State::FinishedExtracting { package, index },
                             ))
                         }
+                        #[cfg(target_os = "windows")]
                         DownloadedArchive::Zip {
                             mut archive,
                             extraction_dir,
@@ -410,9 +438,13 @@ enum State {
 }
 
 enum DownloadedArchive {
+    #[cfg(target_os = "linux")]
     TarXz, // { entries: Entries<XzDecoder<File>> },
+    #[cfg(target_os = "linux")]
     TarBz, // { entries: Entries<BzDecoder<File>> },
+    #[cfg(target_os = "linux")]
     TarGz, // { entries: Entries<GzDecoder<File>> },
+    #[cfg(target_os = "windows")]
     Zip {
         archive: ZipArchive<File>,
         extraction_dir: PathBuf,
