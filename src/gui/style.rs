@@ -1,5 +1,5 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
-use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, slider, Color};
+use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, Color};
 use serde::{Deserialize, Serialize};
 
 /// Creates a const Color. Takes values from 0 to 255.
@@ -122,15 +122,6 @@ impl From<Theme> for Box<dyn button::StyleSheet> {
     }
 }
 
-impl From<Theme> for Box<dyn slider::StyleSheet> {
-    fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => light::Slider.into(),
-            Theme::Dark => dark::Slider.into(),
-        }
-    }
-}
-
 impl From<Theme> for Box<dyn progress_bar::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
@@ -168,9 +159,7 @@ impl From<Theme> for Box<dyn rule::StyleSheet> {
 }
 
 mod light {
-    use iced::{
-        button, checkbox, container, pick_list, progress_bar, radio, rule, slider, Color, Vector,
-    };
+    use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, Color, Vector};
 
     const_color!(ACTIVE_TAB, 190, 190, 190);
     const_color!(HOVERED_TAB, 142, 142, 142);
@@ -419,51 +408,10 @@ mod light {
             }
         }
     }
-
-    pub struct Slider;
-    impl slider::StyleSheet for Slider {
-        fn active(&self) -> slider::Style {
-            slider::Style {
-                rail_colors: (ACTIVE, ACTIVE),
-                handle: slider::Handle {
-                    shape: slider::HandleShape::Circle { radius: 9.0 },
-                    color: INACTIVE,
-                    border_width: 0.0,
-                    border_color: Color::TRANSPARENT,
-                },
-            }
-        }
-
-        fn hovered(&self) -> slider::Style {
-            let active = self.active();
-
-            slider::Style {
-                handle: slider::Handle {
-                    color: HOVERED,
-                    ..active.handle
-                },
-                ..active
-            }
-        }
-
-        fn dragging(&self) -> slider::Style {
-            let active = self.active();
-
-            slider::Style {
-                handle: slider::Handle {
-                    color: ACTIVE,
-                    ..active.handle
-                },
-                ..active
-            }
-        }
-    }
 }
 
 mod dark {
-    use iced::{
-        button, checkbox, container, pick_list, progress_bar, radio, rule, slider, Color, Vector,
-    };
+    use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, Color, Vector};
 
     const_color!(ACTIVE_TAB, 66, 66, 66);
     const_color!(HOVERED_TAB, 52, 52, 52);
@@ -709,45 +657,6 @@ mod dark {
                 width: 2,
                 radius: 1.0,
                 fill_mode: rule::FillMode::Full,
-            }
-        }
-    }
-
-    pub struct Slider;
-    impl slider::StyleSheet for Slider {
-        fn active(&self) -> slider::Style {
-            slider::Style {
-                rail_colors: (ACTIVE, ACTIVE),
-                handle: slider::Handle {
-                    shape: slider::HandleShape::Circle { radius: 9.0 },
-                    color: INACTIVE,
-                    border_width: 0.0,
-                    border_color: Color::TRANSPARENT,
-                },
-            }
-        }
-
-        fn hovered(&self) -> slider::Style {
-            let active = self.active();
-
-            slider::Style {
-                handle: slider::Handle {
-                    color: HOVERED,
-                    ..active.handle
-                },
-                ..active
-            }
-        }
-
-        fn dragging(&self) -> slider::Style {
-            let active = self.active();
-
-            slider::Style {
-                handle: slider::Handle {
-                    color: ACTIVE,
-                    ..active.handle
-                },
-                ..active
             }
         }
     }

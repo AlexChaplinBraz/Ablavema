@@ -15,9 +15,9 @@ use crate::{
     settings::{ModifierKey, CAN_CONNECT, SETTINGS, TEXT_SIZE},
 };
 use iced::{
-    button, pick_list, scrollable, slider, Align, Application, Button, Checkbox, Column, Command,
+    button, pick_list, scrollable, Align, Application, Button, Checkbox, Column, Command,
     Container, Element, Executor, HorizontalAlignment, Length, PickList, ProgressBar, Radio, Row,
-    Rule, Scrollable, Slider, Space, Subscription, Text,
+    Rule, Scrollable, Space, Subscription, Text,
 };
 use itertools::Itertools;
 use reqwest;
@@ -661,12 +661,20 @@ impl Application for Gui {
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
-            Message::MinutesBetweenUpdatesChanged(minutes) => {
-                self.state.minute_value = minutes;
-                Command::none()
-            }
-            Message::SaveMinutesBetweenUpdates(minutes) => {
-                SETTINGS.write().unwrap().minutes_between_updates = minutes as u64;
+            Message::MinutesBetweenUpdatesChanged(change) => {
+                if change.is_positive() {
+                    let mut current = SETTINGS.read().unwrap().minutes_between_updates;
+                    current += change as u64;
+                    if current > 1440 {
+                        SETTINGS.write().unwrap().minutes_between_updates = 1440;
+                    } else {
+                        SETTINGS.write().unwrap().minutes_between_updates = current;
+                    }
+                } else {
+                    let current = SETTINGS.read().unwrap().minutes_between_updates;
+                    SETTINGS.write().unwrap().minutes_between_updates =
+                        current.saturating_sub(change.abs() as u64);
+                }
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
@@ -989,6 +997,19 @@ impl Application for Gui {
                     false => Some(Choice::Disable),
                 };
 
+                // TODO: Change to a stepper when available.
+                // A proper stepper would be better, but this will do for now.
+                // At least it's much better than a slider.
+                let min_button = |label, amount, state| {
+                    Button::new(
+                        state,
+                        Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
+                    )
+                    .on_press(Message::MinutesBetweenUpdatesChanged(amount))
+                    .width(Length::Fill)
+                    .style(theme.tab_button())
+                };
+
                 let settings = Column::new()
                     .padding(10)
                     .spacing(10)
@@ -1011,30 +1032,32 @@ impl Application for Gui {
                     .push(Row::new()
                         .push(Space::with_width(Length::Units(10)))
                         .push(Column::new()
+                            .width(Length::Fill)
                             .spacing(10)
                             .push(Text::new("Delay between checks")
                                 .color(theme.highlight_text())
                                 .size(TEXT_SIZE * 2)
                             )
-                            .push(Text::new("Minutes to wait between update checks. Setting it to 0 will make it check every time. Maximum is 24 hours."))
+                            .push(Text::new("Minutes to wait between update checks. Setting it to 0 will make it check every time. Maximum is a day (1440 minutes)."))
+                        )
+                        .push(Space::with_width(Length::Units(10)))
+                        .push(Column::new()
+                            .align_items(Align::Center)
+                            .width(Length::Units(150))
+                            .spacing(3)
                             .push(Row::new()
-                                .push(Text::new(format!("Current: {}", self.state.minute_value)).width(Length::Units(130)))
-                                // TODO: Change the way delay is configured.
-                                // I hate this slider, but the TextInput doesn't quite work for
-                                // increasing/decreasing an integer. We need a stepper here.
-                                // I could try to imitate it with a TextInput and two buttons,
-                                // but I'd need to handle non-number input somehow.
-                                .push(Slider::new(
-                                    &mut self.state.minute_slider,
-                                    0.0..=1440.0,
-                                    self.state.minute_value,
-                                    Message::MinutesBetweenUpdatesChanged)
-                                        .on_release(Message::SaveMinutesBetweenUpdates(self.state.minute_value))
-                                        .style(self.theme)
-                                )
-                                .push(Space::with_width(Length::Units(10)))
+                                .push(min_button("+1", 1, &mut self.state.plus_1_button))
+                                .push(min_button("+10", 10, &mut self.state.plus_10_button))
+                                .push(min_button("+100", 100, &mut self.state.plus_100_button))
+                            )
+                            .push(Text::new(SETTINGS.read().unwrap().minutes_between_updates.to_string()))
+                            .push(Row::new()
+                                .push(min_button("-1", -1, &mut self.state.minus_1_button))
+                                .push(min_button("-10", -10, &mut self.state.minus_10_button))
+                                .push(min_button("-100", -100, &mut self.state.minus_100_button))
                             )
                         )
+                        .push(Space::with_width(Length::Units(10)))
                     )
                     .push(Rule::horizontal(0).style(self.theme))
                     .push(choice_setting!(
@@ -1247,8 +1270,7 @@ pub enum Message {
     ModifierKey(ModifierKey),
     UseLatestAsDefault(Choice),
     CheckUpdatesAtLaunch(Choice),
-    MinutesBetweenUpdatesChanged(f64),
-    SaveMinutesBetweenUpdates(f64),
+    MinutesBetweenUpdatesChanged(i64),
     UpdateDaily(Choice),
     UpdateBranched(Choice),
     UpdateStable(Choice),
@@ -1277,8 +1299,12 @@ struct GuiState {
     packages_button: button::State,
     settings_button: button::State,
     about_button: button::State,
-    minute_slider: slider::State,
-    minute_value: f64,
+    plus_1_button: button::State,
+    plus_10_button: button::State,
+    plus_100_button: button::State,
+    minus_1_button: button::State,
+    minus_10_button: button::State,
+    minus_100_button: button::State,
 }
 
 impl GuiState {
@@ -1289,7 +1315,6 @@ impl GuiState {
                 sort_by: SETTINGS.read().unwrap().sort_by,
                 ..Controls::default()
             },
-            minute_value: SETTINGS.read().unwrap().minutes_between_updates as f64,
             ..Self::default()
         }
     }
