@@ -17,7 +17,7 @@ use crate::{
 use iced::{
     button, pick_list, scrollable, slider, Align, Application, Button, Checkbox, Column, Command,
     Container, Element, Executor, HorizontalAlignment, Length, PickList, ProgressBar, Radio, Row,
-    Rule, Scrollable, Slider, Subscription, Text,
+    Rule, Scrollable, Slider, Space, Subscription, Text,
 };
 use itertools::Itertools;
 use reqwest;
@@ -952,8 +952,8 @@ impl Application for Gui {
                 macro_rules! choice_setting {
                     ($title:expr, $description:expr, &$array:expr, $option:expr, $message:expr,) => {
                         Row::new()
-                            .spacing(40)
                             .align_items(Align::Center)
+                            .push(Space::with_width(Length::Units(10)))
                             .push(
                                 Column::new()
                                     .spacing(10)
@@ -965,6 +965,7 @@ impl Application for Gui {
                                     )
                                     .push(Text::new($description)),
                             )
+                            .push(Space::with_width(Length::Units(20)))
                             .push($array.iter().fold(
                                 Column::new().spacing(10).width(Length::Units(110)),
                                 |col, value| {
@@ -979,6 +980,7 @@ impl Application for Gui {
                                     )
                                 },
                             ))
+                            .push(Space::with_width(Length::Units(10)))
                     };
                 }
 
@@ -987,143 +989,166 @@ impl Application for Gui {
                     false => Some(Choice::Disable),
                 };
 
-                // TODO: Rewrite descriptions to better explain the behaviour of checking for updates.
-                // Maybe try to group settings with a general description about them.
                 let settings = Column::new()
                     .padding(10)
-                    .push(
-                        choice_setting!(
-                            "Bypass launcher",
-                            "If a default package is set and no updates were found, only open launcher when the selected modifier key is held down.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().bypass_launcher).unwrap()),
-                            Message::BypassLauncher,
+                    .spacing(10)
+                    .push(Text::new("Checking for updates")
+                        .width(Length::Fill)
+                        .horizontal_alignment(HorizontalAlignment::Center)
+                        .size(TEXT_SIZE * 3)
+                        .color(theme.highlight_text())
+                    )
+                    .push(Text::new("These settings affect how checking for updates works. Enabling specific build types also marks the newest package of that build as an update. Keep in mind that you need to first have one installed package of that build type for any newer ones to be marked as an update, even if you're checking for their updates."))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Check at launch",
+                        "Increases launch time for about a second or two. Having a delay between checks improves launch speed.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().check_updates_at_launch).unwrap()),
+                        Message::CheckUpdatesAtLaunch,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(Row::new()
+                        .push(Space::with_width(Length::Units(10)))
+                        .push(Column::new()
+                            .spacing(10)
+                            .push(Text::new("Delay between checks")
+                                .color(theme.highlight_text())
+                                .size(TEXT_SIZE * 2)
+                            )
+                            .push(Text::new("Minutes to wait between update checks. Setting it to 0 will make it check every time. Maximum is 24 hours."))
+                            .push(Row::new()
+                                .push(Text::new(format!("Current: {}", self.state.minute_value)).width(Length::Units(130)))
+                                // TODO: Change the way delay is configured.
+                                // I hate this slider, but the TextInput doesn't quite work for
+                                // increasing/decreasing an integer. We need a stepper here.
+                                // I could try to imitate it with a TextInput and two buttons,
+                                // but I'd need to handle non-number input somehow.
+                                .push(Slider::new(
+                                    &mut self.state.minute_slider,
+                                    0.0..=1440.0,
+                                    self.state.minute_value,
+                                    Message::MinutesBetweenUpdatesChanged)
+                                        .on_release(Message::SaveMinutesBetweenUpdates(self.state.minute_value))
+                                        .style(self.theme)
+                                )
+                                .push(Space::with_width(Length::Units(10)))
+                            )
                         )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Modifier key",
-                            "Change the modifier key if there's any interference when opening the launcher or a .blend file while holding it down.",
-                            &ModifierKey::ALL,
-                            Some(SETTINGS.read().unwrap().modifier_key),
-                            Message::ModifierKey,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Use latest as default",
-                            "Change to the latest package of the same build type when updating.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().use_latest_as_default).unwrap()),
-                            Message::UseLatestAsDefault,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Check updates at launch",
-                            "Increases launch time for about a second or two. Having a delay between checks improves launch speed.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().check_updates_at_launch).unwrap()),
-                            Message::CheckUpdatesAtLaunch,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(Column::new()
-                        .spacing(10)
-                        .push(Text::new("Delay between update checking")
-                            .color(theme.highlight_text())
-                            .size(TEXT_SIZE * 2))
-                        .push(Text::new("Minutes to wait between update checks. Setting it to 0 will make it check every time. Maximum is 24 hours."))
-                        .push(Row::new()
-                            .push(Text::new(format!("Current: {}", self.state.minute_value)).width(Length::Units(130)))
-                            .push(Slider::new(
-                                &mut self.state.minute_slider,
-                                0.0..=1440.0,
-                                self.state.minute_value,
-                                Message::MinutesBetweenUpdatesChanged)
-                                    .on_release(Message::SaveMinutesBetweenUpdates(self.state.minute_value))
-                                    .style(self.theme)))
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Check for daily packages",
-                            "When updating, check for new daily packages. This setting also affects whether the newest daily package is counted as an update.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().update_daily).unwrap()),
-                            Message::UpdateDaily,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Check for branched packages",
-                            "When updating, check for new branched packages. This setting also affects whether the newest branched package is counted as an update.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().update_branched).unwrap()),
-                            Message::UpdateBranched,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Check for stable packages",
-                            "When updating, check for new stable packages. This setting also affects whether the newest stable package is counted as an update.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().update_stable).unwrap()),
-                            Message::UpdateStable,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Check for LTS packages",
-                            "When updating, check for new LTS packages. This setting also affects whether the newest LTS package is counted as an update.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().update_lts).unwrap()),
-                            Message::UpdateLts,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Keep only newest daily package",
-                            "Remove all older daily packages of its build type when installing an update.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_daily).unwrap()),
-                            Message::KeepOnlyLatestDaily,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Keep only newest branched package",
-                            "Remove all older branched packages of its build type when installing an update.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_branched).unwrap()),
-                            Message::KeepOnlyLatestBranched,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Keep only newest stable package",
-                           "Remove all older stable packages when installing an update.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_stable).unwrap()),
-                            Message::KeepOnlyLatestStable,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Keep only newest LTS package",
-                            "Remove all older LTS packages when installing an update.",
-                            &Choice::ALL,
-                            Some(choice(SETTINGS.read().unwrap().keep_only_latest_lts).unwrap()),
-                            Message::KeepOnlyLatestLts,
-                        )
-                    ).push(Rule::horizontal(20).style(self.theme)
-                    ).push(
-                        choice_setting!(
-                            "Choose the theme",
-                            "Both are simple light and dark colour schemes.",
-                            &Theme::ALL,
-                            Some(theme),
-                            Message::ThemeChanged,
-                        )
-                    );
+                    )
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Check daily packages",
+                        "Look for new daily packages. Each build, like Alpha and Beta, is considered separate.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().update_daily).unwrap()),
+                        Message::UpdateDaily,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Check branched packages",
+                        "Look for new branched packages. Each branch is considered a separate build.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().update_branched).unwrap()),
+                        Message::UpdateBranched,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Check stable packages",
+                        "Look for new stable packages.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().update_stable).unwrap()),
+                        Message::UpdateStable,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Check LTS packages",
+                        "Look for new LTS packages.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().update_lts).unwrap()),
+                        Message::UpdateLts,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(Text::new("Installing updates")
+                        .width(Length::Fill)
+                        .horizontal_alignment(HorizontalAlignment::Center)
+                        .size(TEXT_SIZE * 3)
+                        .color(theme.highlight_text())
+                    )
+                    .push(Text::new("These settings affect what happens when an update is installed. Turning on old package removal for a build type means not being able to install an older version of the same build, like older LTS versions. So if needed, install those from the Archived packages."))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Use latest as default",
+                        "Change to the latest package of the same build type when installing an update.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().use_latest_as_default).unwrap()),
+                        Message::UseLatestAsDefault,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Keep only newest daily package",
+                        "Remove all older daily packages of its build type when installing an update.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().keep_only_latest_daily).unwrap()),
+                        Message::KeepOnlyLatestDaily,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Keep only newest branched package",
+                        "Remove all older branched packages of its build type when installing an update.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().keep_only_latest_branched).unwrap()),
+                        Message::KeepOnlyLatestBranched,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Keep only newest stable package",
+                        "Remove all older stable packages when installing an update.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().keep_only_latest_stable).unwrap()),
+                        Message::KeepOnlyLatestStable,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Keep only newest LTS package",
+                        "Remove all older LTS packages when installing an update.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().keep_only_latest_lts).unwrap()),
+                        Message::KeepOnlyLatestLts,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(Text::new("Others")
+                        .width(Length::Fill)
+                        .horizontal_alignment(HorizontalAlignment::Center)
+                        .size(TEXT_SIZE * 3)
+                        .color(theme.highlight_text())
+                    )
+                    .push(Text::new("A few miscellaneous but useful settings."))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Bypass launcher",
+                        "The prefered way to use this launcher. If a default package is set and no updates were found, only open launcher when the selected modifier key is held down. This way the launcher only makes itself known if there's an update or if you want to launch a different package.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().bypass_launcher).unwrap()),
+                        Message::BypassLauncher,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Modifier key",
+                        "You can start holding the modifier key even before double clicking on a .blend file or BlenderLauncher shortcut, but you are able to change it if there's any interference.",
+                        &ModifierKey::ALL,
+                        Some(SETTINGS.read().unwrap().modifier_key),
+                        Message::ModifierKey,
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Choose the theme",
+                        "Both try to mimic Blender's colour schemes as much as possible.",
+                        &Theme::ALL,
+                        Some(theme),
+                        Message::ThemeChanged,
+                    )
+                );
 
                 Container::new(Scrollable::new(&mut self.state.settings_scroll).push(settings))
                     .height(Length::Fill)
