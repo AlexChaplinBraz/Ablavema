@@ -20,7 +20,13 @@ use indicatif::MultiProgress;
 use lazy_static::initialize;
 use reqwest;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fs::File, iter, mem, ops, path::PathBuf, sync::atomic::Ordering, time::SystemTime};
+use std::{
+    fs::{remove_file, File},
+    iter, mem, ops,
+    path::PathBuf,
+    sync::atomic::Ordering,
+    time::SystemTime,
+};
 
 #[derive(Debug, Default)]
 pub struct Releases {
@@ -550,10 +556,6 @@ pub trait ReleaseType:
         bincode::serialize_into(file, self).unwrap();
     }
 
-    // TODO: Add method to purge database.
-    // Would be useful in case there's an available daily package even though it's
-    // no longer listed on the website. Happened with the 2.83.12 Candidate.
-
     /// Returns true if Self changed in any way so it can be reinitialised.
     fn load(&mut self) -> bool {
         let file = File::open(self.get_db_path()).unwrap();
@@ -563,6 +565,14 @@ pub trait ReleaseType:
                 false
             }
             Err(_) => true,
+        }
+    }
+
+    fn purge(&mut self) {
+        let database = self.get_db_path();
+        if database.exists() {
+            remove_file(database).unwrap();
+            *self = Self::default();
         }
     }
 }

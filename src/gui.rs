@@ -476,6 +476,7 @@ impl Application for Gui {
                 self.releases.stable = stable;
                 self.releases.lts = lts;
                 self.releases.archived = archived;
+                self.releases.sync();
                 self.state.controls.checking_for_updates = false;
                 Command::none()
             }
@@ -488,6 +489,7 @@ impl Application for Gui {
             }
             Message::DailyFetched((_, daily)) => {
                 self.releases.daily = daily;
+                self.releases.sync();
                 self.state.controls.checking_for_updates = false;
                 Command::none()
             }
@@ -500,6 +502,7 @@ impl Application for Gui {
             }
             Message::BranchedFetched((_, branched)) => {
                 self.releases.branched = branched;
+                self.releases.sync();
                 self.state.controls.checking_for_updates = false;
                 Command::none()
             }
@@ -512,6 +515,7 @@ impl Application for Gui {
             }
             Message::StableFetched((_, stable)) => {
                 self.releases.stable = stable;
+                self.releases.sync();
                 self.state.controls.checking_for_updates = false;
                 Command::none()
             }
@@ -524,6 +528,7 @@ impl Application for Gui {
             }
             Message::LtsFetched((_, lts)) => {
                 self.releases.lts = lts;
+                self.releases.sync();
                 self.state.controls.checking_for_updates = false;
                 Command::none()
             }
@@ -536,6 +541,7 @@ impl Application for Gui {
             }
             Message::ArchivedFetched((_, archived)) => {
                 self.releases.archived = archived;
+                self.releases.sync();
                 self.state.controls.checking_for_updates = false;
                 Command::none()
             }
@@ -750,6 +756,33 @@ impl Application for Gui {
                 self.theme = theme;
                 SETTINGS.write().unwrap().theme = theme;
                 SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::PurgeDb(dbtype) => {
+                match dbtype {
+                    DbType::All => {
+                        self.releases.daily.purge();
+                        self.releases.branched.purge();
+                        self.releases.stable.purge();
+                        self.releases.lts.purge();
+                        self.releases.archived.purge();
+                    }
+                    DbType::Daily => {
+                        self.releases.daily.purge();
+                    }
+                    DbType::Branched => {
+                        self.releases.branched.purge();
+                    }
+                    DbType::Stable => {
+                        self.releases.stable.purge();
+                    }
+                    DbType::Lts => {
+                        self.releases.lts.purge();
+                    }
+                    DbType::Archived => {
+                        self.releases.archived.purge();
+                    }
+                }
                 Command::none()
             }
         }
@@ -1010,6 +1043,32 @@ impl Application for Gui {
                     .style(theme.tab_button())
                 };
 
+                let purge_button = |label, dbtype, exists, state| {
+                    let button = Button::new(
+                        state,
+                        Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
+                    )
+                    .width(Length::Fill)
+                    .style(theme.tab_button());
+
+                    if exists {
+                        button.on_press(Message::PurgeDb(dbtype))
+                    } else {
+                        button
+                    }
+                };
+
+                let daily_db_exists = self.releases.daily.get_db_path().exists();
+                let branched_db_exists = self.releases.branched.get_db_path().exists();
+                let stable_db_exists = self.releases.stable.get_db_path().exists();
+                let lts_db_exists = self.releases.lts.get_db_path().exists();
+                let archived_db_exists = self.releases.archived.get_db_path().exists();
+                let any_dbs_exist = daily_db_exists
+                    || branched_db_exists
+                    || stable_db_exists
+                    || lts_db_exists
+                    || archived_db_exists;
+
                 let settings = Column::new()
                     .padding(10)
                     .spacing(10)
@@ -1170,7 +1229,65 @@ impl Application for Gui {
                         &Theme::ALL,
                         Some(theme),
                         Message::ThemeChanged,
-                    )
+                    ))
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(Row::new()
+                        .align_items(Align::Center)
+                        .push(Space::with_width(Length::Units(10)))
+                        .push(Column::new()
+                            .spacing(10)
+                            .width(Length::Fill)
+                            .push(Text::new("Purge databases")
+                                .color(theme.highlight_text())
+                                .size(TEXT_SIZE * 2),
+                            )
+                            .push(Text::new("Remove databases. Useful for when a release candidate is still available even though it doesn't appear in the website anymore. Keep in mind that bookmarks are stored in the databases, so they will be lost. Also, any installed package that's no longer available, like with old daily and branched packages, won't reapear."))
+                            .push(Row::new()
+                                .spacing(5)
+                                .push(purge_button(
+                                    "All",
+                                    DbType::All,
+                                    any_dbs_exist,
+                                    &mut self.state.purge_all_button
+                                ))
+                                .push(purge_button(
+                                    "Daily",
+                                    DbType::Daily,
+                                    daily_db_exists,
+                                    &mut self.state.purge_daily_button
+                                ))
+                                .push(purge_button(
+                                    "Branched",
+                                    DbType::Branched,
+                                    branched_db_exists,
+                                    &mut self.state.purge_branched_button
+                                ))
+                                .push(purge_button(
+                                    "Stable",
+                                    DbType::Stable,
+                                    stable_db_exists,
+                                    &mut self.state.purge_stable_button
+                                ))
+                                .push(purge_button(
+                                    "LTS",
+                                    DbType::Lts,
+                                    lts_db_exists,
+                                    &mut self.state.purge_lts_button
+                                ))
+                                .push(purge_button(
+                                    "Archived",
+                                    DbType::Archived,
+                                    archived_db_exists,
+                                    &mut self.state.purge_archived_button
+                                ))
+                            ),
+                        )
+                        .push(Space::with_width(Length::Units(10)))
+                    // TODO: Add cache removal.
+                    // Show how much space it's taking and how much disk space is left.
+                    // Maybe also show how much space installed packages take up.
+                    // While there shouldn't be any orphaned packages, maybe try to check for them
+                    // here and make it possible to delete them. And one for deleting them all.
                 );
 
                 Container::new(Scrollable::new(&mut self.state.settings_scroll).push(settings))
@@ -1280,6 +1397,7 @@ pub enum Message {
     KeepOnlyLatestStable(Choice),
     KeepOnlyLatestLts(Choice),
     ThemeChanged(Theme),
+    PurgeDb(DbType),
 }
 
 #[derive(Debug)]
@@ -1305,6 +1423,12 @@ struct GuiState {
     minus_1_button: button::State,
     minus_10_button: button::State,
     minus_100_button: button::State,
+    purge_all_button: button::State,
+    purge_daily_button: button::State,
+    purge_branched_button: button::State,
+    purge_stable_button: button::State,
+    purge_lts_button: button::State,
+    purge_archived_button: button::State,
 }
 
 impl GuiState {
@@ -1695,6 +1819,16 @@ pub enum Choice {
 
 impl Choice {
     const ALL: [Choice; 2] = [Choice::Enable, Choice::Disable];
+}
+
+#[derive(Clone, Debug)]
+pub enum DbType {
+    All,
+    Daily,
+    Branched,
+    Stable,
+    Lts,
+    Archived,
 }
 
 #[derive(Clone, Debug)]
