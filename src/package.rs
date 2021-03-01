@@ -36,6 +36,7 @@ use zip::{read::ZipFile, ZipArchive};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Package {
+    // TODO: Add "label" field so users can describe what a package is for if needed.
     pub version: String,
     pub name: String,
     pub build: Build,

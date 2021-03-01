@@ -56,7 +56,7 @@ impl ReleaseType for Stable {
                 .replace(".msi", ".zip")
         );
 
-        package.name = get_file_stem(&package.url).to_string();
+        package.name = format!("{}-stable", get_file_stem(&package.url).to_string());
 
         let mut date = node
             .find(Class("dl-header-info-platform"))

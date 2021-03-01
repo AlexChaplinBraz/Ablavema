@@ -84,7 +84,7 @@ impl ReleaseType for Lts {
                     continue;
                 }
 
-                package.name = get_file_stem(node.text().as_str()).to_string();
+                package.name = format!("{}-lts", get_file_stem(node.text().as_str()).to_string());
 
                 package.build = Build::Lts;
 

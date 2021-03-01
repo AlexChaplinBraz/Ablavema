@@ -1513,7 +1513,7 @@ impl Controls {
         );
 
         Container::new(scrollable)
-            // TODO: Can't get it to shrink aroind its content for some reason.
+            // TODO: Can't get it to shrink around its content for some reason.
             // It always fills the whole space unless I set a specific width.
             .width(Length::Units(190))
             .height(Length::Fill)

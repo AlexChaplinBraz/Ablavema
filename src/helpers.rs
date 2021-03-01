@@ -320,14 +320,11 @@ pub fn get_extracted_name(package: &Package) -> &str {
     match EXTRACTED_NAMES.get(&package.name.as_ref()) {
         Some(s) => *s,
         None => {
-            // TODO: Add suffixes to LTS and Stable packages as well.
-            // Found situation where the daily package 2.83.12 Candidate was still
-            // available after it has been released as LTS. May ultimately be pointless
-            // since it would just literally get reinstalled. Maybe the solution would be
-            // to remove the Candidate packages after they've been added to where they belong,
-            // since it seems to have been added manually in the server side
-            // and forgotten, so it's not automatically removed.
-            if package.build == Build::Archived {
+            if package.build == Build::Stable {
+                package.name.trim_end_matches("-stable")
+            } else if package.build == Build::Lts {
+                package.name.trim_end_matches("-lts")
+            } else if package.build == Build::Archived {
                 package.name.trim_end_matches("-archived")
             } else {
                 &package.name
