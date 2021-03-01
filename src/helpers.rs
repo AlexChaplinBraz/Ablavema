@@ -46,7 +46,10 @@ pub async fn check_connection() {
                 CAN_CONNECT.store(false, Ordering::Relaxed);
             }
         }
-        Err(_) => CAN_CONNECT.store(false, Ordering::Relaxed),
+        Err(_) => {
+            CAN_CONNECT.store(false, Ordering::Relaxed);
+            return;
+        }
     }
 
     if CAN_CONNECT.load(Ordering::Relaxed) {
@@ -56,7 +59,10 @@ pub async fn check_connection() {
                     CAN_CONNECT.store(false, Ordering::Relaxed);
                 }
             }
-            Err(_) => CAN_CONNECT.store(false, Ordering::Relaxed),
+            Err(_) => {
+                CAN_CONNECT.store(false, Ordering::Relaxed);
+                return;
+            }
         }
     }
 
@@ -67,9 +73,14 @@ pub async fn check_connection() {
                     CAN_CONNECT.store(false, Ordering::Relaxed);
                 }
             }
-            Err(_) => CAN_CONNECT.store(false, Ordering::Relaxed),
+            Err(_) => {
+                CAN_CONNECT.store(false, Ordering::Relaxed);
+                return;
+            }
         }
     }
+
+    CAN_CONNECT.store(true, Ordering::Relaxed);
 }
 
 pub async fn get_document(url: &str) -> Document {

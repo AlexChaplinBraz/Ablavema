@@ -52,8 +52,8 @@ async fn run() {
         {
             // TODO: Add icon.
             let mut window = iced::window::Settings::default();
-            window.size = (650, 560);
-            window.min_size = Some((650, 560));
+            window.size = (650, 570);
+            window.min_size = Some((650, 570));
 
             let default_settings = iced::Settings::<()>::default();
 

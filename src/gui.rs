@@ -6,7 +6,7 @@ use self::{
     style::Theme,
 };
 use crate::{
-    helpers::open_blender,
+    helpers::{check_connection, open_blender},
     package::{Build, Package, PackageState, PackageStatus},
     releases::{
         archived::Archived, branched::Branched, daily::Daily, lts::Lts, stable::Stable,
@@ -95,6 +95,10 @@ impl Gui {
 
     async fn check_archived(packages: Archived) -> (bool, Archived) {
         Releases::check_archived_updates(packages).await
+    }
+
+    async fn check_connection() {
+        check_connection().await;
     }
 }
 
@@ -785,6 +789,14 @@ impl Application for Gui {
                 }
                 Command::none()
             }
+            Message::CheckConnection => {
+                self.state.controls.checking_connection = true;
+                Command::perform(Gui::check_connection(), Message::ConnectionChecked)
+            }
+            Message::ConnectionChecked(()) => {
+                self.state.controls.checking_connection = false;
+                Command::none()
+            }
         }
     }
 
@@ -1310,25 +1322,7 @@ impl Application for Gui {
             .into(),
         };
 
-        if CAN_CONNECT.load(Ordering::Relaxed) {
-            Column::new().push(tabs).push(body).into()
-        } else {
-            Column::new()
-                .push(tabs)
-                .push(body)
-                .push(
-                    // TODO: Add button for checking connection.
-                    Container::new(
-                        Container::new(Text::new("CANNOT CONNECT").size(TEXT_SIZE - 5)).padding(2),
-                    )
-                    .width(Length::Fill)
-                    .height(Length::Shrink)
-                    .center_x()
-                    .center_y()
-                    .style(self.theme.status_container()),
-                )
-                .into()
-        }
+        Column::new().push(tabs).push(body).into()
     }
 }
 
@@ -1398,6 +1392,8 @@ pub enum Message {
     KeepOnlyLatestLts(Choice),
     ThemeChanged(Theme),
     PurgeDb(DbType),
+    CheckConnection,
+    ConnectionChecked(()),
 }
 
 #[derive(Debug)]
@@ -1458,6 +1454,8 @@ struct Controls {
     sort_by: SortBy,
     sorting_pick_list: pick_list::State<SortBy>,
     scroll: scrollable::State,
+    check_connection_button: button::State,
+    checking_connection: bool,
 }
 
 impl Controls {
@@ -1636,13 +1634,47 @@ impl Controls {
                 .push(sorting),
         );
 
-        Container::new(scrollable)
-            // TODO: Can't get it to shrink around its content for some reason.
-            // It always fills the whole space unless I set a specific width.
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            Container::new(scrollable)
+                // TODO: Can't get it to shrink around its content for some reason.
+                // It always fills the whole space unless I set a specific width.
+                .width(Length::Units(190))
+                .height(Length::Fill)
+                .style(theme.sidebar_container())
+                .into()
+        } else {
+            Container::new(
+                Column::new().push(scrollable.height(Length::Fill)).push(
+                    Container::new(
+                        Row::new()
+                            .padding(1)
+                            .align_items(Align::Center)
+                            .push(Space::with_width(Length::Units(9)))
+                            .push(Text::new("CANNOT CONNECT").width(Length::Fill))
+                            .push({
+                                let button = Button::new(
+                                    &mut self.check_connection_button,
+                                    Text::new("[R]"),
+                                )
+                                .style(theme.tab_button());
+
+                                if self.checking_connection {
+                                    button
+                                } else {
+                                    button.on_press(Message::CheckConnection)
+                                }
+                            })
+                            .push(Space::with_width(Length::Units(9))),
+                    )
+                    .width(Length::Fill)
+                    .style(theme.status_container()),
+                ),
+            )
             .width(Length::Units(190))
             .height(Length::Fill)
             .style(theme.sidebar_container())
             .into()
+        }
     }
 }
 
