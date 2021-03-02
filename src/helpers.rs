@@ -18,19 +18,8 @@ use std::{
     time::Duration,
 };
 
-/// The idea is to test whether there's a working connection to the download servers,
-/// using the resulting boolean to disable related functionality and avoid crashing the program.
+/// Check whether there's a working connection to the download servers.
 pub async fn check_connection() {
-    // TODO: Investigate why this sometimes, very rarely, returns `false`.
-    // Even though it then proceeds to download just fine.
-    // I remember getting an "Unable to reach" type error in the browser for url1 a few times
-    // that would be fixed if I just refreshed right away, so it might be due to that.
-    // In which case, it may be better to make this function retry a few times or be more lenient.
-    // TODO: Consider running this function at multiple points,
-    // just in case the connection is restored to re-enable functionality (or disable it).
-    // This may be a solution to the above problem.
-    // TODO: Consider running this function every time a related button is pressed.
-    // Just in case connection is lost while the launcher was open.
     let url1 = "https://builder.blender.org/download/";
     let url2 = "https://www.blender.org/download/";
     let url3 = "https://ftp.nluug.nl/pub/graphics/blender/release/";

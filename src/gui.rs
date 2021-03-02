@@ -37,16 +37,22 @@ pub struct Gui {
 impl Gui {
     /// A tuple is returned where:
     /// (true_if_available, true_if_for_install, package)
-    async fn check_availability(for_install: bool, package: Package) -> (bool, bool, Package) {
+    async fn check_availability(
+        for_install: bool,
+        package: Package,
+    ) -> Option<(bool, bool, Package)> {
         match reqwest::get(&package.url).await {
             Ok(response) => {
                 if response.status().is_client_error() {
-                    (false, for_install, package)
+                    Some((false, for_install, package))
                 } else {
-                    (true, for_install, package)
+                    Some((true, for_install, package))
                 }
             }
-            Err(_) => panic!("Failed to connect to server"),
+            Err(_) => {
+                CAN_CONNECT.store(false, Ordering::Relaxed);
+                None
+            }
         }
     }
 
@@ -57,7 +63,13 @@ impl Gui {
     async fn check_for_updates(
         packages: (Daily, Branched, Stable, Lts),
     ) -> (bool, Daily, Branched, Stable, Lts) {
-        Releases::check_updates(packages).await
+        check_connection().await;
+
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            Releases::check_updates(packages).await
+        } else {
+            (false, packages.0, packages.1, packages.2, packages.3)
+        }
     }
 
     async fn check_all(
@@ -67,34 +79,70 @@ impl Gui {
         lts: Lts,
         archived: Archived,
     ) -> (bool, Daily, Branched, Stable, Lts, Archived) {
-        (
-            true,
-            Releases::check_daily_updates(daily).await.1,
-            Releases::check_branched_updates(branched).await.1,
-            Releases::check_stable_updates(stable).await.1,
-            Releases::check_lts_updates(lts).await.1,
-            Releases::check_archived_updates(archived).await.1,
-        )
+        check_connection().await;
+
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            (
+                true,
+                Releases::check_daily_updates(daily).await.1,
+                Releases::check_branched_updates(branched).await.1,
+                Releases::check_stable_updates(stable).await.1,
+                Releases::check_lts_updates(lts).await.1,
+                Releases::check_archived_updates(archived).await.1,
+            )
+        } else {
+            (false, daily, branched, stable, lts, archived)
+        }
     }
 
     async fn check_daily(packages: Daily) -> (bool, Daily) {
-        Releases::check_daily_updates(packages).await
+        check_connection().await;
+
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            Releases::check_daily_updates(packages).await
+        } else {
+            (false, packages)
+        }
     }
 
     async fn check_branched(packages: Branched) -> (bool, Branched) {
-        Releases::check_branched_updates(packages).await
+        check_connection().await;
+
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            Releases::check_branched_updates(packages).await
+        } else {
+            (false, packages)
+        }
     }
 
     async fn check_stable(packages: Stable) -> (bool, Stable) {
-        Releases::check_stable_updates(packages).await
+        check_connection().await;
+
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            Releases::check_stable_updates(packages).await
+        } else {
+            (false, packages)
+        }
     }
 
     async fn check_lts(packages: Lts) -> (bool, Lts) {
-        Releases::check_lts_updates(packages).await
+        check_connection().await;
+
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            Releases::check_lts_updates(packages).await
+        } else {
+            (false, packages)
+        }
     }
 
     async fn check_archived(packages: Archived) -> (bool, Archived) {
-        Releases::check_archived_updates(packages).await
+        check_connection().await;
+
+        if CAN_CONNECT.load(Ordering::Relaxed) {
+            Releases::check_archived_updates(packages).await
+        } else {
+            (false, packages)
+        }
     }
 
     async fn check_connection() {
@@ -326,80 +374,83 @@ impl Application for Gui {
                     Command::none()
                 }
             }
-            Message::CheckAvailability(tuple) => {
-                let (available, for_install, package) = tuple;
-                if available {
-                    if for_install {
-                        Command::perform(Gui::pass_package(package), Message::InstallPackage)
+            Message::CheckAvailability(option) => match option {
+                Some(tuple) => {
+                    let (available, for_install, package) = tuple;
+                    if available {
+                        if for_install {
+                            Command::perform(Gui::pass_package(package), Message::InstallPackage)
+                        } else {
+                            self.releases.sync();
+                            Command::none()
+                        }
                     } else {
+                        match package.build {
+                            Build::Daily(_) => {
+                                let index = self
+                                    .releases
+                                    .daily
+                                    .iter()
+                                    .position(|a_package| *a_package == package)
+                                    .unwrap();
+                                self.releases.daily.remove(index);
+                                self.releases.daily.save();
+                            }
+                            Build::Branched(_) => {
+                                let index = self
+                                    .releases
+                                    .branched
+                                    .iter()
+                                    .position(|a_package| *a_package == package)
+                                    .unwrap();
+                                self.releases.branched.remove(index);
+                                self.releases.branched.save();
+                            }
+                            Build::Stable => {
+                                let index = self
+                                    .releases
+                                    .stable
+                                    .iter()
+                                    .position(|a_package| *a_package == package)
+                                    .unwrap();
+                                self.releases.stable.remove(index);
+                                self.releases.stable.save();
+                            }
+                            Build::Lts => {
+                                let index = self
+                                    .releases
+                                    .lts
+                                    .iter()
+                                    .position(|a_package| *a_package == package)
+                                    .unwrap();
+                                self.releases.lts.remove(index);
+                                self.releases.lts.save();
+                            }
+                            Build::Archived => {
+                                let index = self
+                                    .releases
+                                    .archived
+                                    .iter()
+                                    .position(|a_package| *a_package == package)
+                                    .unwrap();
+                                self.releases.archived.remove(index);
+                                self.releases.archived.save();
+                            }
+                        }
+                        if for_install {
+                            msgbox::create(
+                                "BlenderLauncher",
+                                &format!("Package '{}' is no longer available.", package.name),
+                                msgbox::IconType::Info,
+                            )
+                            .unwrap();
+                        }
                         self.releases.sync();
                         Command::none()
                     }
-                } else {
-                    match package.build {
-                        Build::Daily(_) => {
-                            let index = self
-                                .releases
-                                .daily
-                                .iter()
-                                .position(|a_package| *a_package == package)
-                                .unwrap();
-                            self.releases.daily.remove(index);
-                            self.releases.daily.save();
-                        }
-                        Build::Branched(_) => {
-                            let index = self
-                                .releases
-                                .branched
-                                .iter()
-                                .position(|a_package| *a_package == package)
-                                .unwrap();
-                            self.releases.branched.remove(index);
-                            self.releases.branched.save();
-                        }
-                        Build::Stable => {
-                            let index = self
-                                .releases
-                                .stable
-                                .iter()
-                                .position(|a_package| *a_package == package)
-                                .unwrap();
-                            self.releases.stable.remove(index);
-                            self.releases.stable.save();
-                        }
-                        Build::Lts => {
-                            let index = self
-                                .releases
-                                .lts
-                                .iter()
-                                .position(|a_package| *a_package == package)
-                                .unwrap();
-                            self.releases.lts.remove(index);
-                            self.releases.lts.save();
-                        }
-                        Build::Archived => {
-                            let index = self
-                                .releases
-                                .archived
-                                .iter()
-                                .position(|a_package| *a_package == package)
-                                .unwrap();
-                            self.releases.archived.remove(index);
-                            self.releases.archived.save();
-                        }
-                    }
-                    if for_install {
-                        msgbox::create(
-                            "BlenderLauncher",
-                            &format!("Package '{}' is no longer available.", package.name),
-                            msgbox::IconType::Info,
-                        )
-                        .unwrap();
-                    }
-                    self.releases.sync();
-                    Command::none()
                 }
-            }
+                None => Command::none(),
+            },
             Message::InstallPackage(package) => {
                 let (index, package) = iter::empty()
                     .chain(self.releases.daily.iter())
@@ -1346,7 +1397,7 @@ pub enum Message {
     PackageMessage(usize, PackageMessage),
     Bookmark(Package),
     TryToInstall(Package),
-    CheckAvailability((bool, bool, Package)),
+    CheckAvailability(Option<(bool, bool, Package)>),
     InstallPackage(Package),
     PackageInstalled(Package),
     PackageRemoved(Package),
