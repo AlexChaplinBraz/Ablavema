@@ -17,6 +17,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9fe5e32de01730eb1f6b7f5b51c17e03e2325bf40a74f754f04f130043affff"
 
 [[package]]
+name = "ablavema"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "bzip2 0.4.2",
+ "chrono",
+ "clap",
+ "derive_deref",
+ "device_query",
+ "directories-next",
+ "flate2",
+ "iced",
+ "iced_futures",
+ "indicatif",
+ "itertools 0.10.0",
+ "lazy_static",
+ "msgbox",
+ "natord",
+ "prettytable-rs",
+ "regex",
+ "reqwest",
+ "select",
+ "serde",
+ "tar",
+ "timeago",
+ "tokio",
+ "winapi 0.3.9",
+ "xz2",
+ "zip",
+]
+
+[[package]]
 name = "adler32"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -200,39 +233,6 @@ dependencies = [
  "arrayref",
  "arrayvec",
  "constant_time_eq",
-]
-
-[[package]]
-name = "blender-launcher"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "bincode",
- "bzip2 0.4.2",
- "chrono",
- "clap",
- "derive_deref",
- "device_query",
- "directories-next",
- "flate2",
- "iced",
- "iced_futures",
- "indicatif",
- "itertools 0.10.0",
- "lazy_static",
- "msgbox",
- "natord",
- "prettytable-rs",
- "regex",
- "reqwest",
- "select",
- "serde",
- "tar",
- "timeago",
- "tokio",
- "winapi 0.3.9",
- "xz2",
- "zip",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 [package]
-name = "blender-launcher"
-description = "Launcher and version manager for Blender"
+name = "ablavema"
+description = "A Blender launcher and version manager"
 version = "0.1.0"
 authors = ["Alexander Chaplin Braz <contact@alexchaplinbraz.com>"]
 edition = "2018"

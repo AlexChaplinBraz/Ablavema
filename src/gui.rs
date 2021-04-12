@@ -181,7 +181,7 @@ impl Application for Gui {
 
     fn title(&self) -> String {
         format!(
-            "BlenderLauncher{}",
+            "Ablavema{}",
             match self.releases.count_updates().0 {
                 Some(count) => format!(
                     " - {} {} available!",
@@ -366,7 +366,7 @@ impl Application for Gui {
                 } else {
                     // TODO: Consider disabling the Install button instead of opening this msgbox.
                     msgbox::create(
-                        "BlenderLauncher",
+                        "Ablavema",
                         &format!("Can't install '{}' because the setting to keep only latest {} is enabled.", package.name, message),
                         msgbox::IconType::Info,
                     )
@@ -439,7 +439,7 @@ impl Application for Gui {
                         }
                         if for_install {
                             msgbox::create(
-                                "BlenderLauncher",
+                                "Ablavema",
                                 &format!("Package '{}' is no longer available.", package.name),
                                 msgbox::IconType::Info,
                             )
@@ -1278,7 +1278,7 @@ impl Application for Gui {
                     .push(Rule::horizontal(0).style(self.theme))
                     .push(choice_setting!(
                         "Modifier key",
-                        "You can start holding the modifier key even before double clicking on a .blend file or BlenderLauncher shortcut, but you are able to change it if there's any interference.",
+                        "You can start holding the modifier key even before double clicking on a .blend file or Ablavema shortcut, but you are able to change it if there's any interference.",
                         &ModifierKey::ALL,
                         Some(SETTINGS.read().unwrap().modifier_key),
                         Message::ModifierKey,

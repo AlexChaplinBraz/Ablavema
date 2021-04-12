@@ -30,7 +30,7 @@ pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
 pub const TEXT_SIZE: u16 = 16;
 
 lazy_static! {
-    static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "BlenderLauncher").unwrap();
+    static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "Ablavema").unwrap();
     static ref PORTABLE_PATH: PathBuf = current_exe().unwrap().parent().unwrap().to_path_buf();
     pub static ref CONFIG_PATH: PathBuf = {
         if PORTABLE_PATH.join("portable").exists() {

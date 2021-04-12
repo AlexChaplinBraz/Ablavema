@@ -1,4 +1,4 @@
-# BlenderLauncher
+# Ablavema, a Blender launcher and version manager
 
 Practically all the necessary features for managing and using multiple Blender versions are working. What's left until it's ready for its first release is fixing a few known issues and a couple of minor missing features.
 
