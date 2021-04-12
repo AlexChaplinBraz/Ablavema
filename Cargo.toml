@@ -13,8 +13,8 @@ clap = "2.33"
 derive_deref = "1.1"
 device_query = "0.2"
 directories-next = "2.0"
-iced = { git = "https://github.com/hecrj/iced", rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf" }
-iced_futures = { git = "https://github.com/hecrj/iced", rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf" }
+iced = "0.3"
+iced_futures = "0.3"
 indicatif = "0.15"
 itertools = "0.10"
 lazy_static = "1.4"
@@ -25,7 +25,7 @@ regex = "1.4"
 reqwest = "0.11"
 select = "0.5"
 serde = { version = "1.0", features = ["derive"] }
-timeago = "0.2"
+timeago = "0.3"
 tokio = { version = "1.0", features = ["fs", "io-util", "macros", "rt-multi-thread"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -35,5 +35,5 @@ tar = "0.4"
 xz2 = "0.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-winapi = { version = "0.3.9", features = ["wincon"] }
+winapi = { version = "0.3", features = ["wincon"] }
 zip = "0.5"

@@ -43,7 +43,7 @@ async fn main() {
 
     check_connection().await;
 
-    // TODO: Error handling.
+    // TODO: Error reporting on unrecoverable failure.
     run().await;
 }
 
@@ -61,10 +61,11 @@ async fn run() {
             let default_settings = iced::Settings::<()>::default();
 
             let settings = iced::Settings {
-                window,
                 flags: gui_args,
+                window,
                 default_font: default_settings.default_font,
                 default_text_size: TEXT_SIZE,
+                exit_on_close_request: default_settings.exit_on_close_request,
                 antialiasing: default_settings.antialiasing,
             };
 

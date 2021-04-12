@@ -15,9 +15,9 @@ use crate::{
     settings::{ModifierKey, CAN_CONNECT, SETTINGS, TEXT_SIZE},
 };
 use iced::{
-    button, pick_list, scrollable, Align, Application, Button, Checkbox, Column, Command,
-    Container, Element, Executor, HorizontalAlignment, Length, PickList, ProgressBar, Radio, Row,
-    Rule, Scrollable, Space, Subscription, Text,
+    button, pick_list, scrollable, Align, Application, Button, Checkbox, Clipboard, Column,
+    Command, Container, Element, Executor, HorizontalAlignment, Length, PickList, ProgressBar,
+    Radio, Row, Rule, Scrollable, Space, Subscription, Text,
 };
 use itertools::Itertools;
 use reqwest;
@@ -193,7 +193,7 @@ impl Application for Gui {
         )
     }
 
-    fn update(&mut self, message: Message) -> Command<Message> {
+    fn update(&mut self, message: Message, _clipboard: &mut Clipboard) -> Command<Message> {
         match message {
             Message::PackageMessage(index, package_message) => {
                 match iter::empty()
@@ -909,9 +909,7 @@ impl Application for Gui {
         let body: Element<'_, Message> = match self.tab {
             Tab::Packages => {
                 // TODO: Use icons for the buttons.
-                // I could use just the icon here without text if the same icon is used
-                // on the packages but accompanied with text to teach the user what they represent.
-                // Tooltips would be nice too, if `iced` finally implements them.
+                // TODO: Add tooltips.
                 let button = |label, package_message: Option<Message>, state| {
                     let button = Button::new(state, Text::new(label)).style(theme);
 
