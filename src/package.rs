@@ -124,7 +124,7 @@ impl Package {
                         self.url,
                         resp.status(),
                     );
-                    panic!(error);
+                    panic!("{}", error);
                 }
             };
 

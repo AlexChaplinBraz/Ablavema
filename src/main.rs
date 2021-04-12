@@ -24,6 +24,9 @@ use std::sync::atomic::Ordering;
 // TODO: Add self-update for Windows.
 // Might not be bad to have a separate version with it for Linux as well.
 // Or if it doesn't add much to the file size, just make it toggleable through the CLI.
+// TODO: Keep a changelog on the About tab.
+// When updating the launcher itself, download the latest CHANGELOG.md and display it.
+// There's no support for rendering markdown in Iced, but the plain text would do for now.
 // TODO: Add Windows metadata.
 // TODO: Consider building custom window decorations.
 // Something along the lines of how browsers have tabs next to the window buttons.
