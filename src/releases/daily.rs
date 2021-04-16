@@ -11,6 +11,7 @@ use derive_deref::{Deref, DerefMut};
 use select::predicate::{Class, Name};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use versions::Versioning;
 
 #[derive(Clone, Debug, Default, Deref, DerefMut, Deserialize, PartialEq, Serialize)]
 pub struct Daily(Vec<Package>);
@@ -41,16 +42,18 @@ impl ReleaseType for Daily {
 
             package.build = Build::Daily(build.find(Class("build-var")).next().unwrap().text());
 
-            package.version = build
-                .find(Class("name"))
-                .next()
-                .unwrap()
-                .text()
-                .split_whitespace()
-                .skip(1)
-                .next()
-                .unwrap()
-                .to_string();
+            package.version = Versioning::new(
+                build
+                    .find(Class("name"))
+                    .next()
+                    .unwrap()
+                    .text()
+                    .split_whitespace()
+                    .skip(1)
+                    .next()
+                    .unwrap(),
+            )
+            .unwrap();
 
             let small_subtext = build.find(Name("small")).next().unwrap().text();
             if small_subtext.contains('-') {

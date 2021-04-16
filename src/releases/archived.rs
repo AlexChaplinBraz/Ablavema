@@ -12,6 +12,7 @@ use regex::Regex;
 use select::predicate::Name;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use versions::Versioning;
 
 #[derive(Clone, Debug, Default, Deref, DerefMut, Deserialize, PartialEq, Serialize)]
 pub struct Archived(Vec<Package>);
@@ -127,64 +128,49 @@ impl ReleaseType for Archived {
                     package.build = Build::Archived;
 
                     package.version = match version.as_ref() {
-                        "1.0" => String::from("1.0"),
-                        "1.60" => String::from("1.60"),
-                        "1.73" => String::from("1.73"),
+                        "1.0" => Versioning::new("1.0").unwrap(),
+                        "1.60" => Versioning::new("1.60").unwrap(),
+                        "1.73" => Versioning::new("1.73").unwrap(),
                         "1.80" => {
-                            let v = {
-                                if package.name.contains("alpha") {
-                                    "alpha"
-                                } else {
-                                    "a"
-                                }
-                            };
-                            format!("1.80{}", v)
+                            if package.name.contains("alpha") {
+                                Versioning::new("1.80alpha").unwrap()
+                            } else {
+                                Versioning::new("1.80a").unwrap()
+                            }
                         }
                         "2.04" => {
-                            let v = {
-                                if package.name.contains("alpha") {
-                                    "alpha"
-                                } else {
-                                    ""
-                                }
-                            };
-                            format!("2.04{}", v)
+                            if package.name.contains("alpha") {
+                                Versioning::new("2.04alpha").unwrap()
+                            } else {
+                                Versioning::new("2.04").unwrap()
+                            }
                         }
                         "2.39" => {
-                            let v = {
-                                if package.name.contains("alpha1") {
-                                    "alpha1"
-                                } else {
-                                    "alpha2"
-                                }
-                            };
-                            format!("2.40{}", v)
+                            if package.name.contains("alpha") {
+                                Versioning::new("2.40alpha1").unwrap()
+                            } else {
+                                Versioning::new("2.40alpha2").unwrap()
+                            }
                         }
                         "2.50alpha" => {
-                            let v = {
-                                if package.name.contains("alpha0") {
-                                    "alpha0"
-                                } else if package.name.contains("alpha1") {
-                                    "alpha1"
-                                } else {
-                                    "alpha2"
-                                }
-                            };
-                            format!("2.50{}", v)
+                            if package.name.contains("alpha0") {
+                                Versioning::new("2.50alpha0").unwrap()
+                            } else if package.name.contains("alpha1") {
+                                Versioning::new("2.50alpha1").unwrap()
+                            } else {
+                                Versioning::new("2.50alpha2").unwrap()
+                            }
                         }
-                        "2.53beta" => String::from("2.53beta"),
-                        "2.54beta" => String::from("2.54beta"),
-                        "2.55beta" => String::from("2.55beta"),
-                        "2.56beta" => String::from("2.56beta"),
-                        "2.56abeta" => String::from("2.56abeta"),
-                        "2.79latest" => String::from("2.79latest"),
-                        _ => package
-                            .name
-                            .split_terminator("-")
-                            .skip(1)
-                            .next()
-                            .unwrap()
-                            .to_string(),
+                        "2.53beta" => Versioning::new("2.53beta").unwrap(),
+                        "2.54beta" => Versioning::new("2.54beta").unwrap(),
+                        "2.55beta" => Versioning::new("2.55beta").unwrap(),
+                        "2.56beta" => Versioning::new("2.56beta").unwrap(),
+                        "2.56abeta" => Versioning::new("2.56abeta").unwrap(),
+                        "2.79latest" => Versioning::new("2.79latest").unwrap(),
+                        _ => Versioning::new(
+                            package.name.split_terminator("-").skip(1).next().unwrap(),
+                        )
+                        .unwrap(),
                     };
 
                     package.date = NaiveDateTime::parse_from_str(&date, "%d-%b-%Y %T").unwrap();

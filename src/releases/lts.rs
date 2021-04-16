@@ -11,6 +11,7 @@ use derive_deref::{Deref, DerefMut};
 use select::predicate::{Attr, Name};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use versions::Versioning;
 
 #[derive(Clone, Debug, Default, Deref, DerefMut, Deserialize, PartialEq, Serialize)]
 pub struct Lts(Vec<Package>);
@@ -35,12 +36,8 @@ impl ReleaseType for Lts {
             }
             .text();
 
-            package.version = version
-                .split_whitespace()
-                .skip(2)
-                .next()
-                .unwrap()
-                .to_string();
+            package.version =
+                Versioning::new(version.split_whitespace().skip(2).next().unwrap()).unwrap();
 
             let lts_date_id = format!("faq-lts-release-{}{}-1", lts_ver, rev);
             let section = document

@@ -11,6 +11,7 @@ use derive_deref::{Deref, DerefMut};
 use select::predicate::{Attr, Class, Name};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use versions::Versioning;
 
 #[derive(Clone, Debug, Default, Deref, DerefMut, Deserialize, PartialEq, Serialize)]
 pub struct Stable(Vec<Package>);
@@ -35,10 +36,10 @@ impl ReleaseType for Stable {
 
         let node = document.find(Attr("id", o)).next().unwrap();
 
-        package.version = node.find(Name("a")).next().unwrap().text();
-        package
-            .version
-            .retain(|c| c.is_numeric() || c.is_ascii_punctuation());
+        let mut version = node.find(Name("a")).next().unwrap().text();
+        version.retain(|c| c.is_numeric() || c.is_ascii_punctuation());
+
+        package.version = Versioning::new(&version).unwrap();
 
         package.build = Build::Stable;
 

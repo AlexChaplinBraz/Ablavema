@@ -106,12 +106,13 @@ impl Installed {
                         }
                     }
                     Build::Lts if SETTINGS.read().unwrap().keep_only_latest_lts => {
-                        // TODO: This might not work going forward when they move to 3.0.
-                        // Might be better to switch to the `version_compare` crate.
-                        lts_count.push(package.version[0..4].to_owned());
+                        lts_count.push(&package.version);
                         if lts_count
                             .iter()
-                            .filter(|&v| v == &package.version[0..4])
+                            .filter(|v| {
+                                v.nth(0).unwrap() == package.version.nth(0).unwrap()
+                                    && v.nth(1).unwrap() == package.version.nth(1).unwrap()
+                            })
                             .count()
                             > 1
                         {

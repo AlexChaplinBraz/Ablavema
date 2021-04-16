@@ -16,6 +16,7 @@ use tokio::{
     io::AsyncWriteExt,
     task::JoinHandle,
 };
+use versions::Versioning;
 
 #[cfg(target_os = "linux")]
 use bzip2::read::BzDecoder;
@@ -37,7 +38,7 @@ use zip::{read::ZipFile, ZipArchive};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Package {
     // TODO: Add "label" field so users can describe what a package is for if needed.
-    pub version: String,
+    pub version: Versioning,
     pub name: String,
     pub build: Build,
     pub date: NaiveDateTime,
@@ -372,7 +373,7 @@ impl Package {
 impl Default for Package {
     fn default() -> Self {
         Package {
-            version: String::default(),
+            version: Versioning::default(),
             name: String::default(),
             build: Build::Archived,
             date: NaiveDateTime::new(
@@ -401,8 +402,7 @@ impl Ord for Package {
                 .cmp(&other.build)
                 .then(self.date.cmp(&other.date).reverse()),
             Build::Stable | Build::Lts | Build::Archived => {
-                // TODO: Change to the `version_compare` crate for the version.
-                natord::compare_ignore_case(&self.version, &other.version).reverse()
+                Ord::cmp(&self.version, &other.version).reverse()
             }
         }
     }

@@ -440,10 +440,11 @@ pub trait ReleaseType:
                             break;
                         }
                         Build::Lts => {
-                            // TODO: This might not work going forward when they move to 3.0.
-                            // Might be better to switch to the `version_compare` crate.
                             match installed_packages.iter().find(|installed_package| {
-                                installed_package.version[0..4] == package.version[0..4]
+                                installed_package.version.nth(0).unwrap()
+                                    == package.version.nth(0).unwrap()
+                                    && installed_package.version.nth(1).unwrap()
+                                        == package.version.nth(1).unwrap()
                             }) {
                                 Some(_) => break,
                                 None => installed_packages.push(package.clone()),
@@ -479,10 +480,11 @@ pub trait ReleaseType:
                         }
                     }
                     Build::Lts => {
-                        // TODO: This might not work going forward when they move to 3.0.
-                        // Might be better to switch to the `version_compare` crate.
                         if let Some(package) = self.iter_mut().find(|package| {
-                            installed_package.version[0..4] == package.version[0..4]
+                            installed_package.version.nth(0).unwrap()
+                                == package.version.nth(0).unwrap()
+                                && installed_package.version.nth(1).unwrap()
+                                    == package.version.nth(1).unwrap()
                         }) {
                             if package.date > installed_package.date {
                                 package.status = PackageStatus::Update;

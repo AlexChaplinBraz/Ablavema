@@ -1854,10 +1854,8 @@ impl SortBy {
             SortBy::NameDescending => Ord::cmp(&a.name, &b.name).reverse(),
             SortBy::DateAscending => Ord::cmp(&a.date, &b.date),
             SortBy::DateDescending => Ord::cmp(&a.date, &b.date).reverse(),
-            SortBy::VersionAscending => natord::compare_ignore_case(&a.version, &b.version),
-            SortBy::VersionDescending => {
-                natord::compare_ignore_case(&a.version, &b.version).reverse()
-            }
+            SortBy::VersionAscending => Ord::cmp(&a.version, &b.version),
+            SortBy::VersionDescending => Ord::cmp(&a.version, &b.version).reverse(),
         }
     }
 }
@@ -2035,7 +2033,9 @@ impl Package {
                             .width(Length::Fill)
                             .align_items(Align::End)
                             .push(Text::new("Version: ").size(TEXT_SIZE - 4))
-                            .push(Text::new(&self.version).color(theme.highlight_text())),
+                            .push(
+                                Text::new(self.version.to_string()).color(theme.highlight_text()),
+                            ),
                     )
                     .push(
                         Text::new(match self.status {
