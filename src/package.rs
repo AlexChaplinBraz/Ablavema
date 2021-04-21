@@ -9,12 +9,15 @@ use iced::button;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
-use std::{fs::File, mem};
+use std::{
+    fs::{rename, File},
+    mem,
+};
 use timeago::{self, TimeUnit::Minutes};
 use tokio::{
     fs::{self, remove_dir_all, remove_file},
     io::AsyncWriteExt,
-    task::JoinHandle,
+    task::{spawn, JoinHandle},
 };
 use versions::Versioning;
 
@@ -61,6 +64,8 @@ impl Package {
         multi_progress: &MultiProgress,
         flags: &(bool, bool),
     ) -> Option<JoinHandle<()>> {
+        // TODO: Consider reusing the Install module for the CLI as well.
+
         let information_style = ProgressStyle::default_bar()
             .template("{wide_msg}")
             .progress_chars("---");
@@ -154,7 +159,7 @@ impl Package {
                 self.url.split_terminator('/').last().unwrap()
             );
 
-            download_handle = Some(tokio::task::spawn(async move {
+            download_handle = Some(spawn(async move {
                 while let Some(chunk) = source.chunk().await.unwrap() {
                     dest.write_all(&chunk).await.unwrap();
                     progress_bar.inc(chunk.len() as u64);
@@ -169,7 +174,7 @@ impl Package {
         )));
         progress_bar.set_style(extraction_style.clone());
 
-        let extraction_handle = tokio::task::spawn(async move {
+        let extraction_handle = spawn(async move {
             if let Some(handle) = download_handle {
                 handle.await.unwrap();
             }
@@ -307,21 +312,18 @@ impl Package {
             } else {
                 panic!("Unknown archive extension");
             }
+
+            true
         });
 
         let package = (*self).clone();
 
-        let final_tasks = tokio::task::spawn(async move {
-            // TODO: Packages installed this way don't seem to be moving anymore.
-            // Specifically older packages, so it may be related to the Install module's
-            // extracion issue where .tar.bz2 and .tar.gz packages panic.
-            // Except they do get extracted, so it may be an issue with the upgrade to tokio 1.
-            // TODO: Consider reusing the Install module for the CLI as well.
+        let final_tasks = spawn(async move {
             extraction_handle.await.unwrap();
 
             let mut package_path = SETTINGS.read().unwrap().packages_dir.join(&package.name);
 
-            std::fs::rename(
+            rename(
                 SETTINGS
                     .read()
                     .unwrap()
