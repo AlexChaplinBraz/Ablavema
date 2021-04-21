@@ -31,6 +31,20 @@ use std::{
 #[cfg(target_os = "windows")]
 use zip::{read::ZipFile, ZipArchive};
 
+macro_rules! unwrap_or_return {
+    ($index:expr, $result:expr) => {
+        match $result {
+            Ok(x) => x,
+            Err(e) => {
+                return Some((
+                    ($index, Progress::Errored(e.to_string())),
+                    State::FinishedInstalling,
+                ))
+            }
+        }
+    };
+}
+
 pub struct Install {
     package: Package,
     index: usize,
@@ -88,22 +102,27 @@ where
                                     // can reinstall it even if it becomes unavailable like is the
                                     // case with daily and branched packages.
                                     if file.exists() {
-                                        remove_file(&file).await.unwrap();
+                                        unwrap_or_return!(index, remove_file(&file).await);
                                     }
 
                                     let package_dir =
                                         SETTINGS.read().unwrap().packages_dir.join(&package.name);
 
                                     if package_dir.exists() {
-                                        remove_dir_all(&package_dir).await.unwrap();
+                                        unwrap_or_return!(
+                                            index,
+                                            remove_dir_all(&package_dir).await
+                                        );
                                     }
 
-                                    let destination = tokio::fs::OpenOptions::new()
-                                        .create(true)
-                                        .append(true)
-                                        .open(&file)
-                                        .await
-                                        .unwrap();
+                                    let destination = unwrap_or_return!(
+                                        index,
+                                        tokio::fs::OpenOptions::new()
+                                            .create(true)
+                                            .append(true)
+                                            .open(&file)
+                                            .await
+                                    );
 
                                     Some((
                                         (index, Progress::Started),
@@ -119,13 +138,18 @@ where
                                     ))
                                 } else {
                                     Some((
-                                        (index, Progress::Errored(String::from("todo"))),
+                                        (
+                                            index,
+                                            Progress::Errored(String::from(
+                                                "cannot find content length",
+                                            )),
+                                        ),
                                         State::FinishedInstalling,
                                     ))
                                 }
                             }
-                            Err(_) => Some((
-                                (index, Progress::Errored(String::from("todo"))),
+                            Err(e) => Some((
+                                (index, Progress::Errored(e.to_string())),
                                 State::FinishedInstalling,
                             )),
                         }
@@ -143,10 +167,14 @@ where
                         // I had this happen when testing too frequently. Probably not an issue for
                         // normal users, but it may make the download hang, in which case there's a
                         // need to report it to the user as an error.
+                        // TODO: Handle losing connection while downloading.
+                        // The good thing is that it keeps downloading when reconnected,
+                        // but meanwhile it's just stuck. So maybe add a timeout.
                         Ok(Some(chunk)) => {
-                            tokio::io::AsyncWriteExt::write_all(&mut destination, &chunk)
-                                .await
-                                .unwrap();
+                            unwrap_or_return!(
+                                index,
+                                tokio::io::AsyncWriteExt::write_all(&mut destination, &chunk).await
+                            );
 
                             let downloaded = downloaded + chunk.len() as u64;
                             let percentage = (downloaded as f32 / total as f32) * 100.0;
@@ -172,8 +200,8 @@ where
                                 index,
                             },
                         )),
-                        Err(_) => Some((
-                            (index, Progress::Errored(String::from("todo"))),
+                        Err(e) => Some((
+                            (index, Progress::Errored(e.to_string())),
                             State::FinishedInstalling,
                         )),
                     },
@@ -205,11 +233,11 @@ where
                             unreachable!("Windows extraction on non-Windows OS");
                             #[cfg(target_os = "windows")]
                             {
-                                let zip = File::open(&file).unwrap();
+                                let zip = unwrap_or_return!(index, File::open(&file));
                                 // TODO: Figure out why extraction panics here with:
                                 // InvalidArchive("Could not find central directory end")
                                 // on some packages. Especially old ones, but not all of them.
-                                let archive = ZipArchive::new(zip).unwrap();
+                                let archive = unwrap_or_return!(index, ZipArchive::new(zip));
 
                                 // This handles some archives that don't have an inner directory.
                                 let extraction_dir =
@@ -265,13 +293,16 @@ where
                     } => match archive {
                         #[cfg(target_os = "linux")]
                         DownloadedArchive::TarXz => {
-                            let tar_xz = File::open(&file).unwrap();
+                            let tar_xz = unwrap_or_return!(index, File::open(&file));
                             let tar = XzDecoder::new(tar_xz);
                             let mut archive = Archive::new(tar);
 
-                            for entry in archive.entries().unwrap() {
-                                let mut file = entry.unwrap();
-                                file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                            for entry in unwrap_or_return!(index, archive.entries()) {
+                                let mut file = unwrap_or_return!(index, entry);
+                                unwrap_or_return!(
+                                    index,
+                                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir)
+                                );
                             }
 
                             Some((
@@ -281,13 +312,16 @@ where
                         }
                         #[cfg(target_os = "linux")]
                         DownloadedArchive::TarGz => {
-                            let tar_gz = File::open(&file).unwrap();
+                            let tar_gz = unwrap_or_return!(index, File::open(&file));
                             let tar = GzDecoder::new(tar_gz);
                             let mut archive = Archive::new(tar);
 
-                            for entry in archive.entries().unwrap() {
-                                let mut file = entry.unwrap();
-                                file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                            for entry in unwrap_or_return!(index, archive.entries()) {
+                                let mut file = unwrap_or_return!(index, entry);
+                                unwrap_or_return!(
+                                    index,
+                                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir)
+                                );
                             }
 
                             Some((
@@ -297,13 +331,16 @@ where
                         }
                         #[cfg(target_os = "linux")]
                         DownloadedArchive::TarBz => {
-                            let tar_bz2 = File::open(&file).unwrap();
+                            let tar_bz2 = unwrap_or_return!(index, File::open(&file));
                             let tar = BzDecoder::new(tar_bz2);
                             let mut archive = Archive::new(tar);
 
-                            for entry in archive.entries().unwrap() {
-                                let mut file = entry.unwrap();
-                                file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                            for entry in unwrap_or_return!(index, archive.entries()) {
+                                let mut file = unwrap_or_return!(index, entry);
+                                unwrap_or_return!(
+                                    index,
+                                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir)
+                                );
                             }
 
                             Some((
@@ -321,19 +358,23 @@ where
                             {
                                 // TODO: Show progress with bytes to avoid looking stuck.
                                 let mut entry: ZipFile<'_> =
-                                    archive.by_index(extracted as usize).unwrap();
+                                    unwrap_or_return!(index, archive.by_index(extracted as usize));
                                 let entry_name = entry.name().to_owned();
 
                                 if entry.is_dir() {
                                     let extracted_dir_path = extraction_dir.join(entry_name);
-                                    create_dir_all(extracted_dir_path).unwrap();
+                                    unwrap_or_return!(index, create_dir_all(extracted_dir_path));
                                 } else if entry.is_file() {
                                     let mut buffer: Vec<u8> = Vec::new();
-                                    let _bytes_read = entry.read_to_end(&mut buffer).unwrap();
+                                    unwrap_or_return!(index, entry.read_to_end(&mut buffer));
                                     let extracted_file_path = extraction_dir.join(entry_name);
-                                    create_dir_all(extracted_file_path.parent().unwrap()).unwrap();
-                                    let mut file = File::create(extracted_file_path).unwrap();
-                                    file.write(&buffer).unwrap();
+                                    unwrap_or_return!(
+                                        index,
+                                        create_dir_all(extracted_file_path.parent().unwrap())
+                                    );
+                                    let mut file =
+                                        unwrap_or_return!(index, File::create(extracted_file_path));
+                                    unwrap_or_return!(index, file.write(&buffer));
                                 }
                             }
 
@@ -369,19 +410,21 @@ where
                         let mut package_path =
                             SETTINGS.read().unwrap().packages_dir.join(&package.name);
 
-                        std::fs::rename(
-                            SETTINGS
-                                .read()
-                                .unwrap()
-                                .cache_dir
-                                .join(get_extracted_name(&package)),
-                            &package_path,
-                        )
-                        .unwrap();
+                        unwrap_or_return!(
+                            index,
+                            std::fs::rename(
+                                SETTINGS
+                                    .read()
+                                    .unwrap()
+                                    .cache_dir
+                                    .join(get_extracted_name(&package)),
+                                &package_path,
+                            )
+                        );
 
                         package_path.push("package_info.bin");
-                        let file = File::create(&package_path).unwrap();
-                        bincode::serialize_into(file, &package).unwrap();
+                        let file = unwrap_or_return!(index, File::create(&package_path));
+                        unwrap_or_return!(index, bincode::serialize_into(file, &package));
 
                         Some((
                             (index, Progress::FinishedInstalling),
