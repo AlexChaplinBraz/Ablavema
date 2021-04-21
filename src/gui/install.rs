@@ -27,6 +27,8 @@ use xz2::read::XzDecoder;
 use std::{
     fs::create_dir_all,
     io::{Read, Write},
+    thread::sleep,
+    time::Duration,
 };
 #[cfg(target_os = "windows")]
 use zip::{read::ZipFile, ZipArchive};
@@ -233,10 +235,13 @@ where
                             unreachable!("Windows extraction on non-Windows OS");
                             #[cfg(target_os = "windows")]
                             {
+                                // This is a workaround for a relatively common extraction error
+                                // where apparently the extraction started just before the file
+                                // was completely written, so it was giving an "invalid Zip
+                                // archive" error.
+                                sleep(Duration::from_millis(250));
+
                                 let zip = unwrap_or_return!(index, File::open(&file));
-                                // TODO: Figure out why extraction panics here with:
-                                // InvalidArchive("Could not find central directory end")
-                                // on some packages. Especially old ones, but not all of them.
                                 let archive = unwrap_or_return!(index, ZipArchive::new(zip));
 
                                 // This handles some archives that don't have an inner directory.
