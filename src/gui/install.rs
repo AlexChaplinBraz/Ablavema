@@ -271,14 +271,12 @@ where
                             ))
                         }
                         #[cfg(target_os = "linux")]
-                        DownloadedArchive::TarBz => {
+                        DownloadedArchive::TarGz => {
                             let tar_gz = File::open(&file).unwrap();
                             let tar = GzDecoder::new(tar_gz);
                             let mut archive = Archive::new(tar);
 
                             for entry in archive.entries().unwrap() {
-                                // TODO: Figure out why extraction panics here with:
-                                // Custom { kind: InvalidInput, error: "invalid gzip header" }
                                 let mut file = entry.unwrap();
                                 file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
                             }
@@ -289,14 +287,12 @@ where
                             ))
                         }
                         #[cfg(target_os = "linux")]
-                        DownloadedArchive::TarGz => {
+                        DownloadedArchive::TarBz => {
                             let tar_bz2 = File::open(&file).unwrap();
                             let tar = BzDecoder::new(tar_bz2);
                             let mut archive = Archive::new(tar);
 
                             for entry in archive.entries().unwrap() {
-                                // TODO: Figure out why extraction panics here with:
-                                // Custom { kind: InvalidInput, error: DataMagic }
                                 let mut file = entry.unwrap();
                                 file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
                             }
