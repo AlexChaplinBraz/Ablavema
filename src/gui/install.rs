@@ -118,10 +118,16 @@ where
                                         },
                                     ))
                                 } else {
-                                    Some(((index, Progress::Errored), State::FinishedInstalling))
+                                    Some((
+                                        (index, Progress::Errored(String::from("todo"))),
+                                        State::FinishedInstalling,
+                                    ))
                                 }
                             }
-                            Err(_) => Some(((index, Progress::Errored), State::FinishedInstalling)),
+                            Err(_) => Some((
+                                (index, Progress::Errored(String::from("todo"))),
+                                State::FinishedInstalling,
+                            )),
                         }
                     }
                     State::Downloading {
@@ -166,7 +172,10 @@ where
                                 index,
                             },
                         )),
-                        Err(_) => Some(((index, Progress::Errored), State::FinishedInstalling)),
+                        Err(_) => Some((
+                            (index, Progress::Errored(String::from("todo"))),
+                            State::FinishedInstalling,
+                        )),
                     },
                     State::FinishedDownloading {
                         package,
@@ -398,7 +407,7 @@ pub enum Progress {
     ExtractionProgress(f32),
     FinishedExtracting,
     FinishedInstalling,
-    Errored,
+    Errored(String),
 }
 
 enum State {

@@ -1984,11 +1984,12 @@ impl Package {
                     };
                     Command::perform(Gui::pass_package(self.clone()), Message::PackageInstalled)
                 }
-                Progress::Errored => {
+                Progress::Errored(error_message) => {
                     self.state = PackageState::Errored {
+                        error_message,
                         retry_button: Default::default(),
                     };
-                    Command::none()
+                    Command::perform(Gui::pass_package(self.clone()), Message::CancelInstall)
                 }
             },
             PackageMessage::Cancel => {
@@ -2223,8 +2224,19 @@ impl Package {
                     ))
                     .into()
             }
-            // TODO: Retry functionality.
-            PackageState::Errored { retry_button: _ } => Text::new("Error").into(),
+            PackageState::Errored {
+                error_message,
+                retry_button,
+            } => Row::new()
+                .spacing(10)
+                .align_items(Align::Center)
+                .push(Text::new(format!("Error: {}.", error_message)).width(Length::Fill))
+                .push(
+                    Button::new(retry_button, Text::new("Retry"))
+                        .on_press(PackageMessage::Install)
+                        .style(theme),
+                )
+                .into(),
         };
 
         Container::new(

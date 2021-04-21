@@ -487,6 +487,7 @@ pub enum PackageState {
         remove_button: button::State,
     },
     Errored {
+        error_message: String,
         retry_button: button::State,
     },
 }
