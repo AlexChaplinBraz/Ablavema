@@ -346,17 +346,9 @@ impl Package {
         formatter.num_items(2);
         formatter.min_unit(Minutes);
         let duration = Utc::now().naive_utc().signed_duration_since(self.date);
-        let date_time_format = match self.build {
-            Build::Daily(_) | Build::Branched(_) | Build::Archived => "%B %d, %Y - %T",
-            // TODO: Get the date-time of stable and LTS packages from Archived.
-            // Right now it's always set to 00:00:00 because time isn't listed on their pages,
-            // but I could find these packages in Archives and clone their date.
-            // The problem is making this run only when necessary.
-            Build::Stable | Build::Lts => "%B %d, %Y",
-        };
         format!(
             "{} ({})",
-            self.date.format(date_time_format),
+            self.date.format("%B %d, %Y - %T"),
             formatter.convert(duration.to_std().unwrap())
         )
     }

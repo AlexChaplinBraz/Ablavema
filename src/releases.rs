@@ -16,6 +16,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bincode;
+use chrono::NaiveTime;
 use indicatif::MultiProgress;
 use lazy_static::initialize;
 use reqwest;
@@ -113,9 +114,11 @@ impl Releases {
         self.stable.refresh_state(&self.installed);
         self.stable
             .refresh_status(SETTINGS.read().unwrap().update_stable);
+        self.stable.correct_date_time(&self.archived);
 
         self.lts.refresh_state(&self.installed);
         self.lts.refresh_status(SETTINGS.read().unwrap().update_lts);
+        self.lts.correct_date_time(&self.archived);
 
         self.archived.refresh_state(&self.installed);
     }
@@ -495,6 +498,19 @@ pub trait ReleaseType:
                         continue;
                     }
                 }
+            }
+        }
+    }
+
+    // Get the full date-time for stable and LTS packages from their archived counterparts.
+    fn correct_date_time(&mut self, archived: &Archived) {
+        for package in self.iter_mut() {
+            if package.date.time() == NaiveTime::from_hms(0, 0, 0) {
+                let matching_package = archived
+                    .iter()
+                    .find(|a_package| a_package.url == package.url)
+                    .unwrap();
+                package.date = matching_package.date;
             }
         }
     }
