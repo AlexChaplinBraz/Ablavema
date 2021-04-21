@@ -473,12 +473,12 @@ pub enum PackageState {
         install_button: button::State,
     },
     Downloading {
-        // TODO: Add cancel_button.
         progress: f32,
+        cancel_button: button::State,
     },
     Extracting {
-        // TODO: Add cancel_button.
         progress: f32,
+        cancel_button: button::State,
     },
     Installed {
         open_button: button::State,

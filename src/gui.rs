@@ -464,6 +464,17 @@ impl Application for Gui {
                 self.installing.push(((*package).clone(), index));
                 Command::none()
             }
+            Message::CancelInstall(package) => {
+                let index = self
+                    .installing
+                    .iter()
+                    .enumerate()
+                    .find(|(_, (a_package, _))| *a_package == package)
+                    .unwrap()
+                    .0;
+                self.installing.remove(index);
+                Command::none()
+            }
             Message::PackageInstalled(package) => {
                 let index = self
                     .installing
@@ -1397,6 +1408,7 @@ pub enum Message {
     TryToInstall(Package),
     CheckAvailability(Option<(bool, bool, Package)>),
     InstallPackage(Package),
+    CancelInstall(Package),
     PackageInstalled(Package),
     PackageRemoved(Package),
     OpenBlender(Package),
@@ -1914,6 +1926,7 @@ pub enum DbType {
 pub enum PackageMessage {
     Install,
     InstallationProgress(Progress),
+    Cancel,
     Remove,
     OpenBlender,
     OpenBlenderWithFile,
@@ -1930,16 +1943,35 @@ impl Package {
             }
             PackageMessage::InstallationProgress(progress) => match progress {
                 Progress::Started => {
-                    self.state = PackageState::Downloading { progress: 0.0 };
+                    self.state = PackageState::Downloading {
+                        progress: 0.0,
+                        cancel_button: Default::default(),
+                    };
                     Command::none()
                 }
                 Progress::DownloadProgress(progress) => {
-                    self.state = PackageState::Downloading { progress };
+                    if let PackageState::Downloading { cancel_button, .. } = self.state {
+                        self.state = PackageState::Downloading {
+                            progress,
+                            cancel_button,
+                        };
+                    }
                     Command::none()
                 }
-                Progress::FinishedDownloading => Command::none(),
+                Progress::FinishedDownloading => {
+                    self.state = PackageState::Extracting {
+                        progress: 0.0,
+                        cancel_button: Default::default(),
+                    };
+                    Command::none()
+                }
                 Progress::ExtractionProgress(progress) => {
-                    self.state = PackageState::Extracting { progress };
+                    if let PackageState::Extracting { cancel_button, .. } = self.state {
+                        self.state = PackageState::Extracting {
+                            progress,
+                            cancel_button,
+                        };
+                    }
                     Command::none()
                 }
                 Progress::FinishedExtracting => Command::none(),
@@ -1959,6 +1991,10 @@ impl Package {
                     Command::none()
                 }
             },
+            PackageMessage::Cancel => {
+                self.state = PackageState::default();
+                Command::perform(Gui::pass_package(self.clone()), Message::CancelInstall)
+            }
             PackageMessage::Remove => {
                 self.remove();
                 Command::perform(Gui::pass_package(self.clone()), Message::PackageRemoved)
@@ -2081,7 +2117,10 @@ impl Package {
                     install_button,
                 ))
                 .into(),
-            PackageState::Downloading { progress } => Row::new()
+            PackageState::Downloading {
+                progress,
+                cancel_button,
+            } => Row::new()
                 .spacing(10)
                 .align_items(Align::Center)
                 .push(Text::new(format!("Downloading... {:.2}%", progress)))
@@ -2090,9 +2129,23 @@ impl Package {
                         .width(Length::Fill)
                         .style(theme),
                 )
-                // TODO: Cancel functionality.
+                .push(
+                    Button::new(cancel_button, Text::new("Cancel"))
+                        .on_press(PackageMessage::Cancel)
+                        .style(theme),
+                )
                 .into(),
-            PackageState::Extracting { progress } => {
+            PackageState::Extracting {
+                progress,
+                cancel_button: _,
+            } => {
+                // TODO: Figure out why cancelling doesn't work for extraction.
+                // It does visually get cancelled, but the extraction keeps going in the
+                // background, ultimately getting installed. But since the package was supposedly
+                // removed from the installation process, the program crashes at the end when it
+                // tries that, since it's no longer there. The same behaviour happens on Windows,
+                // where the extraction works differently. I thought maybe the download kept going
+                // as well, but no, that stops as intended when cancelled.
                 if cfg!(target_os = "linux") {
                     Row::new()
                         .align_items(Align::Center)
@@ -2101,6 +2154,11 @@ impl Package {
                                 .width(Length::Fill)
                                 .horizontal_alignment(HorizontalAlignment::Center),
                         )
+                        /* .push(
+                            Button::new(cancel_button, Text::new("Cancel"))
+                                .on_press(PackageMessage::Cancel)
+                                .style(theme),
+                        ) */
                         .into()
                 } else {
                     Row::new()
@@ -2112,6 +2170,11 @@ impl Package {
                                 .width(Length::Fill)
                                 .style(theme),
                         )
+                        /* .push(
+                            Button::new(cancel_button, Text::new("Cancel"))
+                                .on_press(PackageMessage::Cancel)
+                                .style(theme),
+                        ) */
                         .into()
                 }
             }
