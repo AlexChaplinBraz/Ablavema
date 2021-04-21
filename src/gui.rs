@@ -449,7 +449,10 @@ impl Application for Gui {
                         Command::none()
                     }
                 }
-                None => Command::none(),
+                None => {
+                    self.releases.sync();
+                    Command::none()
+                }
             },
             Message::InstallPackage(package) => {
                 let (index, package) = iter::empty()
