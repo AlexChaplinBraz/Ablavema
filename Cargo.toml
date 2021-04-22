@@ -4,6 +4,12 @@ description = "A Blender launcher and version manager"
 version = "0.1.0"
 authors = ["Alexander Chaplin Braz <contact@alexchaplinbraz.com>"]
 edition = "2018"
+homepage = "https://github.com/AlexChaplinBraz/Ablavema"
+repository = "https://github.com/AlexChaplinBraz/Ablavema"
+readme = "README.md"
+license = "MIT"
+keywords = ["blender", "launcher", "blend", "gui", "cli"]
+categories = ["accessibility", "command-line-utilities"]
 
 [dependencies]
 async-trait = "0.1"
