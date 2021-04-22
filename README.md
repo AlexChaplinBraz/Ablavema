@@ -4,7 +4,7 @@ Practically all the necessary features for managing and using multiple Blender v
 What's left until it's ready for its first release is fixing a few known issues and a couple of minor missing features.
 
 You can find the changes in [CHANGELOG.md](https://github.com/AlexChaplinBraz/Ablavema/blob/master/CHANGELOG.md)
-and the planned features in [ROADMAP.md](https://github.com/AlexChaplinBraz/Ablavema/blob/master/ROADMAP.md)
+and the planned features in [ROADMAP.md](https://github.com/AlexChaplinBraz/Ablavema/blob/master/ROADMAP.md).
 <!--
 ## Installing
 
@@ -49,12 +49,12 @@ Pull requests are welcomed, but please follow my general coding style
 (which mostly amounts to running `rustfmt` on save).
 
 You can contact me most easily through Ablavema's Discord server with
-discord.gg/D6gmhMUrrH.
+[discord.gg/D6gmhMUrrH](https://discord.gg/D6gmhMUrrH).
 
 But you can also contact me directly as listed at
-alexchaplinbraz.com/contact
+[alexchaplinbraz.com/contact](https://alexchaplinbraz.com/contact).
 
 ## Donate
 
-Please do feel free to support me through alexchaplinbraz.com/donate
+Please do feel free to support me through [alexchaplinbraz.com/donate](https://alexchaplinbraz.com/donate)
 to motivate me to keep working on this project.
