@@ -56,5 +56,5 @@ But you can also contact me directly as listed at
 
 ## Donate
 
-Please do feel free to support me through [alexchaplinbraz.com/donate](https://alexchaplinbraz.com/donate)
+Please consider supporting me through [donate.alexchaplinbraz.com](https://donate.alexchaplinbraz.com/?project=1)
 to motivate me to keep working on this project.
