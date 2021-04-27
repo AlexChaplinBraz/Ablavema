@@ -15,6 +15,8 @@ use crate::{
     settings::{ModifierKey, CAN_CONNECT, SETTINGS, TEXT_SIZE},
 };
 use clap::crate_version;
+use fs2::available_space;
+use fs_extra::dir;
 use iced::{
     button, pick_list, scrollable, Align, Application, Button, Checkbox, Clipboard, Column,
     Command, Container, Element, Executor, HorizontalAlignment, Length, PickList, ProgressBar,
@@ -23,7 +25,12 @@ use iced::{
 use itertools::Itertools;
 use reqwest;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, iter, process, sync::atomic::Ordering};
+use std::{
+    fmt::Display,
+    fs::{create_dir_all, remove_dir_all},
+    iter, process,
+    sync::atomic::Ordering,
+};
 use webbrowser;
 
 #[derive(Debug)]
@@ -884,6 +891,12 @@ impl Application for Gui {
                 self.releases.sync();
                 Command::none()
             }
+            Message::RemoveCache => {
+                remove_dir_all(SETTINGS.read().unwrap().cache_dir.clone()).unwrap();
+                println!("All cache removed.");
+                create_dir_all(SETTINGS.read().unwrap().cache_dir.clone()).unwrap();
+                Command::none()
+            }
             Message::CheckConnection => {
                 self.state.controls.checking_connection = true;
                 Command::perform(Gui::check_connection(), Message::ConnectionChecked)
@@ -1255,6 +1268,27 @@ impl Application for Gui {
                     || lts_packages_exist
                     || archived_packages_exist;
 
+                let installed_packages_space =
+                    dir::get_size(SETTINGS.read().unwrap().packages_dir.clone()).unwrap() as f64
+                        / 1024.0
+                        / 1024.0
+                        / 1024.0;
+                let packages_dir_available_space =
+                    available_space(SETTINGS.read().unwrap().packages_dir.clone()).unwrap() as f64
+                        / 1024.0
+                        / 1024.0
+                        / 1024.0;
+                let cache_space = dir::get_size(SETTINGS.read().unwrap().cache_dir.clone()).unwrap()
+                    as f64
+                    / 1024.0
+                    / 1024.0
+                    / 1024.0;
+                let cache_dir_available_space =
+                    available_space(SETTINGS.read().unwrap().cache_dir.clone()).unwrap() as f64
+                        / 1024.0
+                        / 1024.0
+                        / 1024.0;
+
                 let settings = Column::new()
                     .padding(10)
                     .spacing(10)
@@ -1482,6 +1516,7 @@ impl Application for Gui {
                                 .size(TEXT_SIZE * 2),
                             )
                             .push(Text::new("Useful for getting rid of a large quantity of packages at once."))
+                            .push(Text::new(format!("Space used by installed packages: {:.2} GB\nAvailable space: {:.2} GB", installed_packages_space, packages_dir_available_space)))
                             .push(Row::new()
                                 .spacing(5)
                                 .push(remove_packages_button(
@@ -1523,11 +1558,26 @@ impl Application for Gui {
                             )
                         )
                         .push(Space::with_width(Length::Units(10)))
-                    // TODO: Add cache removal.
-                    // Show how much space it's taking and how much disk space is left.
-                    // Maybe also show how much space installed packages take up.
-                    // While there shouldn't be any orphaned packages, maybe try to check for them
-                    // here and make it possible to delete them. And one for deleting them all.
+                    )
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(Row::new()
+                        .align_items(Align::Center)
+                        .push(Space::with_width(Length::Units(10)))
+                        .push(Column::new()
+                            .spacing(10)
+                            .width(Length::Fill)
+                            .push(Text::new("Remove cache")
+                                .color(theme.highlight_text())
+                                .size(TEXT_SIZE * 2),
+                            )
+                            .push(Text::new("Useful for getting rid of the accumulated cache (mainly downloaded packages) since at the moment cache isn't being automatically removed."))
+                            .push(Text::new(format!("Space used by cache: {:.2} GB\nAvailable space: {:.2} GB", cache_space, cache_dir_available_space)))
+                            .push(Button::new(&mut self.state.remove_cache_button,Text::new("Remove all cache"))
+                                .on_press(Message::RemoveCache)
+                                .style(self.theme.tab_button())
+                            )
+                        )
+                        .push(Space::with_width(Length::Units(10)))
                     );
 
                 Container::new(Scrollable::new(&mut self.state.settings_scroll).push(settings))
@@ -1671,6 +1721,7 @@ pub enum Message {
     ThemeChanged(Theme),
     RemoveDatabases(BuildType),
     RemovePackages(BuildType),
+    RemoveCache,
     CheckConnection,
     ConnectionChecked(()),
 }
@@ -1710,6 +1761,7 @@ struct GuiState {
     remove_stable_packages_button: button::State,
     remove_lts_packages_button: button::State,
     remove_archived_packages_button: button::State,
+    remove_cache_button: button::State,
     repository_link_button: button::State,
     discord_link_button: button::State,
     contact_link_button: button::State,
