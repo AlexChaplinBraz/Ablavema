@@ -1153,7 +1153,7 @@ impl Application for Gui {
                         .size(TEXT_SIZE * 3)
                         .color(theme.highlight_text())
                     )
-                    .push(Text::new("These settings affect how checking for updates works. Enabling specific build types also marks the newest package of that build as an update. Keep in mind that you need to first have one installed package of that build type for any newer ones to be marked as an update, even if you're checking for their updates."))
+                    .push(Text::new("These settings affect how checking for updates works. Enabling specific build types also marks the newest package of that build as an update. Keep in mind that you need to first have one installed package of that build type for any newer ones to be marked as an update, even if you're checking for their updates. It is recommended to disable checking for updates for builds that aren't installed to reduce launch time."))
                     .push(Rule::horizontal(0).style(self.theme))
                     .push(choice_setting!(
                         "Check at launch",

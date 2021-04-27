@@ -20,6 +20,10 @@ use std::{
 
 /// Check whether there's a working connection to the download servers.
 pub async fn check_connection() {
+    // TODO: Fix rare false negative.
+    // Seems to happen randomly, where one of the servers is momentarily unresponsive.
+    // Could be fixed by looping through the check once more if there was an error,
+    // since this just gets fixed if you retry manually right away.
     let url1 = "https://builder.blender.org/download/";
     let url2 = "https://www.blender.org/download/";
     let url3 = "https://ftp.nluug.nl/pub/graphics/blender/release/";
