@@ -77,6 +77,9 @@ pub async fn check_connection() {
 }
 
 pub async fn get_document(url: &str) -> Document {
+    // TODO: Fix hang on getting temp banned mid fetching.
+    // Should be resolved by adding a timeout, but the requirement is being
+    // able to pass an error around and handle it.
     let resp = reqwest::get(url).await.unwrap();
     assert!(resp.status().is_success());
     let resp = resp.bytes().await.unwrap();
