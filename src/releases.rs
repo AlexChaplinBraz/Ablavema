@@ -586,10 +586,15 @@ pub trait ReleaseType:
         }
     }
 
-    fn purge(&mut self) {
+    fn remove_db(&mut self) {
         let database = self.get_db_path();
+        let mut name = self.get_name();
+        if let Some(c) = name.get_mut(0..1) {
+            c.make_ascii_uppercase();
+        }
         if database.exists() {
             remove_file(database).unwrap();
+            println!("{} database removed.", name);
             *self = Self::default();
         }
     }

@@ -833,31 +833,55 @@ impl Application for Gui {
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
-            Message::PurgeDb(dbtype) => {
-                match dbtype {
-                    DbType::All => {
-                        self.releases.daily.purge();
-                        self.releases.branched.purge();
-                        self.releases.stable.purge();
-                        self.releases.lts.purge();
-                        self.releases.archived.purge();
+            Message::RemoveDatabases(build_type) => {
+                match build_type {
+                    BuildType::All => {
+                        self.releases.daily.remove_db();
+                        self.releases.branched.remove_db();
+                        self.releases.stable.remove_db();
+                        self.releases.lts.remove_db();
+                        self.releases.archived.remove_db();
                     }
-                    DbType::Daily => {
-                        self.releases.daily.purge();
+                    BuildType::Daily => {
+                        self.releases.daily.remove_db();
                     }
-                    DbType::Branched => {
-                        self.releases.branched.purge();
+                    BuildType::Branched => {
+                        self.releases.branched.remove_db();
                     }
-                    DbType::Stable => {
-                        self.releases.stable.purge();
+                    BuildType::Stable => {
+                        self.releases.stable.remove_db();
                     }
-                    DbType::Lts => {
-                        self.releases.lts.purge();
+                    BuildType::Lts => {
+                        self.releases.lts.remove_db();
                     }
-                    DbType::Archived => {
-                        self.releases.archived.purge();
+                    BuildType::Archived => {
+                        self.releases.archived.remove_db();
                     }
                 }
+                Command::none()
+            }
+            Message::RemovePackages(build_type) => {
+                match build_type {
+                    BuildType::All => {
+                        self.releases.installed.remove_all();
+                    }
+                    BuildType::Daily => {
+                        self.releases.installed.remove_daily();
+                    }
+                    BuildType::Branched => {
+                        self.releases.installed.remove_branched();
+                    }
+                    BuildType::Stable => {
+                        self.releases.installed.remove_stable();
+                    }
+                    BuildType::Lts => {
+                        self.releases.installed.remove_lts();
+                    }
+                    BuildType::Archived => {
+                        self.releases.installed.remove_archived();
+                    }
+                }
+                self.releases.sync();
                 Command::none()
             }
             Message::CheckConnection => {
@@ -1124,7 +1148,7 @@ impl Application for Gui {
                     .style(theme.tab_button())
                 };
 
-                let purge_button = |label, dbtype, exists, state| {
+                let remove_db_button = |label, build_type, exists, state| {
                     let button = Button::new(
                         state,
                         Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
@@ -1133,7 +1157,7 @@ impl Application for Gui {
                     .style(theme.tab_button());
 
                     if exists {
-                        button.on_press(Message::PurgeDb(dbtype))
+                        button.on_press(Message::RemoveDatabases(build_type))
                     } else {
                         button
                     }
@@ -1149,6 +1173,87 @@ impl Application for Gui {
                     || stable_db_exists
                     || lts_db_exists
                     || archived_db_exists;
+
+                let remove_packages_button = |label, build_type, exists, state| {
+                    let button = Button::new(
+                        state,
+                        Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
+                    )
+                    .width(Length::Fill)
+                    .style(theme.tab_button());
+
+                    if exists {
+                        button.on_press(Message::RemovePackages(build_type))
+                    } else {
+                        button
+                    }
+                };
+
+                let daily_packages_exist = if self
+                    .releases
+                    .installed
+                    .iter()
+                    .filter(|package| matches!(package.build, Build::Daily { .. }))
+                    .count()
+                    > 0
+                {
+                    true
+                } else {
+                    false
+                };
+                let branched_packages_exist = if self
+                    .releases
+                    .installed
+                    .iter()
+                    .filter(|package| matches!(package.build, Build::Branched { .. }))
+                    .count()
+                    > 0
+                {
+                    true
+                } else {
+                    false
+                };
+                let stable_packages_exist = if self
+                    .releases
+                    .installed
+                    .iter()
+                    .filter(|package| package.build == Build::Stable)
+                    .count()
+                    > 0
+                {
+                    true
+                } else {
+                    false
+                };
+                let lts_packages_exist = if self
+                    .releases
+                    .installed
+                    .iter()
+                    .filter(|package| package.build == Build::Lts)
+                    .count()
+                    > 0
+                {
+                    true
+                } else {
+                    false
+                };
+                let archived_packages_exist = if self
+                    .releases
+                    .installed
+                    .iter()
+                    .filter(|package| package.build == Build::Archived)
+                    .count()
+                    > 0
+                {
+                    true
+                } else {
+                    false
+                };
+                let any_packages_exist = daily_packages_exist
+                    || branched_packages_exist
+                    || stable_packages_exist
+                    || lts_packages_exist
+                    || archived_packages_exist;
 
                 let settings = Column::new()
                     .padding(10)
@@ -1290,7 +1395,7 @@ impl Application for Gui {
                     .push(Rule::horizontal(0).style(self.theme))
                     .push(choice_setting!(
                         "Bypass launcher",
-                        "The prefered way to use this launcher. If a default package is set and no updates were found, only open launcher when the selected modifier key is held down. This way the launcher only makes itself known if there's an update or if you want to launch a different package.",
+                        "The preferred way to use this launcher. If a default package is set and no updates were found, only open launcher when the selected modifier key is held down. This way the launcher only makes itself known if there's an update or if you want to launch a different package.",
                         &Choice::ALL,
                         Some(choice(SETTINGS.read().unwrap().bypass_launcher).unwrap()),
                         Message::BypassLauncher,
@@ -1318,50 +1423,104 @@ impl Application for Gui {
                         .push(Column::new()
                             .spacing(10)
                             .width(Length::Fill)
-                            .push(Text::new("Purge databases")
+                            .push(Text::new("Remove databases")
                                 .color(theme.highlight_text())
                                 .size(TEXT_SIZE * 2),
                             )
-                            .push(Text::new("Remove databases. Useful for when a release candidate is still available even though it doesn't appear in the website anymore. Keep in mind that bookmarks are stored in the databases, so they will be lost. Also, any installed package that's no longer available, like with old daily and branched packages, won't reapear."))
+                            .push(Text::new("Useful for when a release candidate is still available even though it doesn't appear in the website anymore. Keep in mind that bookmarks are stored in the databases, so they will be lost. Also, any installed package that's no longer available, like with old daily and branched packages, won't reapear."))
                             .push(Row::new()
                                 .spacing(5)
-                                .push(purge_button(
+                                .push(remove_db_button(
                                     "All",
-                                    DbType::All,
+                                    BuildType::All,
                                     any_dbs_exist,
-                                    &mut self.state.purge_all_button
+                                    &mut self.state.remove_all_dbs_button
                                 ))
-                                .push(purge_button(
+                                .push(remove_db_button(
                                     "Daily",
-                                    DbType::Daily,
+                                    BuildType::Daily,
                                     daily_db_exists,
-                                    &mut self.state.purge_daily_button
+                                    &mut self.state.remove_daily_db_button
                                 ))
-                                .push(purge_button(
+                                .push(remove_db_button(
                                     "Branched",
-                                    DbType::Branched,
+                                    BuildType::Branched,
                                     branched_db_exists,
-                                    &mut self.state.purge_branched_button
+                                    &mut self.state.remove_branched_db_button
                                 ))
-                                .push(purge_button(
+                                .push(remove_db_button(
                                     "Stable",
-                                    DbType::Stable,
+                                    BuildType::Stable,
                                     stable_db_exists,
-                                    &mut self.state.purge_stable_button
+                                    &mut self.state.remove_stable_db_button
                                 ))
-                                .push(purge_button(
+                                .push(remove_db_button(
                                     "LTS",
-                                    DbType::Lts,
+                                    BuildType::Lts,
                                     lts_db_exists,
-                                    &mut self.state.purge_lts_button
+                                    &mut self.state.remove_lts_db_button
                                 ))
-                                .push(purge_button(
+                                .push(remove_db_button(
                                     "Archived",
-                                    DbType::Archived,
+                                    BuildType::Archived,
                                     archived_db_exists,
-                                    &mut self.state.purge_archived_button
+                                    &mut self.state.remove_archived_db_button
                                 ))
-                            ),
+                            )
+                        )
+                        .push(Space::with_width(Length::Units(10)))
+                    )
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(Row::new()
+                        .align_items(Align::Center)
+                        .push(Space::with_width(Length::Units(10)))
+                        .push(Column::new()
+                            .spacing(10)
+                            .width(Length::Fill)
+                            .push(Text::new("Remove packages")
+                                .color(theme.highlight_text())
+                                .size(TEXT_SIZE * 2),
+                            )
+                            .push(Text::new("Useful for getting rid of a large quantity of packages at once."))
+                            .push(Row::new()
+                                .spacing(5)
+                                .push(remove_packages_button(
+                                    "All",
+                                    BuildType::All,
+                                    any_packages_exist,
+                                    &mut self.state.remove_all_packages_button
+                                ))
+                                .push(remove_packages_button(
+                                    "Daily",
+                                    BuildType::Daily,
+                                    daily_packages_exist,
+                                    &mut self.state.remove_daily_packages_button
+                                ))
+                                .push(remove_packages_button(
+                                    "Branched",
+                                    BuildType::Branched,
+                                    branched_packages_exist,
+                                    &mut self.state.remove_branched_packages_button
+                                ))
+                                .push(remove_packages_button(
+                                    "Stable",
+                                    BuildType::Stable,
+                                    stable_packages_exist,
+                                    &mut self.state.remove_stable_packages_button
+                                ))
+                                .push(remove_packages_button(
+                                    "LTS",
+                                    BuildType::Lts,
+                                    lts_packages_exist,
+                                    &mut self.state.remove_lts_packages_button
+                                ))
+                                .push(remove_packages_button(
+                                    "Archived",
+                                    BuildType::Archived,
+                                    archived_packages_exist,
+                                    &mut self.state.remove_archived_packages_button
+                                ))
+                            )
                         )
                         .push(Space::with_width(Length::Units(10)))
                     // TODO: Add cache removal.
@@ -1369,7 +1528,7 @@ impl Application for Gui {
                     // Maybe also show how much space installed packages take up.
                     // While there shouldn't be any orphaned packages, maybe try to check for them
                     // here and make it possible to delete them. And one for deleting them all.
-                );
+                    );
 
                 Container::new(Scrollable::new(&mut self.state.settings_scroll).push(settings))
                     .height(Length::Fill)
@@ -1510,7 +1669,8 @@ pub enum Message {
     KeepOnlyLatestStable(Choice),
     KeepOnlyLatestLts(Choice),
     ThemeChanged(Theme),
-    PurgeDb(DbType),
+    RemoveDatabases(BuildType),
+    RemovePackages(BuildType),
     CheckConnection,
     ConnectionChecked(()),
 }
@@ -1538,12 +1698,18 @@ struct GuiState {
     minus_1_button: button::State,
     minus_10_button: button::State,
     minus_100_button: button::State,
-    purge_all_button: button::State,
-    purge_daily_button: button::State,
-    purge_branched_button: button::State,
-    purge_stable_button: button::State,
-    purge_lts_button: button::State,
-    purge_archived_button: button::State,
+    remove_all_dbs_button: button::State,
+    remove_daily_db_button: button::State,
+    remove_branched_db_button: button::State,
+    remove_stable_db_button: button::State,
+    remove_lts_db_button: button::State,
+    remove_archived_db_button: button::State,
+    remove_all_packages_button: button::State,
+    remove_daily_packages_button: button::State,
+    remove_branched_packages_button: button::State,
+    remove_stable_packages_button: button::State,
+    remove_lts_packages_button: button::State,
+    remove_archived_packages_button: button::State,
     repository_link_button: button::State,
     discord_link_button: button::State,
     contact_link_button: button::State,
@@ -1975,7 +2141,7 @@ impl Choice {
 }
 
 #[derive(Clone, Debug)]
-pub enum DbType {
+pub enum BuildType {
     All,
     Daily,
     Branched,

@@ -126,4 +126,50 @@ impl Installed {
 
         (daily_removed, branched_removed)
     }
+
+    pub fn remove_all(&mut self) {
+        for package in self.iter() {
+            package.remove();
+        }
+    }
+
+    pub fn remove_daily(&mut self) {
+        for package in self.iter() {
+            if matches!(package.build, Build::Daily { .. }) {
+                package.remove();
+            }
+        }
+    }
+
+    pub fn remove_branched(&mut self) {
+        for package in self.iter() {
+            if matches!(package.build, Build::Branched { .. }) {
+                package.remove();
+            }
+        }
+    }
+
+    pub fn remove_stable(&mut self) {
+        for package in self.iter() {
+            if package.build == Build::Stable {
+                package.remove();
+            }
+        }
+    }
+
+    pub fn remove_lts(&mut self) {
+        for package in self.iter() {
+            if package.build == Build::Lts {
+                package.remove();
+            }
+        }
+    }
+
+    pub fn remove_archived(&mut self) {
+        for package in self.iter() {
+            if package.build == Build::Archived {
+                package.remove();
+            }
+        }
+    }
 }
