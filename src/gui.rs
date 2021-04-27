@@ -14,6 +14,7 @@ use crate::{
     },
     settings::{ModifierKey, CAN_CONNECT, SETTINGS, TEXT_SIZE},
 };
+use clap::crate_version;
 use iced::{
     button, pick_list, scrollable, Align, Application, Button, Checkbox, Clipboard, Column,
     Command, Container, Element, Executor, HorizontalAlignment, Length, PickList, ProgressBar,
@@ -23,6 +24,7 @@ use itertools::Itertools;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, iter, process, sync::atomic::Ordering};
+use webbrowser;
 
 #[derive(Debug)]
 pub struct Gui {
@@ -513,6 +515,10 @@ impl Application for Gui {
             Message::OpenBlenderWithFile(package) => {
                 open_blender(package.name, Some(self.file_path.clone().unwrap()));
                 process::exit(0);
+            }
+            Message::OpenBrowser(url) => {
+                let _ = webbrowser::open(&url);
+                Command::none()
             }
             Message::CheckForUpdates => {
                 self.state.controls.checking_for_updates = true;
@@ -1371,18 +1377,66 @@ impl Application for Gui {
                     .style(self.theme)
                     .into()
             }
-            Tab::About => Container::new(
-                Text::new("About tab not yet implemented")
-                    .horizontal_alignment(HorizontalAlignment::Center)
-                    .width(Length::Fill)
-                    .size(TEXT_SIZE * 2),
-            )
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .center_x()
-            .center_y()
-            .style(theme)
-            .into(),
+            Tab::About => {
+                let link = |label, url, state| {
+                    Row::new()
+                        .spacing(10)
+                        .align_items(Align::Center)
+                        .push(Text::new(label).width(Length::Units(70)))
+                        .push(
+                            Button::new(state, Text::new(&url))
+                                .on_press(Message::OpenBrowser(url))
+                                .style(theme),
+                        )
+                };
+
+                Container::new(
+                    Column::new()
+                        .spacing(10)
+                        .align_items(Align::Center)
+                        .push(Space::with_height(Length::Units(20)))
+                        .push(
+                            Row::new()
+                                .spacing(10)
+                                .align_items(Align::End)
+                                .push(Text::new("Ablavema").size(TEXT_SIZE * 3))
+                                .push(Text::new(crate_version!()).size(TEXT_SIZE * 2)),
+                        )
+                        .push(
+                            Text::new("A Blender Launcher and Version Manager").size(TEXT_SIZE * 2),
+                        )
+                        .push(
+                            Column::new()
+                                .spacing(10)
+                                .push(Space::with_height(Length::Units(30)))
+                                .push(link(
+                                    "Repository:",
+                                    String::from("https://github.com/AlexChaplinBraz/Ablavema"),
+                                    &mut self.state.repository_link_button,
+                                ))
+                                .push(link(
+                                    "Discord:",
+                                    String::from("https://discord.gg/D6gmhMUrrH"),
+                                    &mut self.state.discord_link_button,
+                                ))
+                                .push(link(
+                                    "Contact me:",
+                                    String::from("https://alexchaplinbraz.com/contact"),
+                                    &mut self.state.contact_link_button,
+                                ))
+                                .push(link(
+                                    "Donate:",
+                                    String::from("https://donate.alexchaplinbraz.com"),
+                                    &mut self.state.donation_link_button,
+                                )),
+                        ),
+                )
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .center_x()
+                .style(theme)
+                .into()
+            }
         };
 
         Column::new().push(tabs).push(body).into()
@@ -1416,6 +1470,7 @@ pub enum Message {
     PackageRemoved(Package),
     OpenBlender(Package),
     OpenBlenderWithFile(Package),
+    OpenBrowser(String),
     CheckForUpdates,
     UpdatesChecked((bool, Daily, Branched, Stable, Lts)),
     FetchAll,
@@ -1489,6 +1544,10 @@ struct GuiState {
     purge_stable_button: button::State,
     purge_lts_button: button::State,
     purge_archived_button: button::State,
+    repository_link_button: button::State,
+    discord_link_button: button::State,
+    contact_link_button: button::State,
+    donation_link_button: button::State,
 }
 
 impl GuiState {
