@@ -415,7 +415,7 @@ impl PartialEq for Package {
                 self.build == other.build && self.date == other.date
             }
             Build::Stable | Build::Lts | Build::Archived => {
-                self.name == other.name && self.date == other.date
+                self.name == other.name && self.version == other.version
             }
         }
     }
