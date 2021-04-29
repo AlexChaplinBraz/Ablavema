@@ -1,7 +1,10 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 use crate::{
     gui::GuiFlags,
-    helpers::{cli_install, cli_list_narrow, cli_list_wide, is_time_to_update, process_bool_arg},
+    helpers::{
+        check_self_updates, cli_install, cli_list_narrow, cli_list_wide, get_self_releases,
+        is_time_to_update, process_bool_arg,
+    },
     releases::{ReleaseType, Releases},
     settings::{ModifierKey, CAN_CONNECT, LAUNCH_GUI, ONLY_CLI, SETTINGS},
 };
@@ -15,6 +18,7 @@ use tokio::fs::remove_dir_all;
 
 pub async fn run_cli() -> GuiFlags {
     let (mut releases, initialised) = Releases::init().await;
+    let mut self_releases = None;
 
     // Workaround for 'clap' not supporting colours on Windows,
     // even though 'indicatif' does display colours on Windows.
@@ -903,6 +907,26 @@ pub async fn run_cli() -> GuiFlags {
                 }
             }
 
+            // TODO: Add the self-updater to CLI.
+            // TODO: Add setting to notify only on newer version when downgraded.
+            // This would make it possible to downgrade to 0.2.1 from 0.2.2
+            // and not get prompted until a newer version than 0.2.2 is released.
+            if SETTINGS.read().unwrap().check_self_updates_at_launch
+                && is_time_to_update()
+                && CAN_CONNECT.load(Ordering::Relaxed)
+            {
+                self_releases = get_self_releases();
+
+                if let Some(updates) = check_self_updates(&self_releases) {
+                    println!(
+                        "Found {} Ablavema update{}.",
+                        updates,
+                        if updates > 1 { "s" } else { "" }
+                    );
+                    LAUNCH_GUI.store(true, Ordering::Relaxed);
+                }
+            }
+
             if SETTINGS.read().unwrap().bypass_launcher && !LAUNCH_GUI.load(Ordering::Relaxed) {
                 let device_state = DeviceState::new();
                 let keys = device_state.get_keys();
@@ -923,5 +947,6 @@ pub async fn run_cli() -> GuiFlags {
         } else {
             None
         },
+        self_releases,
     }
 }

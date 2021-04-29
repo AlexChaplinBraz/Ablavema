@@ -3,7 +3,7 @@ use crate::{
     package::{Build, Package, PackageState},
     settings::{CAN_CONNECT, SETTINGS},
 };
-use clap::ArgMatches;
+use clap::{crate_version, ArgMatches};
 use indicatif::MultiProgress;
 use lazy_static::lazy_static;
 use prettytable::{
@@ -13,8 +13,15 @@ use prettytable::{
 };
 use reqwest::{self, ClientBuilder};
 use select::document::Document;
+use self_update::{backends::github::ReleaseList, update::Release};
 use std::{
-    collections::HashMap, path::Path, process::Command, str::FromStr, sync::atomic::Ordering,
+    collections::HashMap,
+    env::current_exe,
+    fs::File,
+    path::{Path, PathBuf},
+    process::Command,
+    str::FromStr,
+    sync::atomic::Ordering,
     time::Duration,
 };
 
@@ -24,46 +31,25 @@ pub async fn check_connection() {
     // Seems to happen randomly, where one of the servers is momentarily unresponsive.
     // Could be fixed by looping through the check once more if there was an error,
     // since this just gets fixed if you retry manually right away.
-    let url1 = "https://builder.blender.org/download/";
-    let url2 = "https://www.blender.org/download/";
-    let url3 = "https://ftp.nluug.nl/pub/graphics/blender/release/";
+
+    let urls = [
+        "https://builder.blender.org/download/",
+        "https://www.blender.org/download/",
+        "https://ftp.nluug.nl/pub/graphics/blender/release/",
+        "https://github.com/AlexChaplinBraz/Ablavema",
+    ];
 
     let client = ClientBuilder::new()
         .connect_timeout(Duration::from_secs(1))
         .build()
         .unwrap();
 
-    match client.get(url1).send().await {
-        Ok(response) => {
-            if response.status().is_client_error() || response.status().is_server_error() {
-                CAN_CONNECT.store(false, Ordering::Relaxed);
-            }
-        }
-        Err(_) => {
-            CAN_CONNECT.store(false, Ordering::Relaxed);
-            return;
-        }
-    }
-
-    if CAN_CONNECT.load(Ordering::Relaxed) {
-        match client.get(url2).send().await {
+    for url in urls.iter() {
+        match client.get(*url).send().await {
             Ok(response) => {
                 if response.status().is_client_error() || response.status().is_server_error() {
                     CAN_CONNECT.store(false, Ordering::Relaxed);
-                }
-            }
-            Err(_) => {
-                CAN_CONNECT.store(false, Ordering::Relaxed);
-                return;
-            }
-        }
-    }
-
-    if CAN_CONNECT.load(Ordering::Relaxed) {
-        match client.get(url3).send().await {
-            Ok(response) => {
-                if response.status().is_client_error() || response.status().is_server_error() {
-                    CAN_CONNECT.store(false, Ordering::Relaxed);
+                    return;
                 }
             }
             Err(_) => {
@@ -84,6 +70,85 @@ pub async fn get_document(url: &str) -> Document {
     assert!(resp.status().is_success());
     let resp = resp.bytes().await.unwrap();
     Document::from_read(&resp[..]).unwrap()
+}
+
+pub fn get_self_releases() -> Option<Vec<Release>> {
+    let releases = ReleaseList::configure()
+        .repo_owner("AlexChaplinBraz")
+        .repo_name("Ablavema")
+        .with_target(&self_update::get_target())
+        .build()
+        .unwrap()
+        .fetch()
+        .unwrap();
+
+    if releases.is_empty() {
+        None
+    } else {
+        Some(releases)
+    }
+}
+
+pub fn check_self_updates(releases_option: &Option<Vec<Release>>) -> Option<usize> {
+    match releases_option {
+        Some(releases) => match releases
+            .iter()
+            .enumerate()
+            .find(|(_, release)| release.version == crate_version!())
+        {
+            Some((index, _)) => index,
+            // TODO: Might need to handle cases where the current release doesn't exist,
+            // like if it was deleted. I made it at least so it doesn't crash,
+            // but it shouldn't happen in practice anyway.
+            None => return None,
+        }
+        .return_option(),
+        None => None,
+    }
+}
+
+pub fn change_self_version(releases: Vec<Release>, version: String) {
+    let asset = releases
+        .iter()
+        .find(|release| release.version == version)
+        .unwrap()
+        .asset_for(&self_update::get_target())
+        .unwrap();
+
+    let archive_path = SETTINGS.read().unwrap().cache_dir.join(asset.name);
+    let archive = File::create(&archive_path).unwrap();
+
+    self_update::Download::from_url(&asset.download_url)
+        .set_header(
+            reqwest::header::ACCEPT,
+            "application/octet-stream".parse().unwrap(),
+        )
+        .download_to(&archive)
+        .unwrap();
+
+    let bin_name = PathBuf::from(if cfg!(target_os = "linux") {
+        "ablavema"
+    } else if cfg!(target_os = "windows") {
+        "ablavema.exe"
+    } else if cfg!(target_os = "macos") {
+        todo!("macos bin_name");
+    } else {
+        unreachable!("Unsupported OS");
+    });
+
+    self_update::Extract::from_source(&archive_path)
+        .extract_file(&SETTINGS.read().unwrap().cache_dir, &bin_name)
+        .unwrap();
+
+    // TODO: Offer an option to restore previous version.
+    // Could maybe even save them with their versions in the name so it'd be possible
+    // to quickly swich them around without having to redownload.
+    let tmp_file = SETTINGS.read().unwrap().cache_dir.join("ablavema_backup");
+    let bin_path = SETTINGS.read().unwrap().cache_dir.join(bin_name);
+    self_update::Move::from_source(&bin_path)
+        .replace_using_temp(&tmp_file)
+        .to_dest(&current_exe().unwrap())
+        .unwrap();
 }
 
 pub fn open_blender(package: String, file_path: Option<String>) {

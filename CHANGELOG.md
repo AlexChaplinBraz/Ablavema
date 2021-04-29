@@ -24,6 +24,7 @@ Noncomprehensive list of features available at launch.
 - Settings for checking for updates.
 - Setting a default package.
 - Settings for bypassing the launcher if a default package is set.
+- Updating the launcher itself.
 - Light and dark themes based on Blender.
 - Working as portable by creating an empty file named "portable" in the same directory as the executable.
 

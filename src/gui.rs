@@ -6,7 +6,9 @@ use self::{
     style::Theme,
 };
 use crate::{
-    helpers::{check_connection, open_blender},
+    helpers::{
+        change_self_version, check_connection, check_self_updates, get_self_releases, open_blender,
+    },
     package::{Build, Package, PackageState, PackageStatus},
     releases::{
         archived::Archived, branched::Branched, daily::Daily, lts::Lts, stable::Stable,
@@ -24,6 +26,7 @@ use iced::{
 };
 use itertools::Itertools;
 use reqwest;
+use self_update::update::Release;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
@@ -41,6 +44,7 @@ pub struct Gui {
     state: GuiState,
     tab: Tab,
     theme: Theme,
+    self_releases: Option<Vec<Release>>,
 }
 
 impl Gui {
@@ -157,6 +161,10 @@ impl Gui {
     async fn check_connection() {
         check_connection().await;
     }
+
+    async fn change_self_version(releases: Vec<Release>, version: String) {
+        change_self_version(releases, version);
+    }
 }
 
 impl Application for Gui {
@@ -175,31 +183,42 @@ impl Application for Gui {
             }
         }
 
+        let mut state = GuiState::new();
+
+        let self_releases = flags.self_releases;
+
+        if let Some(s_releases) = &self_releases {
+            state.release_versions = s_releases
+                .iter()
+                .map(|release| release.version.clone())
+                .collect();
+        }
+
         (
             Gui {
                 releases,
                 file_path: flags.file_path,
                 installing: Vec::default(),
-                state: GuiState::new(),
+                state,
+                // TODO: Save tab in user settings.
+                // Will be useful when the recent files tab is introduced.
                 tab: Tab::Packages,
                 theme: SETTINGS.read().unwrap().theme,
+                self_releases,
             },
             Command::none(),
         )
     }
 
     fn title(&self) -> String {
-        format!(
-            "Ablavema{}",
-            match self.releases.count_updates().0 {
-                Some(count) => format!(
-                    " - {} {} available!",
-                    count,
-                    if count == 1 { "update" } else { "updates" }
-                ),
-                None => String::new(),
-            }
-        )
+        match self.releases.count_updates().0 {
+            Some(count) => format!(
+                "Ablavema - {} update{} available!",
+                count,
+                if count > 1 { "s" } else { "" }
+            ),
+            None => String::from("Ablavema"),
+        }
     }
 
     fn update(&mut self, message: Message, _clipboard: &mut Clipboard) -> Command<Message> {
@@ -897,6 +916,53 @@ impl Application for Gui {
                 create_dir_all(SETTINGS.read().unwrap().cache_dir.clone()).unwrap();
                 Command::none()
             }
+            Message::SelfUpdater(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().self_updater = true,
+                    Choice::Disable => SETTINGS.write().unwrap().self_updater = false,
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::CheckSelfUpdatesAtLaunch(choice) => {
+                match choice {
+                    Choice::Enable => SETTINGS.write().unwrap().check_self_updates_at_launch = true,
+                    Choice::Disable => {
+                        SETTINGS.write().unwrap().check_self_updates_at_launch = false
+                    }
+                }
+                SETTINGS.read().unwrap().save();
+                Command::none()
+            }
+            Message::FetchSelfReleases => {
+                self.self_releases = get_self_releases();
+                if let Some(releases) = &self.self_releases {
+                    self.state.release_versions = releases
+                        .iter()
+                        .map(|release| release.version.clone())
+                        .collect();
+                }
+                Command::none()
+            }
+            Message::PickListVersionSelected(version) => {
+                self.state.self_updater_pick_list_selected = version;
+                Command::none()
+            }
+            Message::ChangeVersion => {
+                self.state.installing_self_version = true;
+                Command::perform(
+                    Gui::change_self_version(
+                        self.self_releases.clone().unwrap(),
+                        self.state.self_updater_pick_list_selected.clone(),
+                    ),
+                    Message::VersionChanged,
+                )
+            }
+            Message::VersionChanged(()) => {
+                self.state.installing_self_version = false;
+                self.state.installed_self_version = true;
+                Command::none()
+            }
             Message::CheckConnection => {
                 self.state.controls.checking_connection = true;
                 Command::perform(Gui::check_connection(), Message::ConnectionChecked)
@@ -933,16 +999,26 @@ impl Application for Gui {
             .style(theme.tab_button());
 
             if tab == self_tab {
-                button
+                Container::new(button).padding(2)
             } else {
-                button.on_press(Message::TabChanged(tab))
+                Container::new(button.on_press(Message::TabChanged(tab))).padding(2)
             }
         };
 
+        let self_update_tab_label = format!(
+            "Self-updater{}",
+            match check_self_updates(&self.self_releases) {
+                Some(count) => {
+                    format!(" [{}]", count)
+                }
+                None => {
+                    String::new()
+                }
+            }
+        );
+
         let tabs = Container::new(
             Row::new()
-                .padding(2)
-                .spacing(2)
                 .push(tab_button(
                     "Packages",
                     Tab::Packages,
@@ -953,6 +1029,15 @@ impl Application for Gui {
                     Tab::Settings,
                     &mut self.state.settings_button,
                 ))
+                .push(if SETTINGS.read().unwrap().self_updater {
+                    tab_button(
+                        &self_update_tab_label,
+                        Tab::SelfUpdater,
+                        &mut self.state.self_updater_button,
+                    )
+                } else {
+                    Container::new(Space::with_width(Length::Units(0)))
+                })
                 .push(tab_button(
                     "About",
                     Tab::About,
@@ -1578,20 +1663,162 @@ impl Application for Gui {
                             )
                         )
                         .push(Space::with_width(Length::Units(10)))
-                    );
+                    )
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(choice_setting!(
+                        "Self-updater",
+                        "Update the launcher itself through the built-in system. This enables a hidden tab dedicated to updating, which can also be used to read the release notes of every version. Keep in mind that if Ablavema is installed through a package manager, the laucher should be updated through it. Though if made use of even if installed through a package manager, upon updating it through the package manager the executable would simply be replaced with the newer one, same as if done through the built-in system. In this way, making use of this feature is helpful when trying out older versions to see if a bug was there before or whatnot.",
+                        &Choice::ALL,
+                        Some(choice(SETTINGS.read().unwrap().self_updater).unwrap()),
+                        Message::SelfUpdater,
+                    ));
 
-                Container::new(Scrollable::new(&mut self.state.settings_scroll).push(settings))
-                    .height(Length::Fill)
-                    .width(Length::Fill)
-                    .style(self.theme)
-                    .into()
+                Container::new(Scrollable::new(&mut self.state.settings_scroll).push(
+                    if SETTINGS.read().unwrap().self_updater {
+                        settings
+                            .push(Rule::horizontal(0).style(self.theme))
+                            .push(choice_setting!(
+                                "Check for Ablavema updates at launch",
+                                "This uses the same delay as the normal updates. Keep in mind that, at the moment, if you downgrade you will be prompted to update Ablavema every time updates are checked.",
+                                &Choice::ALL,
+                                Some(
+                                    choice(SETTINGS.read().unwrap().check_self_updates_at_launch)
+                                        .unwrap()
+                                ),
+                                Message::CheckSelfUpdatesAtLaunch,
+                            ))
+                    } else {
+                        settings
+                    },
+                ))
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .style(self.theme)
+                .into()
+            }
+            Tab::SelfUpdater => {
+                let self_updater_pick_list_selected =
+                    self.state.self_updater_pick_list_selected.clone();
+
+                let release_index =
+                    match &self.self_releases {
+                        Some(releases) => {
+                            match releases.iter().enumerate().find(|(_, release)| {
+                                release.version == self_updater_pick_list_selected
+                            }) {
+                                Some((index, _)) => index,
+                                None => 0,
+                            }
+                        }
+                        None => 0,
+                    };
+
+                Container::new(
+                    Column::new()
+                        .align_items(Align::Center)
+                        .push(
+                            Row::new()
+                                .align_items(Align::Center)
+                                .padding(10)
+                                .spacing(10)
+                                .push(Text::new(format!("Current version: {}", crate_version!())))
+                                .push(Text::new("Select version:"))
+                                .push(
+                                    PickList::new(
+                                        &mut self.state.self_updater_pick_list,
+                                        &self.state.release_versions,
+                                        Some(self_updater_pick_list_selected.clone()),
+                                        Message::PickListVersionSelected,
+                                    )
+                                    .width(Length::Units(60))
+                                    .style(theme),
+                                )
+                                .push(if self.state.installed_self_version {
+                                    Container::new(Text::new("Restart Ablavema."))
+                                } else if self.state.installing_self_version {
+                                    Container::new(Text::new("Installing..."))
+                                } else if self.self_releases.is_none() {
+                                    Container::new({
+                                        let button = Button::new(
+                                            &mut self.state.fetch_self_releases_button,
+                                            Text::new("Fetch releases"),
+                                        )
+                                        .style(theme);
+                                        if CAN_CONNECT.load(Ordering::Relaxed) {
+                                            // TODO: Check connectivity on press.
+                                            button.on_press(Message::FetchSelfReleases)
+                                        } else {
+                                            button
+                                        }
+                                    })
+                                } else {
+                                    Container::new({
+                                        let button = Button::new(
+                                            &mut self.state.install_self_version_button,
+                                            Text::new("Install this version"),
+                                        )
+                                        .style(theme);
+                                        if self.state.self_updater_pick_list_selected
+                                            == crate_version!()
+                                            || !CAN_CONNECT.load(Ordering::Relaxed)
+                                        {
+                                            button
+                                        } else {
+                                            // TODO: Check connectivity on press.
+                                            button.on_press(Message::ChangeVersion)
+                                        }
+                                    })
+                                }),
+                        )
+                        .push(match &self.self_releases {
+                            Some(releases) => Container::new(
+                                Scrollable::new(&mut self.state.self_updater_scroll).push(
+                                    Row::new()
+                                        .push(Space::with_width(Length::Fill))
+                                        .push(
+                                            Column::new()
+                                                .padding(10)
+                                                .spacing(20)
+                                                .align_items(Align::Center)
+                                                .width(Length::FillPortion(50))
+                                                .push(
+                                                    Text::new(&releases[release_index].name)
+                                                        .size(TEXT_SIZE * 2),
+                                                )
+                                                .push(Text::new(
+                                                    releases[release_index]
+                                                        .body
+                                                        .as_deref()
+                                                        .unwrap_or_default(),
+                                                )),
+                                        )
+                                        .push(Space::with_width(Length::Fill)),
+                                ),
+                            )
+                            .height(Length::Fill)
+                            .style(theme),
+                            None => Container::new(Space::new(Length::Fill, Length::Fill))
+                                .height(Length::Fill)
+                                .width(Length::Fill)
+                                .style(theme),
+                        }),
+                )
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .center_x()
+                .style(theme.sidebar_container())
+                .into()
             }
             Tab::About => {
                 let link = |label, url, state| {
                     Row::new()
                         .spacing(10)
                         .align_items(Align::Center)
-                        .push(Text::new(label).width(Length::Units(70)))
+                        .push(
+                            Text::new(label)
+                                .width(Length::Units(70))
+                                .color(theme.highlight_text()),
+                        )
                         .push(
                             Button::new(state, Text::new(&url))
                                 .on_press(Message::OpenBrowser(url))
@@ -1603,7 +1830,7 @@ impl Application for Gui {
                     Column::new()
                         .spacing(10)
                         .align_items(Align::Center)
-                        .push(Space::with_height(Length::Units(20)))
+                        .push(Space::with_height(Length::Units(10)))
                         .push(
                             Row::new()
                                 .spacing(10)
@@ -1722,6 +1949,12 @@ pub enum Message {
     RemoveDatabases(BuildType),
     RemovePackages(BuildType),
     RemoveCache,
+    SelfUpdater(Choice),
+    CheckSelfUpdatesAtLaunch(Choice),
+    FetchSelfReleases,
+    PickListVersionSelected(String),
+    ChangeVersion,
+    VersionChanged(()),
     CheckConnection,
     ConnectionChecked(()),
 }
@@ -1730,6 +1963,7 @@ pub enum Message {
 pub struct GuiFlags {
     pub releases: Releases,
     pub file_path: Option<String>,
+    pub self_releases: Option<Vec<Release>>,
 }
 
 #[derive(Debug, Default)]
@@ -1737,11 +1971,13 @@ struct GuiState {
     controls: Controls,
     packages_scroll: scrollable::State,
     settings_scroll: scrollable::State,
+    self_updater_scroll: scrollable::State,
     about_scroll: scrollable::State,
     open_default_button: button::State,
     open_default_with_file_button: button::State,
     packages_button: button::State,
     settings_button: button::State,
+    self_updater_button: button::State,
     about_button: button::State,
     plus_1_button: button::State,
     plus_10_button: button::State,
@@ -1762,6 +1998,13 @@ struct GuiState {
     remove_lts_packages_button: button::State,
     remove_archived_packages_button: button::State,
     remove_cache_button: button::State,
+    release_versions: Vec<String>,
+    fetch_self_releases_button: button::State,
+    self_updater_pick_list: pick_list::State<String>,
+    self_updater_pick_list_selected: String,
+    install_self_version_button: button::State,
+    installing_self_version: bool,
+    installed_self_version: bool,
     repository_link_button: button::State,
     discord_link_button: button::State,
     contact_link_button: button::State,
@@ -1776,6 +2019,7 @@ impl GuiState {
                 sort_by: SETTINGS.read().unwrap().sort_by,
                 ..Controls::default()
             },
+            self_updater_pick_list_selected: crate_version!().to_owned(),
             ..Self::default()
         }
     }
@@ -2179,6 +2423,7 @@ impl Display for SortBy {
 pub enum Tab {
     Packages,
     Settings,
+    SelfUpdater,
     About,
 }
 

@@ -68,6 +68,8 @@ pub struct Settings {
     pub filters: Filters,
     pub sort_by: SortBy,
     pub theme: Theme,
+    pub self_updater: bool,
+    pub check_self_updates_at_launch: bool,
 }
 
 impl Settings {
@@ -142,6 +144,8 @@ impl Default for Settings {
             filters: Filters::default(),
             sort_by: SortBy::default(),
             theme: Theme::default(),
+            self_updater: false,
+            check_self_updates_at_launch: false,
         }
     }
 }
