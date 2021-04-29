@@ -36,7 +36,8 @@ Noncomprehensive list of features available at launch.
 - Extraction speed on Windows may be hampered by Windows Defender.
 - Only placeholders for icons.
 - Rare false negative when checking connectivity at launch.
-- Possible to get the launcher to hang if temporarily banned from one of the servers due to making too many requests. Won't happen with the default settings, but a good way to get temp banned is to check for updates repeatedly.
+- Possible to get the launcher to hang if temporarily banned from one of the servers due to making too many requests.
+Won't happen with the default settings, but a good way to get temp banned is to check for updates repeatedly.
 - CLI on Windows has no colour. Waiting for `clap` 3.0.0 to be released.
 - No macOS release.
 
