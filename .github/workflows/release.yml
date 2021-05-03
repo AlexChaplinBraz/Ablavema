@@ -163,3 +163,23 @@ jobs:
           bodyFile: release/changelog.md
           artifacts: "packages/*"
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-crate:
+    name: Publish crate
+    needs: create-release
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Publish crate
+        run: |
+          cargo login ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          cargo publish --no-verify
