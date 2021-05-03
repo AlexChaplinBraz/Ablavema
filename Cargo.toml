@@ -11,6 +11,14 @@ license = "MIT"
 keywords = ["blender", "launcher", "blend", "gui", "cli"]
 categories = ["accessibility", "command-line-utilities"]
 
+[profile.release]
+lto = true
+codegen-units = 1
+# This would reduce binary size by about 12% (~3MB), but leaving it default for now.
+#panic = "abort"
+# Enable stripping when stabilised https://github.com/rust-lang/rust/issues/72110
+#strip = "symbols"
+
 [dependencies]
 async-trait = "0.1"
 bincode = "1.3"
