@@ -1,0 +1,165 @@
+name: Release Ablavema
+on:
+  push:
+    tags:
+    - '[0-9]+.[0-9]+.[0-9]+*'
+jobs:
+  preparations:
+    name: Preparations
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Create release version env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Extract release title
+        run: |
+          title=$(grep "## \[${{ env.RELEASE_VERSION }}\] - .*: " CHANGELOG.md)
+          if [ "$title" ]; then
+            printf '%s - %s' "${{ env.RELEASE_VERSION }}" "${title#*: }" > title
+          else
+            printf '%s' "${{ env.RELEASE_VERSION }}" > title
+          fi
+
+      - name: Save release title
+        uses: actions/upload-artifact@v2
+        with:
+          name: release
+          path: title
+          if-no-files-found: error
+
+      - name: Extract release changelog
+        run: |
+          begin=$(grep -nm1 "<\!--BEGIN=${{ env.RELEASE_VERSION }}-->" CHANGELOG.md | cut -d: -f1)
+          end=$(grep -nm1 "<\!--END=${{ env.RELEASE_VERSION }}-->" CHANGELOG.md | cut -d: -f1)
+          if [ -z "$begin" ] || [ -z "$end" ]; then
+            echo 'Failed to find the release body tags for version ${{ env.RELEASE_VERSION }} in CHANGELOG.md.'
+            exit 1
+          fi
+          sed -n "$((begin+1)),$((end-1))p" CHANGELOG.md > changelog.md
+
+      - name: Save release changelog
+        uses: actions/upload-artifact@v2
+        with:
+          name: release
+          path: changelog.md
+          if-no-files-found: error
+
+      - name: Strip changelog of release body tags
+        run: sed -i 's/<!--BEGIN.*-->//g;s/<!--END.*-->//g' CHANGELOG.md
+
+      - name: Save clean changelog
+        uses: actions/upload-artifact@v2
+        with:
+          name: clean_changelog
+          path: CHANGELOG.md
+          if-no-files-found: error
+
+  build-package:
+    name: Create package
+    needs: preparations
+    env:
+      RUST_BACKTRACE: 1
+    strategy:
+      matrix:
+        build: [linux-gnu, windows-msvc]
+        include:
+          - build: linux-gnu
+            os: ubuntu-20.04
+            toolchain: stable
+            target: x86_64-unknown-linux-gnu
+          - build: windows-msvc
+            os: windows-2019
+            toolchain: stable
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Create release version env
+        shell: bash
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libssl-dev libgtk-3-dev
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+
+      - name: Build binary
+        shell: bash
+        run: cargo build --verbose --release --target ${{ matrix.target }}
+
+      - name: Strip Linux binary
+        if: matrix.os == 'ubuntu-20.04'
+        run: strip "target/${{ matrix.target }}/release/ablavema"
+
+      - name: Load clean changelog
+        uses: actions/download-artifact@v2
+        with:
+          name: clean_changelog
+
+      - name: Package release
+        shell: bash
+        run: |
+          staging="ablavema-${{ env.RELEASE_VERSION }}-${{ matrix.target }}"
+          mkdir "$staging"
+          mv README.md CHANGELOG.md LICENSE "$staging"
+          if [ "${{ matrix.os }}" = "windows-2019" ]; then
+            mv "target/${{ matrix.target }}/release/ablavema.exe" "$staging"
+            7z a "$staging.zip" "$staging"
+            echo "ASSET=$staging.zip" >> $GITHUB_ENV
+          else
+            mv "target/${{ matrix.target }}/release/ablavema" "$staging"
+            tar czf "$staging.tar.gz" "$staging"
+            echo "ASSET=$staging.tar.gz" >> $GITHUB_ENV
+          fi
+
+      - name: Save package
+        uses: actions/upload-artifact@v2
+        with:
+          name: packages
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  create-release:
+    name: Create release
+    needs: build-package
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Create release version env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Load packages and extras
+        uses: actions/download-artifact@v2
+
+      - name: Create sha256 file
+        run: |
+          cd packages
+          sha256sum ablavema-* > ablavema-${{ env.RELEASE_VERSION }}.sha256
+        
+      - name: Create release title env
+        run: echo "RELEASE_TITLE=$(cat release/title)" >> $GITHUB_ENV
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          name: ${{ env.RELEASE_TITLE }}
+          bodyFile: release/changelog.md
+          artifacts: "packages/*"
+          token: ${{ secrets.GITHUB_TOKEN }}
