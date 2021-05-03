@@ -126,10 +126,18 @@ pub fn change_self_version(releases: Vec<Release>, version: String) {
         .download_to(&archive)
         .unwrap();
 
-    let bin_name = PathBuf::from(if cfg!(target_os = "linux") {
-        "ablavema"
+    let bin_archive_path = PathBuf::from(if cfg!(target_os = "linux") {
+        format!(
+            "ablavema-{}-{}/ablavema",
+            version,
+            self_update::get_target()
+        )
     } else if cfg!(target_os = "windows") {
-        "ablavema.exe"
+        format!(
+            "ablavema-{}-{}/ablavema.exe",
+            version,
+            self_update::get_target()
+        )
     } else if cfg!(target_os = "macos") {
         todo!("macos bin_name");
     } else {
@@ -137,14 +145,14 @@ pub fn change_self_version(releases: Vec<Release>, version: String) {
     });
 
     self_update::Extract::from_source(&archive_path)
-        .extract_file(&SETTINGS.read().unwrap().cache_dir, &bin_name)
+        .extract_file(&SETTINGS.read().unwrap().cache_dir, &bin_archive_path)
         .unwrap();
 
     // TODO: Offer an option to restore previous version.
     // Could maybe even save them with their versions in the name so it'd be possible
     // to quickly swich them around without having to redownload.
     let tmp_file = SETTINGS.read().unwrap().cache_dir.join("ablavema_backup");
-    let bin_path = SETTINGS.read().unwrap().cache_dir.join(bin_name);
+    let bin_path = SETTINGS.read().unwrap().cache_dir.join(bin_archive_path);
     self_update::Move::from_source(&bin_path)
         .replace_using_temp(&tmp_file)
         .to_dest(&current_exe().unwrap())
