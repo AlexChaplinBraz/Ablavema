@@ -1,11 +1,13 @@
 # Ablavema - A Blender Launcher and Version Manager
 
-Practically all the necessary features for managing and using multiple Blender versions are working.
-What's left until it's ready for its first release is fixing a few known issues and a couple of minor missing features.
+At the moment practically all the necessary features for managing and using multiple Blender versions are working.
+
+The project is in the alpha stage, so please consider contributing (whether through giving feedback or donating)
+so I can keep improving it.
 
 You can find the changes in [CHANGELOG.md](https://github.com/AlexChaplinBraz/Ablavema/blob/master/CHANGELOG.md)
 and the planned features in [ROADMAP.md](https://github.com/AlexChaplinBraz/Ablavema/blob/master/ROADMAP.md).
-<!--
+
 ## Installing
 
 You can download the latest release [here](https://github.com/AlexChaplinBraz/Ablavema/releases/latest).
@@ -42,7 +44,7 @@ have installed Ablavema from a package manager, in which case you should update 
 
 You can make the executable store all its files inside its own directory by creating an empty file called `portable`
 next to it. This would allow one to store everything on a flash drive, for example.
--->
+
 ## Contribute
 
 Pull requests are welcomed, but please follow my general coding style
@@ -58,3 +60,7 @@ But you can also contact me directly as listed at
 
 Please consider supporting me through [donate.alexchaplinbraz.com](https://donate.alexchaplinbraz.com/?project=1)
 to motivate me to keep working on this project.
+
+## Legal
+
+MIT License
