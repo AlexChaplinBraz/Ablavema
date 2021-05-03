@@ -183,3 +183,31 @@ jobs:
         run: |
           cargo login ${{ secrets.CARGO_REGISTRY_TOKEN }}
           cargo publish --no-verify
+
+  publish-aur:
+    name: Publish AUR package
+    needs: create-release
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Create release version env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Prepare PKGBUILD
+        run: |
+          eval $(grep 'pkgtarget=' PKGBUILD)
+          wget 'https://github.com/AlexChaplinBraz/Ablavema/releases/download/${{ env.RELEASE_VERSION }}/ablavema-${{ env.RELEASE_VERSION }}.sha256'
+          sha256=$(grep $pkgtarget ablavema-${{ env.RELEASE_VERSION }}.sha256 | cut -d ' ' -f1)
+          sed -i "s/REPLACE_RELEASE_VERSION/${{ env.RELEASE_VERSION }}/;s/REPLACE_SHA256SUMS_X86_64/$sha256/" PKGBUILD
+
+      - name: Publish to the AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v2
+        with:
+          pkgname: ablavema-bin
+          pkgbuild: PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Release ${{ env.RELEASE_VERSION }}
