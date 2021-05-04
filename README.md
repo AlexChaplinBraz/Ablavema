@@ -22,6 +22,10 @@ Download the executable and put it in some user-accessible place. If you have ad
 it into `Program Files/Ablavema`, but if not you can put it in AppData or even just leave it on the Desktop as if it
 were a shortcut. All its related files are created and stored in the relevant AppData directories.
 
+Ablavema can also be installed with [`Scoop`](https://scoop.sh/):
+
+`scoop install https://raw.githubusercontent.com/AlexChaplinBraz/Ablavema/master/ablavema.json`
+
 ### Linux
 
 Download the executable and put it in `PATH`. All files are stored in their proper XDG specified locations.
