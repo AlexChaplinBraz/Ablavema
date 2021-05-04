@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - From `openssl` to `rustls`.
 
+### Fixed
+
+- Issue with Iced's Vulkan backend on `noveau` and `radeon` drivers by using `glow` on Linux.
+
 ## [0.1.0] - 2021-05-03: Minimum Viable Product release
 <!--BEGIN=0.1.0-->
 ### Added
