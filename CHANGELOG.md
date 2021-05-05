@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- From `openssl` to `rustls`.
+- From `openssl` to `rustls`, eliminating the OpenSSL dependency.
+- From `msgbox` to `native-dialog`, eliminating the GTK3 dependency on Linux.
 
 ### Fixed
 
-- Issue with Iced's Vulkan backend on `noveau` and `radeon` drivers by using `glow` on Linux.
+- `GraphicsAdapterNotFound` on Linux with `noveau` and `radeon` drivers (due to missing Vulkan support)
+  by using `iced`'s `glow` rendering backend on Linux.
 
 ## [0.1.0] - 2021-05-03: Minimum Viable Product release
 <!--BEGIN=0.1.0-->
@@ -47,7 +49,7 @@ Noncomprehensive list of features available at launch.
 - Only placeholders for icons.
 - Rare false negative when checking connectivity at launch.
 - Possible to get the launcher to hang if temporarily banned from one of the servers due to making too many requests.
-Won't happen with the default settings, but a good way to get temp banned is to check for updates repeatedly.
+  Won't happen with the default settings, but a good way to get temp banned is to check for updates repeatedly.
 - CLI on Windows has no colour. Waiting for `clap` 3.0.0 to be released.
 - No macOS release.
 <!--END=0.1.0-->

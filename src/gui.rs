@@ -25,6 +25,7 @@ use iced::{
     Radio, Row, Rule, Scrollable, Space, Subscription, Text,
 };
 use itertools::Itertools;
+use native_dialog::{MessageDialog, MessageType};
 use reqwest;
 use self_update::update::Release;
 use serde::{Deserialize, Serialize};
@@ -392,13 +393,14 @@ impl Application for Gui {
                         Message::CheckAvailability,
                     )
                 } else {
-                    // TODO: Consider disabling the Install button instead of opening this msgbox.
-                    msgbox::create(
-                        "Ablavema",
-                        &format!("Can't install '{}' because the setting to keep only latest {} is enabled.", package.name, message),
-                        msgbox::IconType::Info,
-                    )
-                    .unwrap();
+                    // TODO: Consider disabling the Install button instead of opening this MessageDialog.
+                    // And show a tooltip explaining why it's disabled.
+                    MessageDialog::new()
+                        .set_type(MessageType::Info)
+                        .set_title("Ablavema")
+                        .set_text(&format!("Can't install '{}' because the setting to keep only latest {} is enabled.", package.name, message))
+                        .show_alert()
+                        .unwrap();
                     Command::none()
                 }
             }
@@ -466,12 +468,15 @@ impl Application for Gui {
                             }
                         }
                         if for_install {
-                            msgbox::create(
-                                "Ablavema",
-                                &format!("Package '{}' is no longer available.", package.name),
-                                msgbox::IconType::Info,
-                            )
-                            .unwrap();
+                            MessageDialog::new()
+                                .set_type(MessageType::Info)
+                                .set_title("Ablavema")
+                                .set_text(&format!(
+                                    "Package '{}' is no longer available.",
+                                    package.name
+                                ))
+                                .show_alert()
+                                .unwrap();
                         }
                         self.releases.sync();
                         Command::none()
