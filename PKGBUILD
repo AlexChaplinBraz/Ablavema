@@ -9,6 +9,10 @@ arch=('x86_64')
 url='https://github.com/AlexChaplinBraz/Ablavema'
 license=('MIT')
 depends=('fontconfig' 'freetype2' 'glibc' 'xz' 'bzip2' 'libx11' 'gcc-libs')
+optdepends=(
+    'zenity: graphical dialog'
+    'kdialog: graphical dialog'
+)
 conflicts=('ablavema' 'ablavema-git')
 source_x86_64=("$url/releases/download/$pkgver/$_pkgname-$pkgver-$pkgtarget.tar.gz")
 sha256sums_x86_64=('REPLACE_SHA256SUMS_X86_64')

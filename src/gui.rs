@@ -395,12 +395,25 @@ impl Application for Gui {
                 } else {
                     // TODO: Consider disabling the Install button instead of opening this MessageDialog.
                     // And show a tooltip explaining why it's disabled.
-                    MessageDialog::new()
+                    let message = format!(
+                        "Can't install '{}' because the setting to keep only latest {} is enabled.",
+                        package.name, message
+                    );
+                    if let Err(_) = MessageDialog::new()
                         .set_type(MessageType::Info)
                         .set_title("Ablavema")
-                        .set_text(&format!("Can't install '{}' because the setting to keep only latest {} is enabled.", package.name, message))
+                        .set_text(&message)
                         .show_alert()
-                        .unwrap();
+                    {
+                        if cfg!(target_os = "linux") {
+                            println!(
+                                "Error: install 'zenity' or 'kdialog' for a graphical dialog.\nThe message was: {}",
+                                &message
+                            );
+                        } else {
+                            unreachable!("unknown OS dialog error");
+                        }
+                    }
                     Command::none()
                 }
             }
@@ -468,15 +481,24 @@ impl Application for Gui {
                             }
                         }
                         if for_install {
-                            MessageDialog::new()
+                            let message =
+                                format!("Package '{}' is no longer available.", package.name);
+                            if let Err(_) = MessageDialog::new()
                                 .set_type(MessageType::Info)
                                 .set_title("Ablavema")
-                                .set_text(&format!(
-                                    "Package '{}' is no longer available.",
-                                    package.name
-                                ))
+                                .set_text(&message)
                                 .show_alert()
-                                .unwrap();
+                            {
+                                if cfg!(target_os = "linux") {
+                                    // TODO: Show a tooltip if dependencies not found.
+                                    println!(
+                                    "Error: install 'zenity' or 'kdialog' for a graphical dialog.\nThe message was: {}",
+                                    &message
+                                );
+                                } else {
+                                    unreachable!("unknown OS dialog error");
+                                }
+                            }
                         }
                         self.releases.sync();
                         Command::none()
