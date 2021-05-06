@@ -1,7 +1,7 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 use crate::{
     package::{Build, Package},
-    settings::SETTINGS,
+    settings::{get_setting, save_settings, set_setting},
 };
 use bincode;
 use derive_deref::{Deref, DerefMut};
@@ -14,7 +14,7 @@ impl Installed {
     pub fn fetch(&mut self) {
         self.clear();
 
-        for entry in read_dir(&SETTINGS.read().unwrap().packages_dir).unwrap() {
+        for entry in read_dir(&get_setting().packages_dir).unwrap() {
             let dir = entry.unwrap();
             let mut package_info = dir.path();
             package_info.push("package_info.bin");
@@ -37,10 +37,8 @@ impl Installed {
     }
 
     pub fn update_default(&self) {
-        if SETTINGS.read().unwrap().use_latest_as_default
-            && SETTINGS.read().unwrap().default_package.is_some()
-        {
-            let default_package = SETTINGS.read().unwrap().default_package.clone().unwrap();
+        if get_setting().use_latest_as_default && get_setting().default_package.is_some() {
+            let default_package = get_setting().default_package.clone().unwrap();
             let new_default = self
                 .iter()
                 .find(|package| package.build == default_package.build)
@@ -49,8 +47,8 @@ impl Installed {
             if new_default.version == default_package.version
                 && new_default.date > default_package.date
             {
-                SETTINGS.write().unwrap().default_package = Some(new_default.clone());
-                SETTINGS.read().unwrap().save();
+                set_setting().default_package = Some(new_default.clone());
+                save_settings();
 
                 println!(
                     "Installed an update for the default package, switched from:\n{} | {}\nTo:\n{} | {}",
@@ -64,10 +62,10 @@ impl Installed {
         let mut daily_removed = false;
         let mut branched_removed = false;
 
-        if SETTINGS.read().unwrap().keep_only_latest_daily
-            || SETTINGS.read().unwrap().keep_only_latest_branched
-            || SETTINGS.read().unwrap().keep_only_latest_stable
-            || SETTINGS.read().unwrap().keep_only_latest_lts
+        if get_setting().keep_only_latest_daily
+            || get_setting().keep_only_latest_branched
+            || get_setting().keep_only_latest_stable
+            || get_setting().keep_only_latest_lts
         {
             let mut daily_count = Vec::new();
             let mut branched_count = Vec::new();
@@ -75,7 +73,7 @@ impl Installed {
             let mut lts_count = Vec::new();
             for package in self.iter() {
                 match &package.build {
-                    Build::Daily(s) if SETTINGS.read().unwrap().keep_only_latest_daily => {
+                    Build::Daily(s) if get_setting().keep_only_latest_daily => {
                         daily_count.push((package.version.clone(), s.clone()));
                         if daily_count
                             .iter()
@@ -87,7 +85,7 @@ impl Installed {
                             daily_removed = true;
                         }
                     }
-                    Build::Branched(s) if SETTINGS.read().unwrap().keep_only_latest_branched => {
+                    Build::Branched(s) if get_setting().keep_only_latest_branched => {
                         branched_count.push((package.version.clone(), s.clone()));
                         if branched_count
                             .iter()
@@ -99,13 +97,13 @@ impl Installed {
                             branched_removed = true;
                         }
                     }
-                    Build::Stable if SETTINGS.read().unwrap().keep_only_latest_stable => {
+                    Build::Stable if get_setting().keep_only_latest_stable => {
                         stable_count += 1;
                         if stable_count > 1 {
                             package.remove();
                         }
                     }
-                    Build::Lts if SETTINGS.read().unwrap().keep_only_latest_lts => {
+                    Build::Lts if get_setting().keep_only_latest_lts => {
                         lts_count.push(&package.version);
                         if lts_count
                             .iter()

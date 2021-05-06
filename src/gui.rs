@@ -15,7 +15,8 @@ use crate::{
         ReleaseType, Releases,
     },
     settings::{
-        ModifierKey, CAN_CONNECT, CONFIG_FILE_ENV, PORTABLE, PROJECT_DIRS, SETTINGS, TEXT_SIZE,
+        get_setting, save_settings, set_setting, ModifierKey, CAN_CONNECT, CONFIG_FILE_ENV,
+        PORTABLE, PROJECT_DIRS, TEXT_SIZE,
     },
 };
 use clap::crate_version;
@@ -178,11 +179,11 @@ impl Application for Gui {
     fn new(flags: Self::Flags) -> (Self, Command<Message>) {
         let releases = flags.releases;
 
-        let default_package = SETTINGS.read().unwrap().default_package.clone();
+        let default_package = get_setting().default_package.clone();
         if let Some(package) = default_package {
             if !releases.installed.contains(&package) {
-                SETTINGS.write().unwrap().default_package = None;
-                SETTINGS.read().unwrap().save();
+                set_setting().default_package = None;
+                save_settings();
             }
         }
 
@@ -206,7 +207,7 @@ impl Application for Gui {
                 // TODO: Save tab in user settings.
                 // Will be useful when the recent files tab is introduced.
                 tab: Tab::Packages,
-                theme: SETTINGS.read().unwrap().theme,
+                theme: get_setting().theme,
                 self_releases,
             },
             Command::none(),
@@ -328,7 +329,7 @@ impl Application for Gui {
             Message::TryToInstall(package) => {
                 let message = match package.build {
                     Build::Daily(_) => {
-                        if SETTINGS.read().unwrap().keep_only_latest_daily
+                        if get_setting().keep_only_latest_daily
                             && package.status != PackageStatus::Update
                             && self
                                 .releases
@@ -343,7 +344,7 @@ impl Application for Gui {
                         }
                     }
                     Build::Branched(_) => {
-                        if SETTINGS.read().unwrap().keep_only_latest_branched
+                        if get_setting().keep_only_latest_branched
                             && package.status != PackageStatus::Update
                             && self
                                 .releases
@@ -358,7 +359,7 @@ impl Application for Gui {
                         }
                     }
                     Build::Stable => {
-                        if SETTINGS.read().unwrap().keep_only_latest_stable
+                        if get_setting().keep_only_latest_stable
                             && package.status != PackageStatus::Update
                             && self
                                 .releases
@@ -373,7 +374,7 @@ impl Application for Gui {
                         }
                     }
                     Build::Lts => {
-                        if SETTINGS.read().unwrap().keep_only_latest_lts
+                        if get_setting().keep_only_latest_lts
                             && package.status != PackageStatus::Update
                             && self
                                 .releases
@@ -551,11 +552,11 @@ impl Application for Gui {
                 Command::none()
             }
             Message::PackageRemoved(package) => {
-                let default_package_option = SETTINGS.read().unwrap().default_package.clone();
+                let default_package_option = get_setting().default_package.clone();
                 if let Some(default_package) = default_package_option {
                     if default_package == package {
-                        SETTINGS.write().unwrap().default_package = None;
-                        SETTINGS.read().unwrap().save();
+                        set_setting().default_package = None;
+                        save_settings();
                     }
                 }
                 Command::perform(
@@ -683,8 +684,8 @@ impl Application for Gui {
                 } else {
                     self.state.controls.filters.updates = false;
                 }
-                SETTINGS.write().unwrap().filters = self.state.controls.filters;
-                SETTINGS.read().unwrap().save();
+                set_setting().filters = self.state.controls.filters;
+                save_settings();
                 Command::none()
             }
 
@@ -696,8 +697,8 @@ impl Application for Gui {
                 } else {
                     self.state.controls.filters.bookmarks = false;
                 }
-                SETTINGS.write().unwrap().filters = self.state.controls.filters;
-                SETTINGS.read().unwrap().save();
+                set_setting().filters = self.state.controls.filters;
+                save_settings();
                 Command::none()
             }
             Message::FilterInstalledChanged(change) => {
@@ -708,8 +709,8 @@ impl Application for Gui {
                 } else {
                     self.state.controls.filters.installed = false;
                 }
-                SETTINGS.write().unwrap().filters = self.state.controls.filters;
-                SETTINGS.read().unwrap().save();
+                set_setting().filters = self.state.controls.filters;
+                save_settings();
                 Command::none()
             }
             Message::FilterAllChanged(change) => {
@@ -719,49 +720,49 @@ impl Application for Gui {
                 self.state.controls.filters.stable = change;
                 self.state.controls.filters.lts = change;
                 self.state.controls.filters.archived = change;
-                SETTINGS.write().unwrap().filters = self.state.controls.filters;
-                SETTINGS.read().unwrap().save();
+                set_setting().filters = self.state.controls.filters;
+                save_settings();
                 Command::none()
             }
             Message::FilterDailyChanged(change) => {
                 self.state.controls.filters.daily = change;
                 self.state.controls.filters.refresh_all();
-                SETTINGS.write().unwrap().filters = self.state.controls.filters;
-                SETTINGS.read().unwrap().save();
+                set_setting().filters = self.state.controls.filters;
+                save_settings();
                 Command::none()
             }
             Message::FilterBranchedChanged(change) => {
                 self.state.controls.filters.branched = change;
                 self.state.controls.filters.refresh_all();
-                SETTINGS.write().unwrap().filters = self.state.controls.filters;
-                SETTINGS.read().unwrap().save();
+                set_setting().filters = self.state.controls.filters;
+                save_settings();
                 Command::none()
             }
             Message::FilterStableChanged(change) => {
                 self.state.controls.filters.stable = change;
                 self.state.controls.filters.refresh_all();
-                SETTINGS.write().unwrap().filters = self.state.controls.filters;
-                SETTINGS.read().unwrap().save();
+                set_setting().filters = self.state.controls.filters;
+                save_settings();
                 Command::none()
             }
             Message::FilterLtsChanged(change) => {
                 self.state.controls.filters.lts = change;
                 self.state.controls.filters.refresh_all();
-                SETTINGS.write().unwrap().filters = self.state.controls.filters;
-                SETTINGS.read().unwrap().save();
+                set_setting().filters = self.state.controls.filters;
+                save_settings();
                 Command::none()
             }
             Message::FilterArchivedChanged(change) => {
                 self.state.controls.filters.archived = change;
                 self.state.controls.filters.refresh_all();
-                SETTINGS.write().unwrap().filters = self.state.controls.filters;
-                SETTINGS.read().unwrap().save();
+                set_setting().filters = self.state.controls.filters;
+                save_settings();
                 Command::none()
             }
             Message::SortingChanged(sort_by) => {
                 self.state.controls.sort_by = sort_by;
-                SETTINGS.write().unwrap().sort_by = sort_by;
-                SETTINGS.read().unwrap().save();
+                set_setting().sort_by = sort_by;
+                save_settings();
                 Command::none()
             }
             Message::TabChanged(tab) => {
@@ -770,143 +771,143 @@ impl Application for Gui {
             }
             Message::BypassLauncher(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().bypass_launcher = true,
-                    Choice::Disable => SETTINGS.write().unwrap().bypass_launcher = false,
+                    Choice::Enable => set_setting().bypass_launcher = true,
+                    Choice::Disable => set_setting().bypass_launcher = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::ModifierKey(modifier_key) => {
-                SETTINGS.write().unwrap().modifier_key = modifier_key;
-                SETTINGS.read().unwrap().save();
+                set_setting().modifier_key = modifier_key;
+                save_settings();
                 Command::none()
             }
             Message::UseLatestAsDefault(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().use_latest_as_default = true,
-                    Choice::Disable => SETTINGS.write().unwrap().use_latest_as_default = false,
+                    Choice::Enable => set_setting().use_latest_as_default = true,
+                    Choice::Disable => set_setting().use_latest_as_default = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::CheckUpdatesAtLaunch(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().check_updates_at_launch = true,
-                    Choice::Disable => SETTINGS.write().unwrap().check_updates_at_launch = false,
+                    Choice::Enable => set_setting().check_updates_at_launch = true,
+                    Choice::Disable => set_setting().check_updates_at_launch = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::MinutesBetweenUpdatesChanged(change) => {
                 if change.is_positive() {
-                    let mut current = SETTINGS.read().unwrap().minutes_between_updates;
+                    let mut current = get_setting().minutes_between_updates;
                     current += change as u64;
                     if current > 1440 {
-                        SETTINGS.write().unwrap().minutes_between_updates = 1440;
+                        set_setting().minutes_between_updates = 1440;
                     } else {
-                        SETTINGS.write().unwrap().minutes_between_updates = current;
+                        set_setting().minutes_between_updates = current;
                     }
                 } else {
-                    let current = SETTINGS.read().unwrap().minutes_between_updates;
-                    SETTINGS.write().unwrap().minutes_between_updates =
+                    let current = get_setting().minutes_between_updates;
+                    set_setting().minutes_between_updates =
                         current.saturating_sub(change.abs() as u64);
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::UpdateDaily(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().update_daily = true,
-                    Choice::Disable => SETTINGS.write().unwrap().update_daily = false,
+                    Choice::Enable => set_setting().update_daily = true,
+                    Choice::Disable => set_setting().update_daily = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 self.releases.sync();
                 Command::none()
             }
             Message::UpdateBranched(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().update_branched = true,
-                    Choice::Disable => SETTINGS.write().unwrap().update_branched = false,
+                    Choice::Enable => set_setting().update_branched = true,
+                    Choice::Disable => set_setting().update_branched = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 self.releases.sync();
                 Command::none()
             }
             Message::UpdateStable(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().update_stable = true,
-                    Choice::Disable => SETTINGS.write().unwrap().update_stable = false,
+                    Choice::Enable => set_setting().update_stable = true,
+                    Choice::Disable => set_setting().update_stable = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 self.releases.sync();
                 Command::none()
             }
             Message::UpdateLts(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().update_lts = true,
-                    Choice::Disable => SETTINGS.write().unwrap().update_lts = false,
+                    Choice::Enable => set_setting().update_lts = true,
+                    Choice::Disable => set_setting().update_lts = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 self.releases.sync();
                 Command::none()
             }
             Message::KeepOnlyLatestDaily(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().keep_only_latest_daily = true,
-                    Choice::Disable => SETTINGS.write().unwrap().keep_only_latest_daily = false,
+                    Choice::Enable => set_setting().keep_only_latest_daily = true,
+                    Choice::Disable => set_setting().keep_only_latest_daily = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::KeepOnlyLatestBranched(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().keep_only_latest_branched = true,
-                    Choice::Disable => SETTINGS.write().unwrap().keep_only_latest_branched = false,
+                    Choice::Enable => set_setting().keep_only_latest_branched = true,
+                    Choice::Disable => set_setting().keep_only_latest_branched = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::KeepOnlyLatestStable(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().keep_only_latest_stable = true,
-                    Choice::Disable => SETTINGS.write().unwrap().keep_only_latest_stable = false,
+                    Choice::Enable => set_setting().keep_only_latest_stable = true,
+                    Choice::Disable => set_setting().keep_only_latest_stable = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::KeepOnlyLatestLts(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().keep_only_latest_lts = true,
-                    Choice::Disable => SETTINGS.write().unwrap().keep_only_latest_lts = false,
+                    Choice::Enable => set_setting().keep_only_latest_lts = true,
+                    Choice::Disable => set_setting().keep_only_latest_lts = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::ThemeChanged(theme) => {
                 self.theme = theme;
-                SETTINGS.write().unwrap().theme = theme;
-                SETTINGS.read().unwrap().save();
+                set_setting().theme = theme;
+                save_settings();
                 Command::none()
             }
             Message::ChangeLocation(location) => {
                 match location {
                     Location::Databases => {
                         if let Some(directory) = FileDialog::new().show_open_single_dir().unwrap() {
-                            SETTINGS.write().unwrap().databases_dir = directory;
-                            SETTINGS.read().unwrap().save();
+                            set_setting().databases_dir = directory;
+                            save_settings();
                         }
                     }
                     Location::Packages => {
                         if let Some(directory) = FileDialog::new().show_open_single_dir().unwrap() {
-                            SETTINGS.write().unwrap().packages_dir = directory;
-                            SETTINGS.read().unwrap().save();
+                            set_setting().packages_dir = directory;
+                            save_settings();
                             self.releases.sync();
                         }
                     }
                     Location::Cache => {
                         if let Some(directory) = FileDialog::new().show_open_single_dir().unwrap() {
-                            SETTINGS.write().unwrap().cache_dir = directory;
-                            SETTINGS.read().unwrap().save();
+                            set_setting().cache_dir = directory;
+                            save_settings();
                         }
                     }
                 }
@@ -915,20 +916,17 @@ impl Application for Gui {
             Message::ResetLocation(location) => {
                 match location {
                     Location::Databases => {
-                        SETTINGS.write().unwrap().databases_dir =
-                            PROJECT_DIRS.config_dir().to_path_buf();
-                        SETTINGS.read().unwrap().save();
+                        set_setting().databases_dir = PROJECT_DIRS.config_dir().to_path_buf();
+                        save_settings();
                     }
                     Location::Packages => {
-                        SETTINGS.write().unwrap().packages_dir =
-                            PROJECT_DIRS.data_local_dir().to_path_buf();
-                        SETTINGS.read().unwrap().save();
+                        set_setting().packages_dir = PROJECT_DIRS.data_local_dir().to_path_buf();
+                        save_settings();
                         self.releases.sync();
                     }
                     Location::Cache => {
-                        SETTINGS.write().unwrap().cache_dir =
-                            PROJECT_DIRS.cache_dir().to_path_buf();
-                        SETTINGS.read().unwrap().save();
+                        set_setting().cache_dir = PROJECT_DIRS.cache_dir().to_path_buf();
+                        save_settings();
                     }
                 }
                 Command::none()
@@ -985,27 +983,25 @@ impl Application for Gui {
                 Command::none()
             }
             Message::RemoveCache => {
-                remove_dir_all(SETTINGS.read().unwrap().cache_dir.clone()).unwrap();
+                remove_dir_all(get_setting().cache_dir.clone()).unwrap();
                 println!("All cache removed.");
-                create_dir_all(SETTINGS.read().unwrap().cache_dir.clone()).unwrap();
+                create_dir_all(get_setting().cache_dir.clone()).unwrap();
                 Command::none()
             }
             Message::SelfUpdater(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().self_updater = true,
-                    Choice::Disable => SETTINGS.write().unwrap().self_updater = false,
+                    Choice::Enable => set_setting().self_updater = true,
+                    Choice::Disable => set_setting().self_updater = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::CheckSelfUpdatesAtLaunch(choice) => {
                 match choice {
-                    Choice::Enable => SETTINGS.write().unwrap().check_self_updates_at_launch = true,
-                    Choice::Disable => {
-                        SETTINGS.write().unwrap().check_self_updates_at_launch = false
-                    }
+                    Choice::Enable => set_setting().check_self_updates_at_launch = true,
+                    Choice::Disable => set_setting().check_self_updates_at_launch = false,
                 }
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 Command::none()
             }
             Message::FetchSelfReleases => {
@@ -1103,7 +1099,7 @@ impl Application for Gui {
                     Tab::Settings,
                     &mut self.state.settings_button,
                 ))
-                .push(if SETTINGS.read().unwrap().self_updater {
+                .push(if get_setting().self_updater {
                     tab_button(
                         &self_update_tab_label,
                         Tab::SelfUpdater,
@@ -1146,7 +1142,7 @@ impl Application for Gui {
                                 .align_items(Align::Center)
                                 .push(button(
                                     "[=]",
-                                    match SETTINGS.read().unwrap().default_package.clone() {
+                                    match get_setting().default_package.clone() {
                                         Some(package) => Some(Message::OpenBlender(package)),
                                         None => None,
                                     },
@@ -1154,14 +1150,12 @@ impl Application for Gui {
                                 ))
                                 .push(Text::new("Default package:"))
                                 .push(
-                                    Text::new(
-                                        match SETTINGS.read().unwrap().default_package.clone() {
-                                            Some(package) => {
-                                                format!("{}", package.name)
-                                            }
-                                            None => String::from("not set"),
-                                        },
-                                    )
+                                    Text::new(match get_setting().default_package.clone() {
+                                        Some(package) => {
+                                            format!("{}", package.name)
+                                        }
+                                        None => String::from("not set"),
+                                    })
                                     .color(theme.highlight_text()),
                                 ),
                         )
@@ -1172,15 +1166,10 @@ impl Application for Gui {
                                 .push(button(
                                     "[+]",
                                     if self.file_path.is_some()
-                                        && SETTINGS.read().unwrap().default_package.is_some()
+                                        && get_setting().default_package.is_some()
                                     {
                                         Some(Message::OpenBlenderWithFile(
-                                            SETTINGS
-                                                .read()
-                                                .unwrap()
-                                                .default_package
-                                                .clone()
-                                                .unwrap(),
+                                            get_setting().default_package.clone().unwrap(),
                                         ))
                                     } else {
                                         None
@@ -1440,26 +1429,25 @@ impl Application for Gui {
                     || lts_packages_exist
                     || archived_packages_exist;
 
-                let installed_packages_space =
-                    dir::get_size(SETTINGS.read().unwrap().packages_dir.clone()).unwrap() as f64
-                        / 1024.0
-                        / 1024.0
-                        / 1024.0;
-                let packages_dir_available_space =
-                    available_space(SETTINGS.read().unwrap().packages_dir.clone()).unwrap() as f64
-                        / 1024.0
-                        / 1024.0
-                        / 1024.0;
-                let cache_space = dir::get_size(SETTINGS.read().unwrap().cache_dir.clone()).unwrap()
-                    as f64
+                let installed_packages_space = dir::get_size(get_setting().packages_dir.clone())
+                    .unwrap() as f64
                     / 1024.0
                     / 1024.0
                     / 1024.0;
-                let cache_dir_available_space =
-                    available_space(SETTINGS.read().unwrap().cache_dir.clone()).unwrap() as f64
+                let packages_dir_available_space =
+                    available_space(get_setting().packages_dir.clone()).unwrap() as f64
                         / 1024.0
                         / 1024.0
                         / 1024.0;
+                let cache_space = dir::get_size(get_setting().cache_dir.clone()).unwrap() as f64
+                    / 1024.0
+                    / 1024.0
+                    / 1024.0;
+                let cache_dir_available_space = available_space(get_setting().cache_dir.clone())
+                    .unwrap() as f64
+                    / 1024.0
+                    / 1024.0
+                    / 1024.0;
 
                 let settings = Column::new()
                     .padding(10)
@@ -1476,7 +1464,7 @@ impl Application for Gui {
                         "Check at launch",
                         "Increases launch time for about a second or two. Having a delay between checks improves launch speed.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().check_updates_at_launch).unwrap()),
+                        Some(choice(get_setting().check_updates_at_launch).unwrap()),
                         Message::CheckUpdatesAtLaunch,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1501,7 +1489,7 @@ impl Application for Gui {
                                 .push(min_button("+10", 10, &mut self.state.plus_10_button))
                                 .push(min_button("+100", 100, &mut self.state.plus_100_button))
                             )
-                            .push(Text::new(SETTINGS.read().unwrap().minutes_between_updates.to_string()))
+                            .push(Text::new(get_setting().minutes_between_updates.to_string()))
                             .push(Row::new()
                                 .push(min_button("-1", -1, &mut self.state.minus_1_button))
                                 .push(min_button("-10", -10, &mut self.state.minus_10_button))
@@ -1515,7 +1503,7 @@ impl Application for Gui {
                         "Check daily packages",
                         "Look for new daily packages. Each build, like Alpha and Beta, is considered separate.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().update_daily).unwrap()),
+                        Some(choice(get_setting().update_daily).unwrap()),
                         Message::UpdateDaily,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1523,7 +1511,7 @@ impl Application for Gui {
                         "Check branched packages",
                         "Look for new branched packages. Each branch is considered a separate build.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().update_branched).unwrap()),
+                        Some(choice(get_setting().update_branched).unwrap()),
                         Message::UpdateBranched,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1531,7 +1519,7 @@ impl Application for Gui {
                         "Check stable packages",
                         "Look for new stable packages.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().update_stable).unwrap()),
+                        Some(choice(get_setting().update_stable).unwrap()),
                         Message::UpdateStable,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1539,7 +1527,7 @@ impl Application for Gui {
                         "Check LTS packages",
                         "Look for new LTS packages.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().update_lts).unwrap()),
+                        Some(choice(get_setting().update_lts).unwrap()),
                         Message::UpdateLts,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1555,7 +1543,7 @@ impl Application for Gui {
                         "Use latest as default",
                         "Change to the latest package of the same build type when installing an update.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().use_latest_as_default).unwrap()),
+                        Some(choice(get_setting().use_latest_as_default).unwrap()),
                         Message::UseLatestAsDefault,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1563,7 +1551,7 @@ impl Application for Gui {
                         "Keep only newest daily package",
                         "Remove all older daily packages of its build type when installing an update.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().keep_only_latest_daily).unwrap()),
+                        Some(choice(get_setting().keep_only_latest_daily).unwrap()),
                         Message::KeepOnlyLatestDaily,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1571,7 +1559,7 @@ impl Application for Gui {
                         "Keep only newest branched package",
                         "Remove all older branched packages of its build type when installing an update.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().keep_only_latest_branched).unwrap()),
+                        Some(choice(get_setting().keep_only_latest_branched).unwrap()),
                         Message::KeepOnlyLatestBranched,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1579,7 +1567,7 @@ impl Application for Gui {
                         "Keep only newest stable package",
                         "Remove all older stable packages when installing an update.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().keep_only_latest_stable).unwrap()),
+                        Some(choice(get_setting().keep_only_latest_stable).unwrap()),
                         Message::KeepOnlyLatestStable,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1587,7 +1575,7 @@ impl Application for Gui {
                         "Keep only newest LTS package",
                         "Remove all older LTS packages when installing an update.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().keep_only_latest_lts).unwrap()),
+                        Some(choice(get_setting().keep_only_latest_lts).unwrap()),
                         Message::KeepOnlyLatestLts,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1603,7 +1591,7 @@ impl Application for Gui {
                         "Bypass launcher",
                         "The preferred way to use this launcher. If a default package is set and no updates were found, only open launcher when the selected modifier key is held down. This way the launcher only makes itself known if there's an update or if you want to launch a different package.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().bypass_launcher).unwrap()),
+                        Some(choice(get_setting().bypass_launcher).unwrap()),
                         Message::BypassLauncher,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1611,7 +1599,7 @@ impl Application for Gui {
                         "Modifier key",
                         "You can start holding the modifier key even before double clicking on a .blend file or Ablavema shortcut, but you are able to change it if there's any interference.",
                         &ModifierKey::ALL,
-                        Some(SETTINGS.read().unwrap().modifier_key),
+                        Some(get_setting().modifier_key),
                         Message::ModifierKey,
                     ))
                     .push(Rule::horizontal(0).style(self.theme))
@@ -1639,9 +1627,9 @@ impl Application for Gui {
                                     .spacing(10)
                                     .width(Length::Fill)
                                         .push(Text::new(&format!("Ablavema's files are stored in the recommended default locations for every platform, but changing them is possible. To change the location of the configuration file, which is stored by default at '{}' you can set the environment variable {} and it will create that file and use it as the config file, whatever its name is.", PROJECT_DIRS.config_dir().display(), CONFIG_FILE_ENV)))
-                                        .push(Text::new(&format!("Default databases' location: {}\nCurrent databases' location: {}", PROJECT_DIRS.config_dir().display(), SETTINGS.read().unwrap().databases_dir.display())))
-                                        .push(Text::new(&format!("Default packages' location: {}\nCurrent packages' location: {}", PROJECT_DIRS.data_local_dir().display(), SETTINGS.read().unwrap().packages_dir.display())))
-                                        .push(Text::new(&format!("Default cache location: {}\nCurrent cache location: {}", PROJECT_DIRS.cache_dir().display(), SETTINGS.read().unwrap().cache_dir.display())))
+                                        .push(Text::new(&format!("Default databases' location: {}\nCurrent databases' location: {}", PROJECT_DIRS.config_dir().display(), get_setting().databases_dir.display())))
+                                        .push(Text::new(&format!("Default packages' location: {}\nCurrent packages' location: {}", PROJECT_DIRS.data_local_dir().display(), get_setting().packages_dir.display())))
+                                        .push(Text::new(&format!("Default cache location: {}\nCurrent cache location: {}", PROJECT_DIRS.cache_dir().display(), get_setting().cache_dir.display())))
                                         .push(Row::new()
                                             .spacing(5)
                                                 .push(change_location_button(
@@ -1816,12 +1804,12 @@ impl Application for Gui {
                         "Self-updater",
                         "Update the launcher itself through the built-in system. This enables a hidden tab dedicated to updating, which can also be used to read the release notes of every version. Keep in mind that if Ablavema is installed through a package manager, the laucher should be updated through it. Though if made use of even if installed through a package manager, upon updating it through the package manager the executable would simply be replaced with the newer one, same as if done through the built-in system. In this way, making use of this feature is helpful when trying out older versions to see if a bug was there before or whatnot.",
                         &Choice::ALL,
-                        Some(choice(SETTINGS.read().unwrap().self_updater).unwrap()),
+                        Some(choice(get_setting().self_updater).unwrap()),
                         Message::SelfUpdater,
                     ));
 
                 Container::new(Scrollable::new(&mut self.state.settings_scroll).push(
-                    if SETTINGS.read().unwrap().self_updater {
+                    if get_setting().self_updater {
                         settings
                             .push(Rule::horizontal(0).style(self.theme))
                             .push(choice_setting!(
@@ -1829,7 +1817,7 @@ impl Application for Gui {
                                 "This uses the same delay as the normal updates. Keep in mind that, at the moment, if you downgrade you will be prompted to update Ablavema every time updates are checked.",
                                 &Choice::ALL,
                                 Some(
-                                    choice(SETTINGS.read().unwrap().check_self_updates_at_launch)
+                                    choice(get_setting().check_self_updates_at_launch)
                                         .unwrap()
                                 ),
                                 Message::CheckSelfUpdatesAtLaunch,
@@ -2170,8 +2158,8 @@ impl GuiState {
     fn new() -> Self {
         Self {
             controls: Controls {
-                filters: SETTINGS.read().unwrap().filters,
-                sort_by: SETTINGS.read().unwrap().sort_by,
+                filters: get_setting().filters,
+                sort_by: get_setting().sort_by,
                 ..Controls::default()
             },
             self_updater_pick_list_selected: crate_version!().to_owned(),
@@ -2357,7 +2345,7 @@ impl Controls {
                 PickList::new(
                     &mut self.sorting_pick_list,
                     &SortBy::ALL[..],
-                    Some(SETTINGS.read().unwrap().sort_by),
+                    Some(get_setting().sort_by),
                     Message::SortingChanged,
                 )
                 .width(Length::Fill)
@@ -2696,13 +2684,13 @@ impl Package {
                 Message::OpenBlenderWithFile,
             ),
             PackageMessage::SetDefault => {
-                SETTINGS.write().unwrap().default_package = Some(self.clone());
-                SETTINGS.read().unwrap().save();
+                set_setting().default_package = Some(self.clone());
+                save_settings();
                 Command::none()
             }
             PackageMessage::UnsetDefault => {
-                SETTINGS.write().unwrap().default_package = None;
-                SETTINGS.read().unwrap().save();
+                set_setting().default_package = None;
+                save_settings();
                 Command::none()
             }
             PackageMessage::Bookmark => {
@@ -2717,8 +2705,8 @@ impl Package {
         theme: Theme,
         is_odd: bool,
     ) -> Element<'_, PackageMessage> {
-        let is_default_package = SETTINGS.read().unwrap().default_package.is_some()
-            && SETTINGS.read().unwrap().default_package.clone().unwrap() == *self;
+        let is_default_package = get_setting().default_package.is_some()
+            && get_setting().default_package.clone().unwrap() == *self;
 
         let date_time = self.get_formatted_date_time();
 

@@ -1,7 +1,7 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 use crate::{
     helpers::{get_count, get_extracted_name},
-    settings::SETTINGS,
+    settings::get_setting,
 };
 use bincode;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
@@ -76,7 +76,7 @@ impl Package {
             .template("[{elapsed_precise}] [{bar:20.green/red}] {percent}% => {wide_msg}")
             .progress_chars("#>-");
 
-        let package = SETTINGS.read().unwrap().packages_dir.join(&self.name);
+        let package = get_setting().packages_dir.join(&self.name);
 
         if package.exists() && !flags.0 {
             let progress_bar = multi_progress.add(ProgressBar::new(0));
@@ -92,9 +92,7 @@ impl Package {
 
         let download_handle;
 
-        let file = SETTINGS
-            .read()
-            .unwrap()
+        let file = get_setting()
             .cache_dir
             .join(self.url.split_terminator('/').last().unwrap());
 
@@ -215,7 +213,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                        file.unpack_in(&get_setting().cache_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
@@ -231,7 +229,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                        file.unpack_in(&get_setting().cache_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
@@ -247,7 +245,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&SETTINGS.read().unwrap().cache_dir).unwrap();
+                        file.unpack_in(&get_setting().cache_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
@@ -283,7 +281,7 @@ impl Package {
                             .unwrap()
                             .cache_dir
                             .join("blender-2.49b-win64-python26"),
-                        _ => SETTINGS.read().unwrap().cache_dir.clone(),
+                        _ => GetSetting().cache_dir.clone(),
                     };
 
                     for file_index in 0..archive.len() {
@@ -321,14 +319,10 @@ impl Package {
         let final_tasks = spawn(async move {
             extraction_handle.await.unwrap();
 
-            let mut package_path = SETTINGS.read().unwrap().packages_dir.join(&package.name);
+            let mut package_path = get_setting().packages_dir.join(&package.name);
 
             rename(
-                SETTINGS
-                    .read()
-                    .unwrap()
-                    .cache_dir
-                    .join(get_extracted_name(&package)),
+                get_setting().cache_dir.join(get_extracted_name(&package)),
                 &package_path,
             )
             .unwrap();
@@ -354,7 +348,7 @@ impl Package {
     }
 
     pub fn remove(&self) {
-        let path = SETTINGS.read().unwrap().packages_dir.join(&self.name);
+        let path = get_setting().packages_dir.join(&self.name);
         std::fs::remove_dir_all(path).unwrap();
         println!("Removed: {}", self.name);
     }

@@ -12,13 +12,12 @@ use self::{
 use crate::{
     helpers::ReturnOption,
     package::{Build, Package, PackageState, PackageStatus},
-    settings::{CAN_CONNECT, SETTINGS},
+    settings::{get_setting, init_settings, save_settings, set_setting, CAN_CONNECT},
 };
 use async_trait::async_trait;
 use bincode;
 use chrono::NaiveTime;
 use indicatif::MultiProgress;
-use lazy_static::initialize;
 use reqwest;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -43,7 +42,7 @@ impl Releases {
     /// Load databases and sync them with installed packages,
     /// returning Releases and true if initialised.
     pub async fn init() -> (Releases, bool) {
-        initialize(&SETTINGS);
+        init_settings();
         let mut releases = Releases::default();
         let initialised = releases.load_all().await;
         releases.sync();
@@ -104,20 +103,17 @@ impl Releases {
         self.installed.fetch();
 
         self.daily.refresh_state(&self.installed);
-        self.daily
-            .refresh_status(SETTINGS.read().unwrap().update_daily);
+        self.daily.refresh_status(get_setting().update_daily);
 
         self.branched.refresh_state(&self.installed);
-        self.branched
-            .refresh_status(SETTINGS.read().unwrap().update_branched);
+        self.branched.refresh_status(get_setting().update_branched);
 
         self.stable.refresh_state(&self.installed);
-        self.stable
-            .refresh_status(SETTINGS.read().unwrap().update_stable);
+        self.stable.refresh_status(get_setting().update_stable);
         self.stable.correct_date_time(&self.archived);
 
         self.lts.refresh_state(&self.installed);
-        self.lts.refresh_status(SETTINGS.read().unwrap().update_lts);
+        self.lts.refresh_status(get_setting().update_lts);
         self.lts.correct_date_time(&self.archived);
 
         self.archived.refresh_state(&self.installed);
@@ -128,34 +124,34 @@ impl Releases {
     pub async fn check_updates(
         packages: (Daily, Branched, Stable, Lts),
     ) -> (bool, Daily, Branched, Stable, Lts) {
-        SETTINGS.write().unwrap().last_update_time = SystemTime::now();
-        SETTINGS.read().unwrap().save();
+        set_setting().last_update_time = SystemTime::now();
+        save_settings();
 
         let (mut daily, mut branched, mut stable, mut lts) = packages;
 
         let mut updated_daily = false;
-        if SETTINGS.read().unwrap().update_daily {
+        if get_setting().update_daily {
             let (updated, fetched_daily) = Releases::check_daily_updates(daily).await;
             updated_daily = updated;
             daily = fetched_daily;
         }
 
         let mut updated_branched = false;
-        if SETTINGS.read().unwrap().update_branched {
+        if get_setting().update_branched {
             let (updated, fetched_branched) = Releases::check_branched_updates(branched).await;
             updated_branched = updated;
             branched = fetched_branched;
         }
 
         let mut updated_stable = false;
-        if SETTINGS.read().unwrap().update_stable {
+        if get_setting().update_stable {
             let (updated, fetched_stable) = Releases::check_stable_updates(stable).await;
             updated_stable = updated;
             stable = fetched_stable;
         }
 
         let mut updated_lts = false;
-        if SETTINGS.read().unwrap().update_lts {
+        if get_setting().update_lts {
             let (updated, fetched_lts) = Releases::check_lts_updates(lts).await;
             updated_lts = updated;
             lts = fetched_lts;
@@ -354,11 +350,11 @@ impl Releases {
             let (daily_removed, branched_removed) = self.installed.remove_old_packages();
             self.sync();
 
-            if SETTINGS.read().unwrap().keep_only_latest_daily && daily_removed {
+            if get_setting().keep_only_latest_daily && daily_removed {
                 self.daily.remove_dead_packages().await;
             }
 
-            if SETTINGS.read().unwrap().keep_only_latest_branched && branched_removed {
+            if get_setting().keep_only_latest_branched && branched_removed {
                 self.branched.remove_dead_packages().await;
             }
         }

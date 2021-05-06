@@ -6,7 +6,9 @@ use crate::{
         is_time_to_update, process_bool_arg,
     },
     releases::{ReleaseType, Releases},
-    settings::{ModifierKey, CAN_CONNECT, LAUNCH_GUI, ONLY_CLI, SETTINGS},
+    settings::{
+        get_setting, save_settings, set_setting, ModifierKey, CAN_CONNECT, LAUNCH_GUI, ONLY_CLI,
+    },
 };
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgGroup,
@@ -42,7 +44,7 @@ pub async fn run_cli() -> GuiFlags {
     let help_default_package = format!(
         "Select default package to use for opening .blend files [current: {}{}{}]",
         left_ansi_code,
-        match SETTINGS.read().unwrap().default_package.clone() {
+        match get_setting().default_package.clone() {
             Some(package) => package.name,
             None => String::default(),
         },
@@ -51,79 +53,79 @@ pub async fn run_cli() -> GuiFlags {
     let help_bypass_launcher = format!(
         "If default package is set, only open launcher when the set modifier key is held down [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().bypass_launcher,
+        get_setting().bypass_launcher,
         right_ansi_code
     );
     let help_modifier_key = format!(
         "Modifier key to use for opening launcher [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().modifier_key,
+        get_setting().modifier_key,
         right_ansi_code
     );
     let help_use_latest_as_default = format!(
         "Change to the latest package of the same build type when updating [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().use_latest_as_default,
+        get_setting().use_latest_as_default,
         right_ansi_code
     );
     let help_check_updates_at_launch = format!(
         "Check for updates at launch [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().check_updates_at_launch,
+        get_setting().check_updates_at_launch,
         right_ansi_code
     );
     let help_minutes_between_updates = format!(
         "Amount of minutes to wait between update checks [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().minutes_between_updates,
+        get_setting().minutes_between_updates,
         right_ansi_code
     );
     let help_update_daily = format!(
         "Download the latest daily package [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().update_daily,
+        get_setting().update_daily,
         right_ansi_code
     );
     let help_update_branched = format!(
         "Download the latest branched package [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().update_branched,
+        get_setting().update_branched,
         right_ansi_code
     );
     let help_update_stable = format!(
         "Download the latest stable package [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().update_stable,
+        get_setting().update_stable,
         right_ansi_code
     );
     let help_update_lts = format!(
         "Download the latest LTS package [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().update_lts,
+        get_setting().update_lts,
         right_ansi_code
     );
     let help_keep_only_latest_daily = format!(
         "Remove all daily packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().keep_only_latest_daily,
+        get_setting().keep_only_latest_daily,
         right_ansi_code
     );
     let help_keep_only_latest_branched = format!(
         "Remove all branched packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().keep_only_latest_branched,
+        get_setting().keep_only_latest_branched,
         right_ansi_code
     );
     let help_keep_only_latest_stable = format!(
         "Remove all stable packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().keep_only_latest_stable,
+        get_setting().keep_only_latest_stable,
         right_ansi_code
     );
     let help_keep_only_latest_lts = format!(
         "Remove all LTS packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        SETTINGS.read().unwrap().keep_only_latest_lts,
+        get_setting().keep_only_latest_lts,
         right_ansi_code
     );
 
@@ -599,12 +601,12 @@ pub async fn run_cli() -> GuiFlags {
 
             if a.is_present("modifier_key") {
                 let new_arg = a.value_of("modifier_key").unwrap();
-                let old_arg = SETTINGS.read().unwrap().modifier_key.clone();
+                let old_arg = get_setting().modifier_key.clone();
 
                 if new_arg == old_arg.to_string() {
                     println!("'modifier-key' is unchanged from '{}'.", old_arg);
                 } else {
-                    SETTINGS.write().unwrap().modifier_key = match new_arg {
+                    set_setting().modifier_key = match new_arg {
                         "shift" => ModifierKey::Shift,
                         "ctrl" => ModifierKey::Control,
                         "alt" => ModifierKey::Alt,
@@ -624,12 +626,12 @@ pub async fn run_cli() -> GuiFlags {
             if a.is_present("minutes_between_updates") {
                 let new_arg =
                     u64::from_str(a.value_of("minutes_between_updates").unwrap()).unwrap();
-                let old_arg = SETTINGS.read().unwrap().minutes_between_updates;
+                let old_arg = get_setting().minutes_between_updates;
 
                 if new_arg == old_arg {
                     println!("'minutes-between-updates' is unchanged from '{}'.", old_arg);
                 } else {
-                    SETTINGS.write().unwrap().minutes_between_updates = new_arg;
+                    set_setting().minutes_between_updates = new_arg;
 
                     println!(
                         "'minutes-between-updates' changed from '{}' to '{}'.",
@@ -647,7 +649,7 @@ pub async fn run_cli() -> GuiFlags {
             process_bool_arg(a, "keep_only_latest_stable");
             process_bool_arg(a, "keep_only_latest_lts");
 
-            SETTINGS.read().unwrap().save();
+            save_settings();
         }
         ("fetch", Some(a)) => {
             if CAN_CONNECT.load(Ordering::Relaxed) {
@@ -742,7 +744,7 @@ pub async fn run_cli() -> GuiFlags {
         },
         ("remove", Some(a)) => {
             if a.is_present("cache") {
-                remove_dir_all(SETTINGS.read().unwrap().cache_dir.clone())
+                remove_dir_all(get_setting().cache_dir.clone())
                     .await
                     .unwrap();
 
@@ -750,15 +752,15 @@ pub async fn run_cli() -> GuiFlags {
             }
 
             if a.is_present("packages") {
-                remove_dir_all(SETTINGS.read().unwrap().packages_dir.clone())
+                remove_dir_all(get_setting().packages_dir.clone())
                     .await
                     .unwrap();
 
                 println!("Removed all packages.");
 
-                if !SETTINGS.read().unwrap().default_package.is_none() {
-                    SETTINGS.write().unwrap().default_package = None;
-                    SETTINGS.read().unwrap().save();
+                if !get_setting().default_package.is_none() {
+                    set_setting().default_package = None;
+                    save_settings();
 
                     println!("All packages removed. Please install and select a new package.");
                 }
@@ -803,10 +805,10 @@ pub async fn run_cli() -> GuiFlags {
                     }
                 }
 
-                if SETTINGS.read().unwrap().default_package.is_some() {
+                if get_setting().default_package.is_some() {
                     releases.installed.fetch();
 
-                    let old_default = SETTINGS.read().unwrap().default_package.clone().unwrap();
+                    let old_default = get_setting().default_package.clone().unwrap();
 
                     if releases
                         .installed
@@ -814,8 +816,8 @@ pub async fn run_cli() -> GuiFlags {
                         .find(|package| package.name == old_default.name)
                         .is_none()
                     {
-                        SETTINGS.write().unwrap().default_package = None;
-                        SETTINGS.read().unwrap().save();
+                        set_setting().default_package = None;
+                        save_settings();
 
                         println!(
                             "Default package '{}' was removed. Please select a new package.",
@@ -827,10 +829,10 @@ pub async fn run_cli() -> GuiFlags {
         }
         ("select", Some(a)) => {
             if a.is_present("unset") {
-                match SETTINGS.read().unwrap().default_package.clone() {
+                match get_setting().default_package.clone() {
                     Some(package) => {
-                        SETTINGS.write().unwrap().default_package = None;
-                        SETTINGS.read().unwrap().save();
+                        set_setting().default_package = None;
+                        save_settings();
                         println!("Default package '{}' was unset.", package.name);
                     }
                     None => {
@@ -838,7 +840,7 @@ pub async fn run_cli() -> GuiFlags {
                     }
                 }
             } else {
-                SETTINGS.write().unwrap().default_package = {
+                set_setting().default_package = {
                     if a.is_present("name") {
                         match releases
                             .installed
@@ -863,16 +865,10 @@ pub async fn run_cli() -> GuiFlags {
                     }
                 };
 
-                SETTINGS.read().unwrap().save();
+                save_settings();
                 println!(
                     "Selected: {}",
-                    SETTINGS
-                        .read()
-                        .unwrap()
-                        .default_package
-                        .clone()
-                        .unwrap()
-                        .name
+                    get_setting().default_package.clone().unwrap().name
                 );
             }
         }
@@ -888,7 +884,7 @@ pub async fn run_cli() -> GuiFlags {
         _ => {
             ONLY_CLI.store(false, Ordering::Relaxed);
 
-            if SETTINGS.read().unwrap().check_updates_at_launch && !initialised {
+            if get_setting().check_updates_at_launch && !initialised {
                 if is_time_to_update() {
                     if CAN_CONNECT.load(Ordering::Relaxed) {
                         let packages = Releases::check_updates(releases.take()).await;
@@ -912,7 +908,7 @@ pub async fn run_cli() -> GuiFlags {
             // TODO: Add setting to notify only on newer version when downgraded.
             // This would make it possible to downgrade to 0.2.1 from 0.2.2
             // and not get prompted until a newer version than 0.2.2 is released.
-            if SETTINGS.read().unwrap().check_self_updates_at_launch
+            if get_setting().check_self_updates_at_launch
                 && is_time_to_update()
                 && CAN_CONNECT.load(Ordering::Relaxed)
             {
@@ -928,11 +924,11 @@ pub async fn run_cli() -> GuiFlags {
                 }
             }
 
-            if SETTINGS.read().unwrap().bypass_launcher && !LAUNCH_GUI.load(Ordering::Relaxed) {
+            if get_setting().bypass_launcher && !LAUNCH_GUI.load(Ordering::Relaxed) {
                 let device_state = DeviceState::new();
                 let keys = device_state.get_keys();
 
-                if keys.contains(&SETTINGS.read().unwrap().modifier_key.get_keycode()) {
+                if keys.contains(&get_setting().modifier_key.get_keycode()) {
                     LAUNCH_GUI.store(true, Ordering::Relaxed);
                 }
             } else {

@@ -1,6 +1,6 @@
 //#![allow(dead_code, unused_imports, unused_variables)]
 use super::{Message, PackageMessage};
-use crate::{helpers::get_extracted_name, package::Package, settings::SETTINGS};
+use crate::{helpers::get_extracted_name, package::Package, settings::get_setting};
 use bincode;
 use iced_futures::{
     futures::stream::{unfold, BoxStream},
@@ -8,7 +8,7 @@ use iced_futures::{
 };
 use reqwest;
 use std::{
-    fs::File,
+    fs::{rename, File},
     hash::{Hash, Hasher},
     path::PathBuf,
 };
@@ -86,10 +86,9 @@ where
                         match response {
                             Ok(response) => {
                                 if let Some(total) = response.content_length() {
-                                    let file =
-                                        SETTINGS.read().unwrap().cache_dir.join(
-                                            package.url.split_terminator('/').last().unwrap(),
-                                        );
+                                    let file = get_setting()
+                                        .cache_dir
+                                        .join(package.url.split_terminator('/').last().unwrap());
 
                                     // TODO: Give option to reuse previously downloaded packages.
                                     // Could have an extra button [Install from cache].
@@ -108,7 +107,7 @@ where
                                     }
 
                                     let package_dir =
-                                        SETTINGS.read().unwrap().packages_dir.join(&package.name);
+                                        get_setting().packages_dir.join(&package.name);
 
                                     if package_dir.exists() {
                                         unwrap_or_return!(
@@ -262,7 +261,7 @@ where
                                             .unwrap()
                                             .cache_dir
                                             .join("blender-2.49b-win64-python26"),
-                                        _ => SETTINGS.read().unwrap().cache_dir.clone(),
+                                        _ => GetSetting().cache_dir.clone(),
                                     };
 
                                 let total = archive.len() as u64;
@@ -304,10 +303,7 @@ where
 
                             for entry in unwrap_or_return!(index, archive.entries()) {
                                 let mut file = unwrap_or_return!(index, entry);
-                                unwrap_or_return!(
-                                    index,
-                                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir)
-                                );
+                                unwrap_or_return!(index, file.unpack_in(&get_setting().cache_dir));
                             }
 
                             Some((
@@ -323,10 +319,7 @@ where
 
                             for entry in unwrap_or_return!(index, archive.entries()) {
                                 let mut file = unwrap_or_return!(index, entry);
-                                unwrap_or_return!(
-                                    index,
-                                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir)
-                                );
+                                unwrap_or_return!(index, file.unpack_in(&get_setting().cache_dir));
                             }
 
                             Some((
@@ -342,10 +335,7 @@ where
 
                             for entry in unwrap_or_return!(index, archive.entries()) {
                                 let mut file = unwrap_or_return!(index, entry);
-                                unwrap_or_return!(
-                                    index,
-                                    file.unpack_in(&SETTINGS.read().unwrap().cache_dir)
-                                );
+                                unwrap_or_return!(index, file.unpack_in(&get_setting().cache_dir));
                             }
 
                             Some((
@@ -412,19 +402,14 @@ where
                         }
                     },
                     State::FinishedExtracting { package, index } => {
-                        let mut package_path =
-                            SETTINGS.read().unwrap().packages_dir.join(&package.name);
+                        let mut package_path = get_setting().packages_dir.join(&package.name);
 
                         // TODO: Fix moving directories across filesystems.
                         // Can probably use the `fs_extra` crate, which I'm already depending on.
                         unwrap_or_return!(
                             index,
-                            std::fs::rename(
-                                SETTINGS
-                                    .read()
-                                    .unwrap()
-                                    .cache_dir
-                                    .join(get_extracted_name(&package)),
+                            rename(
+                                get_setting().cache_dir.join(get_extracted_name(&package)),
                                 &package_path,
                             )
                         );

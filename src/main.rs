@@ -11,7 +11,7 @@ use crate::{
     cli::run_cli,
     gui::Gui,
     helpers::open_blender,
-    settings::{LAUNCH_GUI, ONLY_CLI, SETTINGS},
+    settings::{get_setting, LAUNCH_GUI, ONLY_CLI},
 };
 use helpers::check_connection;
 use iced::Application;
@@ -51,8 +51,7 @@ async fn run() {
     let gui_args = run_cli().await;
 
     if !ONLY_CLI.load(Ordering::Relaxed) {
-        if LAUNCH_GUI.load(Ordering::Relaxed) || SETTINGS.read().unwrap().default_package.is_none()
-        {
+        if LAUNCH_GUI.load(Ordering::Relaxed) || get_setting().default_package.is_none() {
             // TODO: Add icon.
             let mut window = iced::window::Settings::default();
             window.size = (650, 570);
@@ -73,25 +72,10 @@ async fn run() {
         } else {
             match &gui_args.file_path {
                 Some(file_path) => open_blender(
-                    SETTINGS
-                        .read()
-                        .unwrap()
-                        .default_package
-                        .clone()
-                        .unwrap()
-                        .name,
+                    get_setting().default_package.clone().unwrap().name,
                     Some(file_path.to_owned()),
                 ),
-                None => open_blender(
-                    SETTINGS
-                        .read()
-                        .unwrap()
-                        .default_package
-                        .clone()
-                        .unwrap()
-                        .name,
-                    None,
-                ),
+                None => open_blender(get_setting().default_package.clone().unwrap().name, None),
             }
         }
     }

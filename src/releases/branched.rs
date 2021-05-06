@@ -3,7 +3,7 @@ use crate::{
     helpers::{get_document, get_file_stem},
     package::{Build, Os, Package},
     releases::ReleaseType,
-    settings::SETTINGS,
+    settings::get_setting,
 };
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDateTime, Utc};
@@ -124,6 +124,6 @@ impl ReleaseType for Branched {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        SETTINGS.read().unwrap().databases_dir.join("branched.bin")
+        get_setting().databases_dir.join("branched.bin")
     }
 }

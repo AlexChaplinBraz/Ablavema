@@ -6,7 +6,7 @@ use crate::{
 use bincode;
 use device_query::Keycode;
 use directories_next::ProjectDirs;
-use lazy_static::lazy_static;
+use lazy_static::{initialize, lazy_static};
 use serde::{Deserialize, Serialize};
 use std::{
     env::current_exe,
@@ -15,10 +15,26 @@ use std::{
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
-        RwLock,
+        RwLock, RwLockReadGuard, RwLockWriteGuard,
     },
     time::{Duration, SystemTime},
 };
+
+pub fn init_settings() {
+    initialize(&SETTINGS);
+}
+
+pub fn save_settings() {
+    SETTINGS.read().unwrap().save()
+}
+
+pub fn get_setting() -> RwLockReadGuard<'static, Settings> {
+    SETTINGS.read().unwrap()
+}
+
+pub fn set_setting() -> RwLockWriteGuard<'static, Settings> {
+    SETTINGS.write().unwrap()
+}
 
 const CONFIG_NAME: &str = "config.bin";
 pub const CONFIG_FILE_ENV: &str = "ABLAVEMA_CONFIG_FILE";
@@ -34,7 +50,7 @@ pub const TEXT_SIZE: u16 = 16;
 lazy_static! {
     pub static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "Ablavema").unwrap();
     static ref PORTABLE_PATH: PathBuf = current_exe().unwrap().parent().unwrap().to_path_buf();
-    pub static ref CONFIG_PATH: PathBuf = {
+    static ref CONFIG_PATH: PathBuf = {
         if PORTABLE_PATH.join("portable").exists() {
             PORTABLE.store(true, Ordering::Relaxed);
             PORTABLE_PATH.join(CONFIG_NAME)
@@ -49,7 +65,7 @@ lazy_static! {
             config_path.join(CONFIG_NAME)
         }
     };
-    pub static ref SETTINGS: RwLock<Settings> = RwLock::new(Settings::init());
+    static ref SETTINGS: RwLock<Settings> = RwLock::new(Settings::init());
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -112,7 +128,7 @@ impl Settings {
         settings
     }
 
-    pub fn save(&self) {
+    fn save(&self) {
         let conf_file = File::create(&*CONFIG_PATH).unwrap();
         bincode::serialize_into(conf_file, self).unwrap();
     }

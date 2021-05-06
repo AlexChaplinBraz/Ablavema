@@ -1,7 +1,7 @@
 //#![allow(dead_code, unused_imports, unused_variables, unused_macros)]
 use crate::{
     package::{Build, Package, PackageState},
-    settings::{CAN_CONNECT, SETTINGS},
+    settings::{get_setting, set_setting, CAN_CONNECT},
 };
 use clap::{crate_version, ArgMatches};
 use indicatif::MultiProgress;
@@ -115,7 +115,7 @@ pub fn change_self_version(releases: Vec<Release>, version: String) {
         .asset_for(&self_update::get_target())
         .unwrap();
 
-    let archive_path = SETTINGS.read().unwrap().cache_dir.join(asset.name);
+    let archive_path = get_setting().cache_dir.join(asset.name);
     let archive = File::create(&archive_path).unwrap();
 
     self_update::Download::from_url(&asset.download_url)
@@ -145,14 +145,14 @@ pub fn change_self_version(releases: Vec<Release>, version: String) {
     });
 
     self_update::Extract::from_source(&archive_path)
-        .extract_file(&SETTINGS.read().unwrap().cache_dir, &bin_archive_path)
+        .extract_file(&get_setting().cache_dir, &bin_archive_path)
         .unwrap();
 
     // TODO: Offer an option to restore previous version.
     // Could maybe even save them with their versions in the name so it'd be possible
     // to quickly swich them around without having to redownload.
-    let tmp_file = SETTINGS.read().unwrap().cache_dir.join("ablavema_backup");
-    let bin_path = SETTINGS.read().unwrap().cache_dir.join(bin_archive_path);
+    let tmp_file = get_setting().cache_dir.join("ablavema_backup");
+    let bin_path = get_setting().cache_dir.join(bin_archive_path);
     self_update::Move::from_source(&bin_path)
         .replace_using_temp(&tmp_file)
         .to_dest(&current_exe().unwrap())
@@ -160,7 +160,7 @@ pub fn change_self_version(releases: Vec<Release>, version: String) {
 }
 
 pub fn open_blender(package: String, file_path: Option<String>) {
-    let mut cmd = Command::new(SETTINGS.read().unwrap().packages_dir.join(package).join({
+    let mut cmd = Command::new(get_setting().packages_dir.join(package).join({
         if cfg!(target_os = "linux") {
             "blender"
         } else if cfg!(target_os = "windows") {
@@ -211,34 +211,34 @@ fn expand_bool(boolean: &str) -> bool {
 
 fn read_bool_setting(name: &str) -> bool {
     match name {
-        "bypass_launcher" => SETTINGS.read().unwrap().bypass_launcher,
-        "use_latest_as_default" => SETTINGS.read().unwrap().use_latest_as_default,
-        "check_updates_at_launch" => SETTINGS.read().unwrap().check_updates_at_launch,
-        "update_daily" => SETTINGS.read().unwrap().update_daily,
-        "update_branched" => SETTINGS.read().unwrap().update_branched,
-        "update_stable" => SETTINGS.read().unwrap().update_stable,
-        "update_lts" => SETTINGS.read().unwrap().update_lts,
-        "keep_only_latest_daily" => SETTINGS.read().unwrap().keep_only_latest_daily,
-        "keep_only_latest_branched" => SETTINGS.read().unwrap().keep_only_latest_branched,
-        "keep_only_latest_stable" => SETTINGS.read().unwrap().keep_only_latest_stable,
-        "keep_only_latest_lts" => SETTINGS.read().unwrap().keep_only_latest_lts,
+        "bypass_launcher" => get_setting().bypass_launcher,
+        "use_latest_as_default" => get_setting().use_latest_as_default,
+        "check_updates_at_launch" => get_setting().check_updates_at_launch,
+        "update_daily" => get_setting().update_daily,
+        "update_branched" => get_setting().update_branched,
+        "update_stable" => get_setting().update_stable,
+        "update_lts" => get_setting().update_lts,
+        "keep_only_latest_daily" => get_setting().keep_only_latest_daily,
+        "keep_only_latest_branched" => get_setting().keep_only_latest_branched,
+        "keep_only_latest_stable" => get_setting().keep_only_latest_stable,
+        "keep_only_latest_lts" => get_setting().keep_only_latest_lts,
         _ => panic!("Unknown boolean field"),
     }
 }
 
 fn write_bool_setting(name: &str, value: bool) {
     match name {
-        "bypass_launcher" => SETTINGS.write().unwrap().bypass_launcher = value,
-        "use_latest_as_default" => SETTINGS.write().unwrap().use_latest_as_default = value,
-        "check_updates_at_launch" => SETTINGS.write().unwrap().check_updates_at_launch = value,
-        "update_daily" => SETTINGS.write().unwrap().update_daily = value,
-        "update_branched" => SETTINGS.write().unwrap().update_branched = value,
-        "update_stable" => SETTINGS.write().unwrap().update_stable = value,
-        "update_lts" => SETTINGS.write().unwrap().update_lts = value,
-        "keep_only_latest_daily" => SETTINGS.write().unwrap().keep_only_latest_daily = value,
-        "keep_only_latest_branched" => SETTINGS.write().unwrap().keep_only_latest_branched = value,
-        "keep_only_latest_stable" => SETTINGS.write().unwrap().keep_only_latest_stable = value,
-        "keep_only_latest_lts" => SETTINGS.write().unwrap().keep_only_latest_lts = value,
+        "bypass_launcher" => set_setting().bypass_launcher = value,
+        "use_latest_as_default" => set_setting().use_latest_as_default = value,
+        "check_updates_at_launch" => set_setting().check_updates_at_launch = value,
+        "update_daily" => set_setting().update_daily = value,
+        "update_branched" => set_setting().update_branched = value,
+        "update_stable" => set_setting().update_stable = value,
+        "update_lts" => set_setting().update_lts = value,
+        "keep_only_latest_daily" => set_setting().keep_only_latest_daily = value,
+        "keep_only_latest_branched" => set_setting().keep_only_latest_branched = value,
+        "keep_only_latest_stable" => set_setting().keep_only_latest_stable = value,
+        "keep_only_latest_lts" => set_setting().keep_only_latest_lts = value,
         _ => panic!("Unknown boolean field"),
     }
 }
@@ -253,16 +253,14 @@ pub fn get_file_stem(filename: &str) -> &str {
 }
 
 pub fn is_time_to_update() -> bool {
-    if SETTINGS
-        .read()
-        .unwrap()
+    if get_setting()
         .last_update_time
         .elapsed()
         .unwrap()
         .as_secs()
         .checked_div(60)
         .unwrap()
-        >= SETTINGS.read().unwrap().minutes_between_updates
+        >= get_setting().minutes_between_updates
     {
         true
     } else {
