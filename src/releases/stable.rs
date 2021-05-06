@@ -3,7 +3,7 @@ use crate::{
     helpers::{get_document, get_file_stem},
     package::{Build, Os, Package},
     releases::ReleaseType,
-    settings::CONFIG_PATH,
+    settings::SETTINGS,
 };
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
@@ -93,6 +93,6 @@ impl ReleaseType for Stable {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        CONFIG_PATH.parent().unwrap().join("stable_db.bin")
+        SETTINGS.read().unwrap().databases_dir.join("stable.bin")
     }
 }

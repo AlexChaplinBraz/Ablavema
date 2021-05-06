@@ -415,6 +415,8 @@ where
                         let mut package_path =
                             SETTINGS.read().unwrap().packages_dir.join(&package.name);
 
+                        // TODO: Fix moving directories across filesystems.
+                        // Can probably use the `fs_extra` crate, which I'm already depending on.
                         unwrap_or_return!(
                             index,
                             std::fs::rename(

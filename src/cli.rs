@@ -127,6 +127,7 @@ pub async fn run_cli() -> GuiFlags {
         right_ansi_code
     );
 
+    // TODO: Add the path changing to the CLI.
     let args = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())

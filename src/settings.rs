@@ -10,6 +10,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
     env::current_exe,
+    env::var,
     fs::{create_dir_all, File},
     path::PathBuf,
     sync::{
@@ -20,7 +21,8 @@ use std::{
 };
 
 const CONFIG_NAME: &str = "config.bin";
-static PORTABLE: AtomicBool = AtomicBool::new(false);
+pub const CONFIG_FILE_ENV: &str = "ABLAVEMA_CONFIG_FILE";
+pub static PORTABLE: AtomicBool = AtomicBool::new(false);
 pub static CAN_CONNECT: AtomicBool = AtomicBool::new(true);
 pub static ONLY_CLI: AtomicBool = AtomicBool::new(true);
 pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
@@ -30,12 +32,17 @@ pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
 pub const TEXT_SIZE: u16 = 16;
 
 lazy_static! {
-    static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "Ablavema").unwrap();
+    pub static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", "Ablavema").unwrap();
     static ref PORTABLE_PATH: PathBuf = current_exe().unwrap().parent().unwrap().to_path_buf();
     pub static ref CONFIG_PATH: PathBuf = {
         if PORTABLE_PATH.join("portable").exists() {
             PORTABLE.store(true, Ordering::Relaxed);
             PORTABLE_PATH.join(CONFIG_NAME)
+        } else if let Ok(path) = var(CONFIG_FILE_ENV) {
+            // TODO: Probably need to validate config path set with env.
+            let config_path = PathBuf::from(path);
+            create_dir_all(config_path.parent().unwrap()).unwrap();
+            config_path
         } else {
             let config_path = PROJECT_DIRS.config_dir().to_path_buf();
             create_dir_all(&config_path).unwrap();
@@ -61,9 +68,9 @@ pub struct Settings {
     pub keep_only_latest_branched: bool,
     pub keep_only_latest_stable: bool,
     pub keep_only_latest_lts: bool,
+    pub databases_dir: PathBuf,
     pub packages_dir: PathBuf,
     pub cache_dir: PathBuf,
-    pub releases_db: PathBuf,
     pub last_update_time: SystemTime,
     pub filters: Filters,
     pub sort_by: SortBy,
@@ -83,7 +90,7 @@ impl Settings {
             let conf_file = File::open(&*CONFIG_PATH).unwrap();
             let settings: Settings = bincode::deserialize_from(conf_file).unwrap_or_else(|_| {
                 // This is in case the Settings struct changed,
-                // which would just the settings with defaults.
+                // which would just initialise the settings with defaults.
                 let default = Settings::default();
                 let conf_file = File::create(&*CONFIG_PATH).unwrap();
                 bincode::serialize_into(conf_file, &default).unwrap();
@@ -93,18 +100,14 @@ impl Settings {
         };
 
         if PORTABLE.load(Ordering::Relaxed) {
+            settings.databases_dir = PORTABLE_PATH.join("databases");
             settings.packages_dir = PORTABLE_PATH.join("packages");
-            settings.releases_db = PORTABLE_PATH.join("releases_db.bin");
             settings.cache_dir = PORTABLE_PATH.join("cache");
-
-            create_dir_all(&settings.packages_dir).unwrap();
-            create_dir_all(&settings.releases_db.parent().unwrap()).unwrap();
-            create_dir_all(&settings.cache_dir).unwrap();
-        } else {
-            create_dir_all(&settings.packages_dir).unwrap();
-            create_dir_all(&settings.releases_db.parent().unwrap()).unwrap();
-            create_dir_all(&settings.cache_dir).unwrap();
         }
+
+        create_dir_all(&settings.databases_dir).unwrap();
+        create_dir_all(&settings.packages_dir).unwrap();
+        create_dir_all(&settings.cache_dir).unwrap();
 
         settings
     }
@@ -134,9 +137,8 @@ impl Default for Settings {
             keep_only_latest_branched: false,
             keep_only_latest_stable: false,
             keep_only_latest_lts: false,
-            // TODO: Let the user change these locations.
+            databases_dir: PROJECT_DIRS.config_dir().to_path_buf(),
             packages_dir: PROJECT_DIRS.data_local_dir().to_path_buf(),
-            releases_db: PROJECT_DIRS.config_dir().join("releases_db.bin"),
             cache_dir: PROJECT_DIRS.cache_dir().to_path_buf(),
             last_update_time: SystemTime::now()
                 .checked_sub(Duration::from_secs(minutes_between_updates * 60))

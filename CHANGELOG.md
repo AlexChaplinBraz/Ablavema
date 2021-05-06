@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Changing paths to where the databases, packages and cache files are stored.
+  The configuration file's path can be changed with the ABLAVEMA_CONFIG_FILE environment variable.
+
 ### Changed
 
 - From `openssl` to `rustls`, eliminating the OpenSSL dependency.
@@ -16,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `GraphicsAdapterNotFound` on Linux with `noveau` and `radeon` drivers (due to missing Vulkan support)
   by using `iced`'s `glow` rendering backend on Linux.
+
+### Known issues
+
+- `Invalid cross-device link (os error 18)` upon installing a package when the cache and packages folders
+  are located on different mount points.
 
 ## [0.1.0] - 2021-05-03: Minimum Viable Product release
 <!--BEGIN=0.1.0-->

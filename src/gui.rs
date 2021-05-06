@@ -14,7 +14,9 @@ use crate::{
         archived::Archived, branched::Branched, daily::Daily, lts::Lts, stable::Stable,
         ReleaseType, Releases,
     },
-    settings::{ModifierKey, CAN_CONNECT, SETTINGS, TEXT_SIZE},
+    settings::{
+        ModifierKey, CAN_CONNECT, CONFIG_FILE_ENV, PORTABLE, PROJECT_DIRS, SETTINGS, TEXT_SIZE,
+    },
 };
 use clap::crate_version;
 use fs2::available_space;
@@ -25,7 +27,7 @@ use iced::{
     Radio, Row, Rule, Scrollable, Space, Subscription, Text,
 };
 use itertools::Itertools;
-use native_dialog::{MessageDialog, MessageType};
+use native_dialog::{FileDialog, MessageDialog, MessageType};
 use reqwest;
 use self_update::update::Release;
 use serde::{Deserialize, Serialize};
@@ -886,6 +888,51 @@ impl Application for Gui {
                 SETTINGS.read().unwrap().save();
                 Command::none()
             }
+            Message::ChangeLocation(location) => {
+                match location {
+                    Location::Databases => {
+                        if let Some(directory) = FileDialog::new().show_open_single_dir().unwrap() {
+                            SETTINGS.write().unwrap().databases_dir = directory;
+                            SETTINGS.read().unwrap().save();
+                        }
+                    }
+                    Location::Packages => {
+                        if let Some(directory) = FileDialog::new().show_open_single_dir().unwrap() {
+                            SETTINGS.write().unwrap().packages_dir = directory;
+                            SETTINGS.read().unwrap().save();
+                            self.releases.sync();
+                        }
+                    }
+                    Location::Cache => {
+                        if let Some(directory) = FileDialog::new().show_open_single_dir().unwrap() {
+                            SETTINGS.write().unwrap().cache_dir = directory;
+                            SETTINGS.read().unwrap().save();
+                        }
+                    }
+                }
+                Command::none()
+            }
+            Message::ResetLocation(location) => {
+                match location {
+                    Location::Databases => {
+                        SETTINGS.write().unwrap().databases_dir =
+                            PROJECT_DIRS.config_dir().to_path_buf();
+                        SETTINGS.read().unwrap().save();
+                    }
+                    Location::Packages => {
+                        SETTINGS.write().unwrap().packages_dir =
+                            PROJECT_DIRS.data_local_dir().to_path_buf();
+                        SETTINGS.read().unwrap().save();
+                        self.releases.sync();
+                    }
+                    Location::Cache => {
+                        SETTINGS.write().unwrap().cache_dir =
+                            PROJECT_DIRS.cache_dir().to_path_buf();
+                        SETTINGS.read().unwrap().save();
+                    }
+                }
+                Command::none()
+            }
             Message::RemoveDatabases(build_type) => {
                 match build_type {
                     BuildType::All => {
@@ -1273,6 +1320,19 @@ impl Application for Gui {
                     .style(theme.tab_button())
                 };
 
+                let change_location_button = |label, location, state| {
+                    Button::new(state, Text::new(label))
+                        .style(theme.tab_button())
+                        .on_press(Message::ChangeLocation(location))
+                };
+
+                let reset_location_button = |location, state| {
+                    // TODO: Disable button if path is default.
+                    Button::new(state, Text::new("[R]"))
+                        .style(theme.tab_button())
+                        .on_press(Message::ResetLocation(location))
+                };
+
                 let remove_db_button = |label, build_type, exists, state| {
                     let button = Button::new(
                         state,
@@ -1569,6 +1629,64 @@ impl Application for Gui {
                         .push(Column::new()
                             .spacing(10)
                             .width(Length::Fill)
+                            .push(Text::new("Change locations")
+                                .color(theme.highlight_text())
+                                .size(TEXT_SIZE * 2),
+                            ).push(if PORTABLE.load(Ordering::Relaxed) {
+                                Container::new(Text::new("Can't change locations because portable mode is enabled. Delete the \"portable\" file in the executable's directory to disable it.")).width(Length::Fill)
+                            } else {
+                                Container::new(Column::new()
+                                    .spacing(10)
+                                    .width(Length::Fill)
+                                        .push(Text::new(&format!("Ablavema's files are stored in the recommended default locations for every platform, but changing them is possible. To change the location of the configuration file, which is stored by default at '{}' you can set the environment variable {} and it will create that file and use it as the config file, whatever its name is.", PROJECT_DIRS.config_dir().display(), CONFIG_FILE_ENV)))
+                                        .push(Text::new(&format!("Default databases' location: {}\nCurrent databases' location: {}", PROJECT_DIRS.config_dir().display(), SETTINGS.read().unwrap().databases_dir.display())))
+                                        .push(Text::new(&format!("Default packages' location: {}\nCurrent packages' location: {}", PROJECT_DIRS.data_local_dir().display(), SETTINGS.read().unwrap().packages_dir.display())))
+                                        .push(Text::new(&format!("Default cache location: {}\nCurrent cache location: {}", PROJECT_DIRS.cache_dir().display(), SETTINGS.read().unwrap().cache_dir.display())))
+                                        .push(Row::new()
+                                            .spacing(5)
+                                                .push(change_location_button(
+                                                    "Databases",
+                                                    Location::Databases,
+                                                    &mut self.state.change_databases_location_button
+                                                ))
+                                                .push(reset_location_button(
+                                                    Location::Databases,
+                                                    &mut self.state.reset_databases_location_button
+                                                ))
+                                                .push(Space::with_width(Length::Units(15)))
+                                                .push(change_location_button(
+                                                    "Packages",
+                                                    Location::Packages,
+                                                    &mut self.state.change_packages_location_button
+                                                ))
+                                                .push(reset_location_button(
+                                                    Location::Packages,
+                                                    &mut self.state.reset_packages_location_button
+                                                ))
+                                                .push(Space::with_width(Length::Units(15)))
+                                                .push(change_location_button(
+                                                    "Cache",
+                                                    Location::Cache,
+                                                    &mut self.state.change_cache_location_button
+                                                ))
+                                                .push(reset_location_button(
+                                                    Location::Cache,
+                                                    &mut self.state.reset_cache_location_button
+                                                ))
+                                        )
+                                )
+                            }
+                            )
+                        )
+                        .push(Space::with_width(Length::Units(10)))
+                    )
+                    .push(Rule::horizontal(0).style(self.theme))
+                    .push(Row::new()
+                        .align_items(Align::Center)
+                        .push(Space::with_width(Length::Units(10)))
+                        .push(Column::new()
+                            .spacing(10)
+                            .width(Length::Fill)
                             .push(Text::new("Remove databases")
                                 .color(theme.highlight_text())
                                 .size(TEXT_SIZE * 2),
@@ -1628,6 +1746,7 @@ impl Application for Gui {
                                 .size(TEXT_SIZE * 2),
                             )
                             .push(Text::new("Useful for getting rid of a large quantity of packages at once."))
+                            // TODO: Fix slowdowns due to calculating packages' size.
                             .push(Text::new(format!("Space used by installed packages: {:.2} GB\nAvailable space: {:.2} GB", installed_packages_space, packages_dir_available_space)))
                             .push(Row::new()
                                 .spacing(5)
@@ -1683,6 +1802,7 @@ impl Application for Gui {
                                 .size(TEXT_SIZE * 2),
                             )
                             .push(Text::new("Useful for getting rid of the accumulated cache (mainly downloaded packages) since at the moment cache isn't being automatically removed."))
+                            // TODO: Fix slowdowns due to calculating cache size.
                             .push(Text::new(format!("Space used by cache: {:.2} GB\nAvailable space: {:.2} GB", cache_space, cache_dir_available_space)))
                             .push(Button::new(&mut self.state.remove_cache_button,Text::new("Remove all cache"))
                                 .on_press(Message::RemoveCache)
@@ -1973,6 +2093,8 @@ pub enum Message {
     KeepOnlyLatestStable(Choice),
     KeepOnlyLatestLts(Choice),
     ThemeChanged(Theme),
+    ChangeLocation(Location),
+    ResetLocation(Location),
     RemoveDatabases(BuildType),
     RemovePackages(BuildType),
     RemoveCache,
@@ -2012,6 +2134,12 @@ struct GuiState {
     minus_1_button: button::State,
     minus_10_button: button::State,
     minus_100_button: button::State,
+    change_databases_location_button: button::State,
+    reset_databases_location_button: button::State,
+    change_packages_location_button: button::State,
+    reset_packages_location_button: button::State,
+    change_cache_location_button: button::State,
+    reset_cache_location_button: button::State,
     remove_all_dbs_button: button::State,
     remove_daily_db_button: button::State,
     remove_branched_db_button: button::State,
@@ -2472,6 +2600,13 @@ pub enum BuildType {
     Stable,
     Lts,
     Archived,
+}
+
+#[derive(Clone, Debug)]
+pub enum Location {
+    Databases,
+    Packages,
+    Cache,
 }
 
 #[derive(Clone, Debug)]
