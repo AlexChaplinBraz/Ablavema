@@ -1315,12 +1315,21 @@ impl Application for Gui {
                         .on_press(Message::ChangeLocation(location))
                 };
 
-                let reset_location_button = |location, state| {
-                    // TODO: Disable button if path is default.
-                    Button::new(state, Text::new("[R]"))
-                        .style(theme.tab_button())
-                        .on_press(Message::ResetLocation(location))
+                let reset_location_button = |location, default, state| {
+                    let button = Button::new(state, Text::new("[R]")).style(theme.tab_button());
+
+                    if default {
+                        button
+                    } else {
+                        button.on_press(Message::ResetLocation(location))
+                    }
                 };
+
+                let databases_location_is_default =
+                    get_setting().databases_dir == PROJECT_DIRS.config_dir();
+                let packages_location_is_default =
+                    get_setting().packages_dir == PROJECT_DIRS.data_local_dir();
+                let cache_location_is_default = get_setting().cache_dir == PROJECT_DIRS.cache_dir();
 
                 let remove_db_button = |label, build_type, exists, state| {
                     let button = Button::new(
@@ -1639,6 +1648,7 @@ impl Application for Gui {
                                                 ))
                                                 .push(reset_location_button(
                                                     Location::Databases,
+                                                    databases_location_is_default,
                                                     &mut self.state.reset_databases_location_button
                                                 ))
                                                 .push(Space::with_width(Length::Units(15)))
@@ -1649,6 +1659,7 @@ impl Application for Gui {
                                                 ))
                                                 .push(reset_location_button(
                                                     Location::Packages,
+                                                    packages_location_is_default,
                                                     &mut self.state.reset_packages_location_button
                                                 ))
                                                 .push(Space::with_width(Length::Units(15)))
@@ -1659,6 +1670,7 @@ impl Application for Gui {
                                                 ))
                                                 .push(reset_location_button(
                                                     Location::Cache,
+                                                    cache_location_is_default,
                                                     &mut self.state.reset_cache_location_button
                                                 ))
                                         )
