@@ -1256,6 +1256,25 @@ impl Application for Gui {
                 .into()
             }
             Tab::Settings => {
+                let settings_block_intro = |title, description| {
+                    Column::new()
+                        .spacing(10)
+                        .push(
+                            Text::new(title)
+                                .width(Length::Fill)
+                                .horizontal_alignment(HorizontalAlignment::Center)
+                                .size(TEXT_SIZE * 3)
+                                .color(theme.highlight_text()),
+                        )
+                        .push(
+                            Text::new(description)
+                                .width(Length::Fill)
+                                .horizontal_alignment(HorizontalAlignment::Center),
+                        )
+                };
+
+                let separator = || Rule::horizontal(0).style(theme);
+
                 macro_rules! choice_setting {
                     ($title:expr, $description:expr, &$array:expr, $option:expr, $message:expr,) => {
                         Row::new()
@@ -1310,9 +1329,13 @@ impl Application for Gui {
                 };
 
                 let change_location_button = |label, location, state| {
-                    Button::new(state, Text::new(label))
-                        .style(theme.tab_button())
-                        .on_press(Message::ChangeLocation(location))
+                    Button::new(
+                        state,
+                        Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
+                    )
+                    .width(Length::Fill)
+                    .style(theme.tab_button())
+                    .on_press(Message::ChangeLocation(location))
                 };
 
                 let reset_location_button = |location, default, state| {
@@ -1324,12 +1347,6 @@ impl Application for Gui {
                         button.on_press(Message::ResetLocation(location))
                     }
                 };
-
-                let databases_location_is_default =
-                    get_setting().databases_dir == PROJECT_DIRS.config_dir();
-                let packages_location_is_default =
-                    get_setting().packages_dir == PROJECT_DIRS.data_local_dir();
-                let cache_location_is_default = get_setting().cache_dir == PROJECT_DIRS.cache_dir();
 
                 let remove_db_button = |label, build_type, exists, state| {
                     let button = Button::new(
@@ -1438,402 +1455,531 @@ impl Application for Gui {
                     || lts_packages_exist
                     || archived_packages_exist;
 
-                let installed_packages_space = dir::get_size(get_setting().packages_dir.clone())
-                    .unwrap() as f64
-                    / 1024.0
-                    / 1024.0
-                    / 1024.0;
-                let packages_dir_available_space =
-                    available_space(get_setting().packages_dir.clone()).unwrap() as f64
-                        / 1024.0
-                        / 1024.0
-                        / 1024.0;
-                let cache_space = dir::get_size(get_setting().cache_dir.clone()).unwrap() as f64
-                    / 1024.0
-                    / 1024.0
-                    / 1024.0;
-                let cache_dir_available_space = available_space(get_setting().cache_dir.clone())
-                    .unwrap() as f64
-                    / 1024.0
-                    / 1024.0
-                    / 1024.0;
+                let checking_for_updates_block = settings_block_intro(
+                    "Checking for updates",
+                    "\
+These settings affect how checking for updates works. Enabling specific build types also marks \
+the newest package of that build as an update. Keep in mind that you need to first have one \
+installed package of that build type for any newer ones to be marked as an update, even if \
+you're checking for their updates. It is recommended to disable checking for updates for builds \
+that aren't installed to reduce launch time.",
+                );
 
-                let settings = Column::new()
-                    .padding(10)
-                    .spacing(10)
-                    .push(Text::new("Checking for updates")
-                        .width(Length::Fill)
-                        .horizontal_alignment(HorizontalAlignment::Center)
-                        .size(TEXT_SIZE * 3)
-                        .color(theme.highlight_text())
-                    )
-                    .push(Text::new("These settings affect how checking for updates works. Enabling specific build types also marks the newest package of that build as an update. Keep in mind that you need to first have one installed package of that build type for any newer ones to be marked as an update, even if you're checking for their updates. It is recommended to disable checking for updates for builds that aren't installed to reduce launch time."))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Check at launch",
-                        "Increases launch time for about a second or two. Having a delay between checks improves launch speed.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().check_updates_at_launch).unwrap()),
-                        Message::CheckUpdatesAtLaunch,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(Row::new()
+                let check_updates_at_launch = choice_setting!(
+                    "Check at launch",
+                    "Increases Ablavema's launch time for about a second or two.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().check_updates_at_launch).unwrap()),
+                    Message::CheckUpdatesAtLaunch,
+                );
+
+                let minutes_between_updates = {
+                    Row::new()
                         .push(Space::with_width(Length::Units(10)))
-                        .push(Column::new()
-                            .width(Length::Fill)
-                            .spacing(10)
-                            .push(Text::new("Delay between checks")
-                                .color(theme.highlight_text())
-                                .size(TEXT_SIZE * 2)
-                            )
-                            .push(Text::new("Minutes to wait between update checks. Setting it to 0 will make it check every time. Maximum is a day (1440 minutes)."))
+                        .push(
+                            Column::new()
+                                .width(Length::Fill)
+                                .spacing(10)
+                                .push(
+                                    Text::new("Delay between checks")
+                                        .color(theme.highlight_text())
+                                        .size(TEXT_SIZE * 2),
+                                )
+                                .push(Text::new(
+                                    "\
+Minutes to wait between update checks. Setting it to 0 will make it check every time. \
+Maximum is a day (1440 minutes).",
+                                )),
                         )
                         .push(Space::with_width(Length::Units(10)))
-                        .push(Column::new()
-                            .align_items(Align::Center)
-                            .width(Length::Units(150))
-                            .spacing(3)
-                            .push(Row::new()
-                                .push(min_button("+1", 1, &mut self.state.plus_1_button))
-                                .push(min_button("+10", 10, &mut self.state.plus_10_button))
-                                .push(min_button("+100", 100, &mut self.state.plus_100_button))
-                            )
-                            .push(Text::new(get_setting().minutes_between_updates.to_string()))
-                            .push(Row::new()
-                                .push(min_button("-1", -1, &mut self.state.minus_1_button))
-                                .push(min_button("-10", -10, &mut self.state.minus_10_button))
-                                .push(min_button("-100", -100, &mut self.state.minus_100_button))
-                            )
+                        .push(
+                            Column::new()
+                                .align_items(Align::Center)
+                                .width(Length::Units(150))
+                                .spacing(3)
+                                .push(
+                                    Row::new()
+                                        .push(min_button("+1", 1, &mut self.state.plus_1_button))
+                                        .push(min_button("+10", 10, &mut self.state.plus_10_button))
+                                        .push(min_button(
+                                            "+100",
+                                            100,
+                                            &mut self.state.plus_100_button,
+                                        )),
+                                )
+                                .push(Text::new(get_setting().minutes_between_updates.to_string()))
+                                .push(
+                                    Row::new()
+                                        .push(min_button("-1", -1, &mut self.state.minus_1_button))
+                                        .push(min_button(
+                                            "-10",
+                                            -10,
+                                            &mut self.state.minus_10_button,
+                                        ))
+                                        .push(min_button(
+                                            "-100",
+                                            -100,
+                                            &mut self.state.minus_100_button,
+                                        )),
+                                ),
                         )
                         .push(Space::with_width(Length::Units(10)))
-                    )
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Check daily packages",
-                        "Look for new daily packages. Each build, like Alpha and Beta, is considered separate.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().update_daily).unwrap()),
-                        Message::UpdateDaily,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Check branched packages",
-                        "Look for new branched packages. Each branch is considered a separate build.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().update_branched).unwrap()),
-                        Message::UpdateBranched,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Check stable packages",
-                        "Look for new stable packages.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().update_stable).unwrap()),
-                        Message::UpdateStable,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Check LTS packages",
-                        "Look for new LTS packages.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().update_lts).unwrap()),
-                        Message::UpdateLts,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(Text::new("Installing updates")
-                        .width(Length::Fill)
-                        .horizontal_alignment(HorizontalAlignment::Center)
-                        .size(TEXT_SIZE * 3)
-                        .color(theme.highlight_text())
-                    )
-                    .push(Text::new("These settings affect what happens when an update is installed. Turning on old package removal for a build type means not being able to install an older version of the same build, like older LTS versions. So if needed, install those from the Archived packages."))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Use latest as default",
-                        "Change to the latest package of the same build type when installing an update.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().use_latest_as_default).unwrap()),
-                        Message::UseLatestAsDefault,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Keep only newest daily package",
-                        "Remove all older daily packages of its build type when installing an update.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().keep_only_latest_daily).unwrap()),
-                        Message::KeepOnlyLatestDaily,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Keep only newest branched package",
-                        "Remove all older branched packages of its build type when installing an update.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().keep_only_latest_branched).unwrap()),
-                        Message::KeepOnlyLatestBranched,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Keep only newest stable package",
-                        "Remove all older stable packages when installing an update.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().keep_only_latest_stable).unwrap()),
-                        Message::KeepOnlyLatestStable,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Keep only newest LTS package",
-                        "Remove all older LTS packages when installing an update.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().keep_only_latest_lts).unwrap()),
-                        Message::KeepOnlyLatestLts,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(Text::new("Others")
-                        .width(Length::Fill)
-                        .horizontal_alignment(HorizontalAlignment::Center)
-                        .size(TEXT_SIZE * 3)
-                        .color(theme.highlight_text())
-                    )
-                    .push(Text::new("A few miscellaneous but useful settings."))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Bypass launcher",
-                        "The preferred way to use this launcher. If a default package is set and no updates were found, only open launcher when the selected modifier key is held down. This way the launcher only makes itself known if there's an update or if you want to launch a different package.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().bypass_launcher).unwrap()),
-                        Message::BypassLauncher,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Modifier key",
-                        "You can start holding the modifier key even before double clicking on a .blend file or Ablavema shortcut, but you are able to change it if there's any interference.",
-                        &ModifierKey::ALL,
-                        Some(get_setting().modifier_key),
-                        Message::ModifierKey,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Choose the theme",
-                        "Both try to mimic Blender's colour schemes as much as possible.",
-                        &Theme::ALL,
-                        Some(theme),
-                        Message::ThemeChanged,
-                    ))
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(Row::new()
-                        .align_items(Align::Center)
-                        .push(Space::with_width(Length::Units(10)))
-                        .push(Column::new()
+                };
+
+                let check_daily = choice_setting!(
+                    "Check daily packages",
+                    "Look for new daily packages. Each build, like Alpha and Beta, is considered separate.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().update_daily).unwrap()),
+                    Message::UpdateDaily,
+                );
+
+                let check_branched = choice_setting!(
+                    "Check branched packages",
+                    "Look for new branched packages. Each branch is considered a separate build.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().update_branched).unwrap()),
+                    Message::UpdateBranched,
+                );
+
+                let check_stable = choice_setting!(
+                    "Check stable packages",
+                    "Look for new stable packages.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().update_stable).unwrap()),
+                    Message::UpdateStable,
+                );
+
+                let check_lts = choice_setting!(
+                    "Check LTS packages",
+                    "Look for new LTS packages.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().update_lts).unwrap()),
+                    Message::UpdateLts,
+                );
+
+                let installing_updates_block = settings_block_intro(
+                    "Installing updates",
+                    "\
+These settings affect what happens when an update is installed. Turning on old package removal \
+for a build type means not being able to install an older version of the same build, like older \
+LTS versions. So if needed, install those from the Archived packages.",
+                );
+
+                let use_latest_as_default = choice_setting!(
+                    "Use latest as default",
+                    "Change to the latest package of the same build type when installing an update.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().use_latest_as_default).unwrap()),
+                    Message::UseLatestAsDefault,
+                );
+
+                let keep_only_latest_daily = choice_setting!(
+                    "Keep only newest daily package",
+                    "Remove all older daily packages of its build type when installing an update.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().keep_only_latest_daily).unwrap()),
+                    Message::KeepOnlyLatestDaily,
+                );
+
+                let keep_only_latest_branched = choice_setting!(
+                    "Keep only newest branched package",
+                    "Remove all older branched packages of its build type when installing an update.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().keep_only_latest_branched).unwrap()),
+                    Message::KeepOnlyLatestBranched,
+                );
+
+                let keep_only_latest_stable = choice_setting!(
+                    "Keep only newest stable package",
+                    "Remove all older stable packages when installing an update.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().keep_only_latest_stable).unwrap()),
+                    Message::KeepOnlyLatestStable,
+                );
+
+                let keep_only_latest_lts = choice_setting!(
+                    "Keep only newest LTS package",
+                    "Remove all older LTS packages when installing an update.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().keep_only_latest_lts).unwrap()),
+                    Message::KeepOnlyLatestLts,
+                );
+
+                let others_block = settings_block_intro(
+                    "Miscelaneous",
+                    "A few miscellaneous but useful settings.",
+                );
+
+                let bypass_launcher = choice_setting!(
+                    "Bypass launcher",
+                    "\
+The preferred way to use this launcher. If a default package is set and no updates were found, \
+only open launcher when the selected modifier key is held down. This way the launcher only makes \
+itself known if there's an update or if you want to launch a different package.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().bypass_launcher).unwrap()),
+                    Message::BypassLauncher,
+                );
+
+                let modifier_key = choice_setting!(
+                    "Modifier key",
+                    "\
+You can start holding the modifier key even before double clicking on a .blend file or Ablavema \
+shortcut, but you are able to change it if there's any interference.",
+                    &ModifierKey::ALL,
+                    Some(get_setting().modifier_key),
+                    Message::ModifierKey,
+                );
+
+                let choose_theme = choice_setting!(
+                    "Choose the theme",
+                    "Both try to mimic Blender's colour schemes as much as possible.",
+                    &Theme::ALL,
+                    Some(theme),
+                    Message::ThemeChanged,
+                );
+
+                let change_location = Row::new()
+                    .align_items(Align::Center)
+                    .push(Space::with_width(Length::Units(10)))
+                    .push(
+                        Column::new()
                             .spacing(10)
                             .width(Length::Fill)
-                            .push(Text::new("Change locations")
-                                .color(theme.highlight_text())
-                                .size(TEXT_SIZE * 2),
-                            ).push(if PORTABLE.load(Ordering::Relaxed) {
-                                Container::new(Text::new("Can't change locations because portable mode is enabled. Delete the \"portable\" file in the executable's directory to disable it.")).width(Length::Fill)
+                            .push(
+                                Text::new("Change locations")
+                                    .color(theme.highlight_text())
+                                    .size(TEXT_SIZE * 2),
+                            )
+                            .push(if PORTABLE.load(Ordering::Relaxed) {
+                                Container::new(Text::new(
+                                    "\
+Can't change locations because portable mode is enabled. Delete the \"portable\" file in the \
+executable's directory to disable it.",
+                                ))
+                                .width(Length::Fill)
                             } else {
-                                Container::new(Column::new()
-                                    .spacing(10)
-                                    .width(Length::Fill)
-                                        .push(Text::new(&format!("Ablavema's files are stored in the recommended default locations for every platform, but changing them is possible. To change the location of the configuration file, which is stored by default at '{}' you can set the environment variable {} and it will create that file and use it as the config file, whatever its name is.", PROJECT_DIRS.config_dir().display(), CONFIG_FILE_ENV)))
-                                        .push(Text::new(&format!("Default databases' location: {}\nCurrent databases' location: {}", PROJECT_DIRS.config_dir().display(), get_setting().databases_dir.display())))
-                                        .push(Text::new(&format!("Default packages' location: {}\nCurrent packages' location: {}", PROJECT_DIRS.data_local_dir().display(), get_setting().packages_dir.display())))
-                                        .push(Text::new(&format!("Default cache location: {}\nCurrent cache location: {}", PROJECT_DIRS.cache_dir().display(), get_setting().cache_dir.display())))
-                                        .push(Row::new()
-                                            .spacing(5)
+                                Container::new(
+                                    Column::new()
+                                        .spacing(10)
+                                        .width(Length::Fill)
+                                        .push(Text::new(
+                                            "\
+Ablavema's files are stored in the recommended default locations for every platform, but \
+changing them is possible.",
+                                        ))
+                                        .push(Text::new(&format!(
+                                            "\
+To change the location of the configuration file, which is located by default at '{}' you can \
+set the environment variable {} and it will create that file and use it as the config file, \
+whatever its name is.",
+                                            PROJECT_DIRS.config_dir().display(),
+                                            CONFIG_FILE_ENV
+                                        )))
+                                        .push(Text::new(&format!(
+                                            "Databases: {}\nPackages: {}\nCache: {}",
+                                            get_setting().databases_dir.display(),
+                                            get_setting().packages_dir.display(),
+                                            get_setting().cache_dir.display()
+                                        )))
+                                        .push(
+                                            Row::new()
+                                                .spacing(5)
                                                 .push(change_location_button(
                                                     "Databases",
                                                     Location::Databases,
-                                                    &mut self.state.change_databases_location_button
+                                                    &mut self
+                                                        .state
+                                                        .change_databases_location_button,
                                                 ))
                                                 .push(reset_location_button(
                                                     Location::Databases,
-                                                    databases_location_is_default,
-                                                    &mut self.state.reset_databases_location_button
+                                                    get_setting().databases_dir
+                                                        == PROJECT_DIRS.config_dir(),
+                                                    &mut self.state.reset_databases_location_button,
                                                 ))
                                                 .push(Space::with_width(Length::Units(15)))
                                                 .push(change_location_button(
                                                     "Packages",
                                                     Location::Packages,
-                                                    &mut self.state.change_packages_location_button
+                                                    &mut self.state.change_packages_location_button,
                                                 ))
                                                 .push(reset_location_button(
                                                     Location::Packages,
-                                                    packages_location_is_default,
-                                                    &mut self.state.reset_packages_location_button
+                                                    get_setting().packages_dir
+                                                        == PROJECT_DIRS.data_local_dir(),
+                                                    &mut self.state.reset_packages_location_button,
                                                 ))
                                                 .push(Space::with_width(Length::Units(15)))
                                                 .push(change_location_button(
                                                     "Cache",
                                                     Location::Cache,
-                                                    &mut self.state.change_cache_location_button
+                                                    &mut self.state.change_cache_location_button,
                                                 ))
                                                 .push(reset_location_button(
                                                     Location::Cache,
-                                                    cache_location_is_default,
-                                                    &mut self.state.reset_cache_location_button
-                                                ))
-                                        )
+                                                    get_setting().cache_dir
+                                                        == PROJECT_DIRS.cache_dir(),
+                                                    &mut self.state.reset_cache_location_button,
+                                                )),
+                                        ),
                                 )
-                            }
-                            )
-                        )
-                        .push(Space::with_width(Length::Units(10)))
+                            }),
                     )
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(Row::new()
-                        .align_items(Align::Center)
-                        .push(Space::with_width(Length::Units(10)))
-                        .push(Column::new()
+                    .push(Space::with_width(Length::Units(10)));
+
+                let remove_databases = Row::new()
+                    .align_items(Align::Center)
+                    .push(Space::with_width(Length::Units(10)))
+                    .push(
+                        Column::new()
                             .spacing(10)
                             .width(Length::Fill)
-                            .push(Text::new("Remove databases")
-                                .color(theme.highlight_text())
-                                .size(TEXT_SIZE * 2),
+                            .push(
+                                Text::new("Remove databases")
+                                    .color(theme.highlight_text())
+                                    .size(TEXT_SIZE * 2),
                             )
-                            .push(Text::new("Useful for when a release candidate is still available even though it doesn't appear in the website anymore. Keep in mind that bookmarks are stored in the databases, so they will be lost. Also, any installed package that's no longer available, like with old daily and branched packages, won't reapear."))
-                            .push(Row::new()
-                                .spacing(5)
-                                .push(remove_db_button(
-                                    "All",
-                                    BuildType::All,
-                                    any_dbs_exist,
-                                    &mut self.state.remove_all_dbs_button
-                                ))
-                                .push(remove_db_button(
-                                    "Daily",
-                                    BuildType::Daily,
-                                    daily_db_exists,
-                                    &mut self.state.remove_daily_db_button
-                                ))
-                                .push(remove_db_button(
-                                    "Branched",
-                                    BuildType::Branched,
-                                    branched_db_exists,
-                                    &mut self.state.remove_branched_db_button
-                                ))
-                                .push(remove_db_button(
-                                    "Stable",
-                                    BuildType::Stable,
-                                    stable_db_exists,
-                                    &mut self.state.remove_stable_db_button
-                                ))
-                                .push(remove_db_button(
-                                    "LTS",
-                                    BuildType::Lts,
-                                    lts_db_exists,
-                                    &mut self.state.remove_lts_db_button
-                                ))
-                                .push(remove_db_button(
-                                    "Archived",
-                                    BuildType::Archived,
-                                    archived_db_exists,
-                                    &mut self.state.remove_archived_db_button
-                                ))
-                            )
-                        )
-                        .push(Space::with_width(Length::Units(10)))
+                            .push(Text::new(
+                                "\
+Useful for when a release candidate is still available even though it doesn't appear in the \
+website anymore. Keep in mind that bookmarks are stored in the databases, so they will be lost. \
+Also, any installed package that's no longer available, like with old daily and branched \
+packages, won't reapear.",
+                            ))
+                            .push(
+                                Row::new()
+                                    .spacing(20)
+                                    .push(remove_db_button(
+                                        "All",
+                                        BuildType::All,
+                                        any_dbs_exist,
+                                        &mut self.state.remove_all_dbs_button,
+                                    ))
+                                    .push(remove_db_button(
+                                        "Daily",
+                                        BuildType::Daily,
+                                        daily_db_exists,
+                                        &mut self.state.remove_daily_db_button,
+                                    ))
+                                    .push(remove_db_button(
+                                        "Branched",
+                                        BuildType::Branched,
+                                        branched_db_exists,
+                                        &mut self.state.remove_branched_db_button,
+                                    ))
+                                    .push(remove_db_button(
+                                        "Stable",
+                                        BuildType::Stable,
+                                        stable_db_exists,
+                                        &mut self.state.remove_stable_db_button,
+                                    ))
+                                    .push(remove_db_button(
+                                        "LTS",
+                                        BuildType::Lts,
+                                        lts_db_exists,
+                                        &mut self.state.remove_lts_db_button,
+                                    ))
+                                    .push(remove_db_button(
+                                        "Archived",
+                                        BuildType::Archived,
+                                        archived_db_exists,
+                                        &mut self.state.remove_archived_db_button,
+                                    )),
+                            ),
                     )
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(Row::new()
-                        .align_items(Align::Center)
-                        .push(Space::with_width(Length::Units(10)))
-                        .push(Column::new()
+                    .push(Space::with_width(Length::Units(10)));
+
+                let remove_packages = Row::new()
+                    .align_items(Align::Center)
+                    .push(Space::with_width(Length::Units(10)))
+                    .push(
+                        Column::new()
                             .spacing(10)
                             .width(Length::Fill)
-                            .push(Text::new("Remove packages")
-                                .color(theme.highlight_text())
-                                .size(TEXT_SIZE * 2),
+                            .push(
+                                Text::new("Remove packages")
+                                    .color(theme.highlight_text())
+                                    .size(TEXT_SIZE * 2),
                             )
-                            .push(Text::new("Useful for getting rid of a large quantity of packages at once."))
+                            .push(Text::new(
+                                "\
+Useful for getting rid of a large quantity of packages at the same time.",
+                            ))
                             // TODO: Fix slowdowns due to calculating packages' size.
-                            .push(Text::new(format!("Space used by installed packages: {:.2} GB\nAvailable space: {:.2} GB", installed_packages_space, packages_dir_available_space)))
-                            .push(Row::new()
-                                .spacing(5)
-                                .push(remove_packages_button(
-                                    "All",
-                                    BuildType::All,
-                                    any_packages_exist,
-                                    &mut self.state.remove_all_packages_button
-                                ))
-                                .push(remove_packages_button(
-                                    "Daily",
-                                    BuildType::Daily,
-                                    daily_packages_exist,
-                                    &mut self.state.remove_daily_packages_button
-                                ))
-                                .push(remove_packages_button(
-                                    "Branched",
-                                    BuildType::Branched,
-                                    branched_packages_exist,
-                                    &mut self.state.remove_branched_packages_button
-                                ))
-                                .push(remove_packages_button(
-                                    "Stable",
-                                    BuildType::Stable,
-                                    stable_packages_exist,
-                                    &mut self.state.remove_stable_packages_button
-                                ))
-                                .push(remove_packages_button(
-                                    "LTS",
-                                    BuildType::Lts,
-                                    lts_packages_exist,
-                                    &mut self.state.remove_lts_packages_button
-                                ))
-                                .push(remove_packages_button(
-                                    "Archived",
-                                    BuildType::Archived,
-                                    archived_packages_exist,
-                                    &mut self.state.remove_archived_packages_button
-                                ))
-                            )
-                        )
-                        .push(Space::with_width(Length::Units(10)))
+                            .push(Text::new(format!(
+                                "Space used by packages: {:.2} GB\nAvailable space: {:.2} GB",
+                                dir::get_size(get_setting().packages_dir.clone()).unwrap() as f64
+                                    / 1024.0
+                                    / 1024.0
+                                    / 1024.0,
+                                available_space(get_setting().packages_dir.clone()).unwrap() as f64
+                                    / 1024.0
+                                    / 1024.0
+                                    / 1024.0
+                            )))
+                            .push(
+                                Row::new()
+                                    .spacing(20)
+                                    .push(remove_packages_button(
+                                        "All",
+                                        BuildType::All,
+                                        any_packages_exist,
+                                        &mut self.state.remove_all_packages_button,
+                                    ))
+                                    .push(remove_packages_button(
+                                        "Daily",
+                                        BuildType::Daily,
+                                        daily_packages_exist,
+                                        &mut self.state.remove_daily_packages_button,
+                                    ))
+                                    .push(remove_packages_button(
+                                        "Branched",
+                                        BuildType::Branched,
+                                        branched_packages_exist,
+                                        &mut self.state.remove_branched_packages_button,
+                                    ))
+                                    .push(remove_packages_button(
+                                        "Stable",
+                                        BuildType::Stable,
+                                        stable_packages_exist,
+                                        &mut self.state.remove_stable_packages_button,
+                                    ))
+                                    .push(remove_packages_button(
+                                        "LTS",
+                                        BuildType::Lts,
+                                        lts_packages_exist,
+                                        &mut self.state.remove_lts_packages_button,
+                                    ))
+                                    .push(remove_packages_button(
+                                        "Archived",
+                                        BuildType::Archived,
+                                        archived_packages_exist,
+                                        &mut self.state.remove_archived_packages_button,
+                                    )),
+                            ),
                     )
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(Row::new()
-                        .align_items(Align::Center)
-                        .push(Space::with_width(Length::Units(10)))
-                        .push(Column::new()
+                    .push(Space::with_width(Length::Units(10)));
+
+                let remove_cache = Row::new()
+                    .align_items(Align::Center)
+                    .push(Space::with_width(Length::Units(10)))
+                    .push(
+                        Column::new()
                             .spacing(10)
                             .width(Length::Fill)
-                            .push(Text::new("Remove cache")
-                                .color(theme.highlight_text())
-                                .size(TEXT_SIZE * 2),
+                            .push(
+                                Text::new("Remove cache")
+                                    .color(theme.highlight_text())
+                                    .size(TEXT_SIZE * 2),
                             )
-                            .push(Text::new("Useful for getting rid of the accumulated cache (mainly downloaded packages) since at the moment cache isn't being automatically removed."))
+                            .push(Text::new(
+                                "\
+Useful for getting rid of the accumulated cache (mainly downloaded packages) since at the moment \
+cache isn't being automatically removed.",
+                            ))
                             // TODO: Fix slowdowns due to calculating cache size.
-                            .push(Text::new(format!("Space used by cache: {:.2} GB\nAvailable space: {:.2} GB", cache_space, cache_dir_available_space)))
-                            .push(Button::new(&mut self.state.remove_cache_button,Text::new("Remove all cache"))
-                                .on_press(Message::RemoveCache)
-                                .style(self.theme.tab_button())
-                            )
-                        )
-                        .push(Space::with_width(Length::Units(10)))
+                            .push(Text::new(format!(
+                                "Space used by cache: {:.2} GB\nAvailable space: {:.2} GB",
+                                dir::get_size(get_setting().cache_dir.clone()).unwrap() as f64
+                                    / 1024.0
+                                    / 1024.0
+                                    / 1024.0,
+                                available_space(get_setting().cache_dir.clone()).unwrap() as f64
+                                    / 1024.0
+                                    / 1024.0
+                                    / 1024.0
+                            )))
+                            .push(
+                                Row::new().push(
+                                    Button::new(
+                                        &mut self.state.remove_cache_button,
+                                        Text::new("Remove all cache")
+                                            .horizontal_alignment(HorizontalAlignment::Center),
+                                    )
+                                    .on_press(Message::RemoveCache)
+                                    .width(Length::Fill)
+                                    .style(self.theme.tab_button()),
+                                ),
+                            ),
                     )
-                    .push(Rule::horizontal(0).style(self.theme))
-                    .push(choice_setting!(
-                        "Self-updater",
-                        "Update the launcher itself through the built-in system. This enables a hidden tab dedicated to updating, which can also be used to read the release notes of every version. Keep in mind that if Ablavema is installed through a package manager, the laucher should be updated through it. Though if made use of even if installed through a package manager, upon updating it through the package manager the executable would simply be replaced with the newer one, same as if done through the built-in system. In this way, making use of this feature is helpful when trying out older versions to see if a bug was there before or whatnot.",
-                        &Choice::ALL,
-                        Some(choice(get_setting().self_updater).unwrap()),
-                        Message::SelfUpdater,
-                    ));
+                    .push(Space::with_width(Length::Units(10)));
+
+                let self_updater = choice_setting!(
+                    "Self-updater",
+                    "\
+Update the launcher itself through the built-in system. This enables a hidden tab dedicated to \
+updating, which can also be used to read the release notes of every version. Keep in mind that \
+if Ablavema is installed through a package manager, the laucher should be updated through it.
+
+Though if made use of even if installed through a package manager, upon updating Ablavema the \
+executable would simply be replaced with the newer one, same as if done through the built-in \
+self-updater. In this way, making use of this feature is helpful when trying out older versions \
+to see if a bug was there before or whatnot.",
+                    &Choice::ALL,
+                    Some(choice(get_setting().self_updater).unwrap()),
+                    Message::SelfUpdater,
+                );
+
+                let settings = Column::new()
+                    .padding(10)
+                    .spacing(10)
+                    .push(checking_for_updates_block)
+                    .push(separator())
+                    .push(check_updates_at_launch)
+                    .push(separator())
+                    .push(minutes_between_updates)
+                    .push(separator())
+                    .push(check_daily)
+                    .push(separator())
+                    .push(check_branched)
+                    .push(separator())
+                    .push(check_stable)
+                    .push(separator())
+                    .push(check_lts)
+                    .push(separator())
+                    .push(installing_updates_block)
+                    .push(separator())
+                    .push(use_latest_as_default)
+                    .push(separator())
+                    .push(keep_only_latest_daily)
+                    .push(separator())
+                    .push(keep_only_latest_branched)
+                    .push(separator())
+                    .push(keep_only_latest_stable)
+                    .push(separator())
+                    .push(keep_only_latest_lts)
+                    .push(separator())
+                    .push(others_block)
+                    .push(separator())
+                    .push(bypass_launcher)
+                    .push(separator())
+                    .push(modifier_key)
+                    .push(separator())
+                    .push(choose_theme)
+                    .push(separator())
+                    .push(change_location)
+                    .push(separator())
+                    .push(remove_databases)
+                    .push(separator())
+                    .push(remove_packages)
+                    .push(separator())
+                    .push(remove_cache)
+                    .push(separator())
+                    .push(self_updater);
 
                 Container::new(Scrollable::new(&mut self.state.settings_scroll).push(
                     if get_setting().self_updater {
-                        settings
-                            .push(Rule::horizontal(0).style(self.theme))
-                            .push(choice_setting!(
-                                "Check for Ablavema updates at launch",
-                                "This uses the same delay as the normal updates. Keep in mind that, at the moment, if you downgrade you will be prompted to update Ablavema every time updates are checked.",
-                                &Choice::ALL,
-                                Some(
-                                    choice(get_setting().check_self_updates_at_launch)
-                                        .unwrap()
-                                ),
-                                Message::CheckSelfUpdatesAtLaunch,
-                            ))
+                        settings.push(separator()).push(choice_setting!(
+                            "Check for Ablavema updates at launch",
+                            "\
+This uses the same delay as the normal updates. Keep in mind that, at the moment, if you \
+downgrade you will be prompted to update Ablavema every time updates are checked.",
+                            &Choice::ALL,
+                            Some(choice(get_setting().check_self_updates_at_launch).unwrap()),
+                            Message::CheckSelfUpdatesAtLaunch,
+                        ))
                     } else {
                         settings
                     },
