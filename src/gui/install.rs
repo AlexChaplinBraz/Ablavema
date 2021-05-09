@@ -246,22 +246,16 @@ where
                                 // This handles some archives that don't have an inner directory.
                                 let extraction_dir =
                                     match file.file_name().unwrap().to_str().unwrap() {
-                                        "blender-2.49-win64.zip" => SETTINGS
-                                            .read()
-                                            .unwrap()
-                                            .cache_dir
-                                            .join("blender-2.49-win64"),
-                                        "blender-2.49a-win64-python26.zip" => SETTINGS
-                                            .read()
-                                            .unwrap()
+                                        "blender-2.49-win64.zip" => {
+                                            get_setting().cache_dir.join("blender-2.49-win64")
+                                        }
+                                        "blender-2.49a-win64-python26.zip" => get_setting()
                                             .cache_dir
                                             .join("blender-2.49a-win64-python26"),
-                                        "blender-2.49b-win64-python26.zip" => SETTINGS
-                                            .read()
-                                            .unwrap()
+                                        "blender-2.49b-win64-python26.zip" => get_setting()
                                             .cache_dir
                                             .join("blender-2.49b-win64-python26"),
-                                        _ => GetSetting().cache_dir.clone(),
+                                        _ => get_setting().cache_dir.clone(),
                                     };
 
                                 let total = archive.len() as u64;
