@@ -197,16 +197,16 @@ jobs:
 
       - name: Prepare PKGBUILD
         run: |
-          eval $(grep 'pkgtarget=' PKGBUILD)
+          eval $(grep 'pkgtarget=' extra/linux/PKGBUILD)
           wget 'https://github.com/AlexChaplinBraz/Ablavema/releases/download/${{ env.RELEASE_VERSION }}/ablavema-${{ env.RELEASE_VERSION }}.sha256'
           sha256=$(grep $pkgtarget ablavema-${{ env.RELEASE_VERSION }}.sha256 | cut -d ' ' -f1)
-          sed -i "s/REPLACE_RELEASE_VERSION/${{ env.RELEASE_VERSION }}/;s/REPLACE_SHA256SUMS_X86_64/$sha256/" PKGBUILD
+          sed -i "s/REPLACE_RELEASE_VERSION/${{ env.RELEASE_VERSION }}/;s/REPLACE_SHA256SUMS_X86_64/$sha256/" extra/linux/PKGBUILD
 
       - name: Publish to the AUR
         uses: KSXGitHub/github-actions-deploy-aur@v2
         with:
           pkgname: ablavema-bin
-          pkgbuild: PKGBUILD
+          pkgbuild: extra/linux/PKGBUILD
           commit_username: ${{ secrets.AUR_USERNAME }}
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}

@@ -24,7 +24,7 @@ were a shortcut. All its related files are created and stored in the relevant Ap
 
 Ablavema can also be installed with [`Scoop`](https://scoop.sh/):
 
-`scoop install https://raw.githubusercontent.com/AlexChaplinBraz/Ablavema/master/ablavema.json`
+`scoop install https://raw.githubusercontent.com/AlexChaplinBraz/Ablavema/master/extra/scoop/ablavema.json`
 
 ### Linux
 
