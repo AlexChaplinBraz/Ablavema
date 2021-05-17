@@ -7,7 +7,8 @@ use self::{
 };
 use crate::{
     helpers::{
-        change_self_version, check_connection, check_self_updates, get_self_releases, open_blender,
+        change_self_version, check_connection, check_self_updates, fetch_self_releases,
+        open_blender,
     },
     package::{Build, Package, PackageState, PackageStatus},
     releases::{
@@ -38,6 +39,7 @@ use std::{
     iter, process,
     sync::atomic::Ordering,
 };
+use tokio::task::spawn_blocking;
 use webbrowser;
 
 #[derive(Debug)]
@@ -166,8 +168,14 @@ impl Gui {
         check_connection().await;
     }
 
+    async fn fetch_self_releases() -> Option<Vec<Release>> {
+        spawn_blocking(|| fetch_self_releases()).await.unwrap()
+    }
+
     async fn change_self_version(releases: Vec<Release>, version: String) {
-        change_self_version(releases, version);
+        spawn_blocking(|| change_self_version(releases, version))
+            .await
+            .unwrap();
     }
 }
 
@@ -1005,13 +1013,18 @@ impl Application for Gui {
                 Command::none()
             }
             Message::FetchSelfReleases => {
-                self.self_releases = get_self_releases();
+                self.state.fetching_self_releases = true;
+                Command::perform(Gui::fetch_self_releases(), Message::PopulateSelfReleases)
+            }
+            Message::PopulateSelfReleases(self_releases) => {
+                self.self_releases = self_releases;
                 if let Some(releases) = &self.self_releases {
                     self.state.release_versions = releases
                         .iter()
                         .map(|release| release.version.clone())
                         .collect();
                 }
+                self.state.fetching_self_releases = false;
                 Command::none()
             }
             Message::PickListVersionSelected(version) => {
@@ -2037,7 +2050,9 @@ downgrade you will be prompted to update Ablavema every time updates are checked
                                             Text::new("Fetch releases"),
                                         )
                                         .style(theme);
-                                        if CAN_CONNECT.load(Ordering::Relaxed) {
+                                        if CAN_CONNECT.load(Ordering::Relaxed)
+                                            && !self.state.fetching_self_releases
+                                        {
                                             // TODO: Check connectivity on press.
                                             button.on_press(Message::FetchSelfReleases)
                                         } else {
@@ -2247,6 +2262,7 @@ pub enum Message {
     SelfUpdater(Choice),
     CheckSelfUpdatesAtLaunch(Choice),
     FetchSelfReleases,
+    PopulateSelfReleases(Option<Vec<Release>>),
     PickListVersionSelected(String),
     ChangeVersion,
     VersionChanged(()),
@@ -2301,6 +2317,7 @@ struct GuiState {
     remove_cache_button: button::State,
     release_versions: Vec<String>,
     fetch_self_releases_button: button::State,
+    fetching_self_releases: bool,
     self_updater_pick_list: pick_list::State<String>,
     self_updater_pick_list_selected: String,
     install_self_version_button: button::State,

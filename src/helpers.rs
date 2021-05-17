@@ -72,7 +72,7 @@ pub async fn get_document(url: &str) -> Document {
     Document::from_read(&resp[..]).unwrap()
 }
 
-pub fn get_self_releases() -> Option<Vec<Release>> {
+pub fn fetch_self_releases() -> Option<Vec<Release>> {
     let releases = ReleaseList::configure()
         .repo_owner("AlexChaplinBraz")
         .repo_name("Ablavema")

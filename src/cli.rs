@@ -2,7 +2,7 @@
 use crate::{
     gui::GuiFlags,
     helpers::{
-        check_self_updates, cli_install, cli_list_narrow, cli_list_wide, get_self_releases,
+        check_self_updates, cli_install, cli_list_narrow, cli_list_wide, fetch_self_releases,
         is_time_to_update, process_bool_arg,
     },
     releases::{ReleaseType, Releases},
@@ -912,7 +912,7 @@ pub async fn run_cli() -> GuiFlags {
                 && is_time_to_update()
                 && CAN_CONNECT.load(Ordering::Relaxed)
             {
-                self_releases = get_self_releases();
+                self_releases = fetch_self_releases();
 
                 if let Some(updates) = check_self_updates(&self_releases) {
                     println!(

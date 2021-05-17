@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `GraphicsAdapterNotFound` on Linux with `noveau` and `radeon` drivers (due to missing Vulkan support)
   by using `iced`'s `glow` rendering backend on Linux.
+- Self-updater not working anymore even though nothing changed and it still works in the 0.1.0 release.
 
 ### Known issues
 
