@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Windows icon.
 - Changing paths to where the databases, packages and cache files are stored.
   The configuration file's path can be changed with the ABLAVEMA_CONFIG_FILE environment variable.
 
