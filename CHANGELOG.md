@@ -64,5 +64,5 @@ Noncomprehensive list of features available at launch.
 - CLI on Windows has no colour. Waiting for `clap` 3.0.0 to be released.
 - No macOS release.
 <!--END=0.1.0-->
-[Unreleased]: https://github.com/AlexChaplinBraz/Ablavema/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/AlexChaplinBraz/Ablavema/releases/tag/v0.1.0
+[Unreleased]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.1.0...HEAD
+[0.1.0]: https://github.com/AlexChaplinBraz/Ablavema/releases/tag/0.1.0
