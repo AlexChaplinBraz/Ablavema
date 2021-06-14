@@ -337,7 +337,11 @@ impl Package {
         format!(
             "{} ({})",
             self.date.format("%B %d, %Y - %T"),
-            formatter.convert(duration.to_std().unwrap())
+            // TODO: Properly get date-time based on timezone.
+            // It worked miraculously for me all this time, but now `Utc::now()` gives me
+            // a time one hour behind the date scraped from blender.org so this is inaccurate.
+            // I should switch from NaiveDateTime to DateTime so I can properly calculate time.
+            formatter.convert(duration.to_std().unwrap_or_default())
         )
     }
 

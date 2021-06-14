@@ -26,11 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Panic on finding new stable/LTS packages with outdated archived package list. Happened because the exact time was
   taken from the equivalent package in the archived list. Now it'll just stay at 00:00:00 until the new archived
   packages are fetched.
+- `OutOfRangeError` due to the difference in timezones when calculating how long ago a package was released.
 
 ### Known issues
 
 - `Invalid cross-device link (os error 18)` upon installing a package when the cache and packages folders
   are located on different mount points.
+- The "how long ago" indicator for the package dates is inaccurate if the user's timezone differs from the one used
+  by the Blender Foundation. 
 
 ## [0.1.0] - 2021-05-03: Minimum Viable Product release
 <!--BEGIN=0.1.0-->
