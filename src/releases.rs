@@ -10,15 +10,16 @@ use self::{
     stable::Stable,
 };
 use crate::{
-    helpers::ReturnOption,
-    package::{Build, Package, PackageState, PackageStatus},
+    helpers::{get_document, get_file_stem, ReturnOption},
+    package::{Build, Os, Package, PackageState, PackageStatus},
     settings::{get_setting, init_settings, save_settings, set_setting, CAN_CONNECT},
 };
 use async_trait::async_trait;
 use bincode;
-use chrono::NaiveTime;
+use chrono::{Datelike, NaiveDateTime, NaiveTime, Utc};
 use indicatif::MultiProgress;
 use reqwest;
+use select::predicate::{And, Class, Name};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fs::{remove_file, File},
@@ -27,6 +28,7 @@ use std::{
     sync::atomic::Ordering,
     time::SystemTime,
 };
+use versions::Versioning;
 
 #[derive(Debug, Default)]
 pub struct Releases {
@@ -372,6 +374,78 @@ pub trait ReleaseType:
 {
     async fn fetch() -> Self;
 
+    async fn fetch_from_builder(builder_builds_type: BuilderBuildsType) -> Self {
+        let document = get_document(builder_builds_type.get_url()).await;
+        let mut packages = Self::default();
+
+        let (platform, os) = {
+            if cfg!(target_os = "linux") {
+                ("platform-linux", Os::Linux)
+            } else if cfg!(target_os = "windows") {
+                ("platform-windows", Os::Windows)
+            } else if cfg!(target_os = "macos") {
+                ("platform-darwin", Os::MacOs)
+            } else {
+                unreachable!("Unsupported OS");
+            }
+        };
+
+        let builds_list = document
+            .find(And(Class("builds-list"), Class(platform)))
+            .next()
+            .unwrap();
+
+        for build in builds_list.find(Class("os")) {
+            let mut package = Package::default();
+
+            package.url = build
+                .find(Name("a"))
+                .next()
+                .unwrap()
+                .attr("href")
+                .unwrap()
+                .to_string();
+
+            if package.url.ends_with(".sha256") {
+                continue;
+            }
+
+            package.name = get_file_stem(&package.url).to_string();
+
+            let build_name = build.find(Class("build-var")).next().unwrap().text();
+            package.build = match builder_builds_type {
+                BuilderBuildsType::Daily => Build::Daily(build_name),
+                BuilderBuildsType::Branched => Build::Branched(build_name),
+            };
+
+            package.version = Versioning::new(
+                build
+                    .find(Class("name"))
+                    .next()
+                    .unwrap()
+                    .text()
+                    .split_whitespace()
+                    .skip(1)
+                    .next()
+                    .unwrap(),
+            )
+            .unwrap();
+
+            let small_subtext = build.find(Name("small")).next().unwrap().text();
+            let parts: Vec<&str> = small_subtext.split_terminator(" - ").collect();
+            let date = format!("{}-{}", parts[0], Utc::today().year());
+            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
+            package.commit = parts[2].to_string();
+
+            package.os = os;
+
+            packages.push(package);
+        }
+
+        packages.sort();
+        packages
+    }
+
     async fn get_new_packages(&self) -> Option<Self> {
         let mut fetched_packages = Self::fetch().await;
         let mut new_packages = Self::default();
@@ -593,6 +667,29 @@ pub trait ReleaseType:
             remove_file(database).unwrap();
             println!("{} database removed.", name);
             *self = Self::default();
+        }
+    }
+}
+
+pub enum BuilderBuildsType {
+    // TODO: Add support for all the other new types.
+    // Would require more than a few changes to the GUI and the logic behind some parts.
+    Daily,
+    // TODO: Rename "Branched" back to "Experimental".
+    // I used "branched" to have more or less the same character width for easier GUI building,
+    // but after adding the archived types for each of the four build types, the names will be too
+    // long anyway, so I might as well use the official "experimental" moniker.
+    Branched,
+}
+
+impl BuilderBuildsType {
+    const DAILY_URL: &'static str = "https://builder.blender.org/download/daily/";
+    const BRANCHED_URL: &'static str = "https://builder.blender.org/download/experimental/";
+
+    fn get_url(&self) -> &'static str {
+        match self {
+            BuilderBuildsType::Daily => Self::DAILY_URL,
+            BuilderBuildsType::Branched => Self::BRANCHED_URL,
         }
     }
 }

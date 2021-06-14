@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   taken from the equivalent package in the archived list. Now it'll just stay at 00:00:00 until the new archived
   packages are fetched.
 - `OutOfRangeError` due to the difference in timezones when calculating how long ago a package was released.
+- Daily and branched package fetching. Was broken due to a website redesign.
 
 ### Known issues
 

@@ -440,7 +440,7 @@ impl std::fmt::Display for Build {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub enum Os {
     Linux,
     Windows,
