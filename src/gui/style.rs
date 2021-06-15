@@ -1,4 +1,3 @@
-//#![allow(dead_code, unused_imports, unused_variables)]
 use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, Color};
 use serde::{Deserialize, Serialize};
 

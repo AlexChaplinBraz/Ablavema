@@ -1,4 +1,3 @@
-//#![allow(dead_code, unused_imports, unused_variables)]
 mod install;
 pub mod style;
 use self::{

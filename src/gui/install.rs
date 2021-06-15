@@ -1,4 +1,3 @@
-//#![allow(dead_code, unused_imports, unused_variables)]
 use super::{Message, PackageMessage};
 use crate::{helpers::get_extracted_name, package::Package, settings::get_setting};
 use bincode;

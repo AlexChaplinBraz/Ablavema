@@ -1,4 +1,3 @@
-//#![allow(dead_code, unused_imports, unused_variables)]
 use crate::{
     helpers::{get_document, get_file_stem},
     package::{Build, Change, Os, Package},

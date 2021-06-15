@@ -1,4 +1,3 @@
-//#![allow(dead_code, unused_imports, unused_variables)]
 use super::{BuilderBuildsType, ReleaseType};
 use crate::{package::Package, settings::get_setting};
 use async_trait::async_trait;

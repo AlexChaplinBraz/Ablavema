@@ -1,4 +1,3 @@
-//#![allow(dead_code, unused_imports, unused_variables)]
 use crate::{
     package::{Build, Package},
     settings::{get_setting, save_settings, set_setting},

@@ -1,4 +1,3 @@
-//#![allow(dead_code, unused_imports, unused_variables)]
 pub mod archived;
 pub mod branched;
 pub mod daily;

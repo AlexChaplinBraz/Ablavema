@@ -1,4 +1,3 @@
-//#![allow(dead_code, unused_imports, unused_variables)]
 use crate::{
     gui::{style::Theme, Filters, SortBy},
     package::Package,

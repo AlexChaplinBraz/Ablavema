@@ -1,4 +1,3 @@
-//#![allow(dead_code, unused_imports, unused_variables)]
 use crate::{
     helpers::{get_count, get_extracted_name},
     settings::get_setting,
