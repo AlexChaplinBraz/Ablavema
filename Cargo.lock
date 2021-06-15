@@ -31,6 +31,7 @@ dependencies = [
  "flate2",
  "fs2",
  "fs_extra",
+ "glob",
  "iced",
  "iced_futures",
  "indicatif",
@@ -1436,6 +1437,12 @@ checksum = "579160312273c954cc51bd440f059dde741029ac8daf8c84fece76cb77f62c15"
 dependencies = [
  "version_check",
 ]
+
+[[package]]
+name = "glob"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
 
 [[package]]
 name = "glow"

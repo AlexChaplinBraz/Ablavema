@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fetching of daily and experimental packages. Was broken due to a website redesign.
 - Fetching of Long-term Support packages. Was broken due to the addition of the 2.93 LTS series.
+- Error on installing the newer stable and LTS packages.
 - Crash with `GraphicsAdapterNotFound` on Linux with `noveau` and `radeon` drivers (due to missing Vulkan support)
   by using `iced`'s `glow` rendering backend on Linux.
 - Self-updater crashing even though nothing changed and it still works in the 0.1.0 release.

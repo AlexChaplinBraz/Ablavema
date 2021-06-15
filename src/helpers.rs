@@ -1,6 +1,5 @@
-//#![allow(dead_code, unused_imports, unused_variables, unused_macros)]
 use crate::{
-    package::{Build, Package, PackageState},
+    package::{Package, PackageState},
     settings::{get_setting, set_setting, CAN_CONNECT},
 };
 use clap::{crate_version, ArgMatches};
@@ -392,25 +391,6 @@ pub trait ReturnOption: Default + PartialEq {
 
 impl ReturnOption for usize {}
 
-/// Handles cases where the extracted directory isn't named the same
-/// as the downloaded archive from which the name of the package is taken.
-pub fn get_extracted_name(package: &Package) -> &str {
-    match EXTRACTED_NAMES.get(&package.name.as_ref()) {
-        Some(s) => *s,
-        None => {
-            if package.build == Build::Stable {
-                package.name.trim_end_matches("-stable")
-            } else if package.build == Build::Lts {
-                package.name.trim_end_matches("-lts")
-            } else if package.build == Build::Archived {
-                package.name.trim_end_matches("-archived")
-            } else {
-                &package.name
-            }
-        }
-    }
-}
-
 /// Handles getting the hardcoded entry count for archives. Exists mostly because there's
 /// no length method for tar archives and calculating it is too costly (up to 30 seconds).
 /// This deals mainly with older packages and gives an approximate default for newer ones.
@@ -422,44 +402,6 @@ pub fn get_count(file: &str) -> u64 {
 }
 
 lazy_static! {
-    static ref EXTRACTED_NAMES: HashMap<&'static str, &'static str> = [
-        (
-            "blender-2.27.NewPy1-linux-glibc2.3.2-i386-archived",
-            "blender-2.27-linux-glibc2.3.2-i386"
-        ),
-        (
-            // Seems like a wrongly packaged version.
-            // This actually conflicts if the 2.35b archive is being installed
-            // at the same time as the actual 2.35a archive.
-            // There's no error, but the files end up distributed between
-            // the two directories, breaking both packages.
-            // TODO: I don't even.
-            "blender-2.35b-linux-glibc2.2.5-i386-archived",
-            "blender-2.35a-linux-glibc2.2.5-i386"
-        ),
-        ("blender-2.5-alpha1-linux-glibc27-x86_64-archived", "blender-2.50-alpha1-linux-glibc27-x86_64"),
-        ("blender-2.5-alpha1-linux-glibc27-i686-archived", "blender-2.50-alpha1-linux-glibc27-i686"),
-        (
-            "blender-2.27.NewPy1-windows-archived",
-            "blender-2.27-windows"
-        ),
-        ("blender-2.47-windows-law-archived", "blender-2.47-windows"),
-        ("blender-2.48-windows64-archived", "Blender248"),
-        ("blender-2.48a-windows64-archived", "Blender248a"),
-        ("blender-2.5-alpha1-win64-archived", "blender25-win64-26982"),
-        ("blender-2.5-alpha2-win64-archived", "Release"),
-        (
-            "blender-2.79-e045fe53f1b0-win64-archived",
-            "blender-2.79.0-git.e045fe53f1b0-windows64"
-        ),
-        (
-            "blender-2.79-e045fe53f1b0-win32-archived",
-            "blender-2.79.0-git.e045fe53f1b0-windows32"
-        ),
-    ]
-    .iter()
-    .copied()
-    .collect();
     static ref ARCHIVE_ITEM_COUNT: HashMap<&'static str, u64> = [
         ("blender1.80a-linux-glibc2.1.2-i386.tar.gz", 51),
         ("blender1.80-linux-glibc2.1.3-alpha.tar.gz", 47),

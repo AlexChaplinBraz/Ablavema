@@ -1,9 +1,7 @@
-use crate::{
-    helpers::{get_count, get_extracted_name},
-    settings::get_setting,
-};
+use crate::{helpers::get_count, settings::get_setting};
 use bincode;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use glob::glob;
 use iced::button;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::{header, Client};
@@ -75,9 +73,9 @@ impl Package {
             .template("[{elapsed_precise}] [{bar:20.green/red}] {percent}% => {wide_msg}")
             .progress_chars("#>-");
 
-        let package = get_setting().packages_dir.join(&self.name);
+        let package_dir = get_setting().packages_dir.join(&self.name);
 
-        if package.exists() && !flags.0 {
+        if package_dir.exists() && !flags.0 {
             let progress_bar = multi_progress.add(ProgressBar::new(0));
             progress_bar.set_style(information_style.clone());
 
@@ -85,8 +83,8 @@ impl Package {
             progress_bar.finish_with_message(&msg);
 
             return None;
-        } else if package.exists() && flags.0 {
-            remove_dir_all(&package).await.unwrap();
+        } else if package_dir.exists() && flags.0 {
+            remove_dir_all(&package_dir).await.unwrap();
         }
 
         let download_handle;
@@ -171,6 +169,8 @@ impl Package {
         )));
         progress_bar.set_style(extraction_style.clone());
 
+        let extraction_dir = get_setting().cache_dir.join(&self.name);
+
         let extraction_handle = spawn(async move {
             if let Some(handle) = download_handle {
                 handle.await.unwrap();
@@ -212,7 +212,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&get_setting().cache_dir).unwrap();
+                        file.unpack_in(&extraction_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
@@ -228,7 +228,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&get_setting().cache_dir).unwrap();
+                        file.unpack_in(&extraction_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
@@ -244,7 +244,7 @@ impl Package {
                     for entry in archive.entries().unwrap() {
                         progress_bar.inc(1);
                         let mut file = entry.unwrap();
-                        file.unpack_in(&get_setting().cache_dir).unwrap();
+                        file.unpack_in(&extraction_dir).unwrap();
                     }
 
                     let msg = format!("Extracted {}", file.file_name().unwrap().to_str().unwrap());
@@ -265,16 +265,10 @@ impl Package {
 
                     // This handles some archives that don't have an inner directory.
                     let extraction_dir = match file.file_name().unwrap().to_str().unwrap() {
-                        "blender-2.49-win64.zip" => {
-                            get_setting().cache_dir.join("blender-2.49-win64")
-                        }
-                        "blender-2.49a-win64-python26.zip" => {
-                            get_setting().cache_dir.join("blender-2.49a-win64-python26")
-                        }
-                        "blender-2.49b-win64-python26.zip" => {
-                            get_setting().cache_dir.join("blender-2.49b-win64-python26")
-                        }
-                        _ => get_setting().cache_dir.clone(),
+                        "blender-2.49-win64.zip"
+                        | "blender-2.49a-win64-python26.zip"
+                        | "blender-2.49b-win64-python26.zip" => extraction_dir.join("inner"),
+                        _ => extraction_dir,
                     };
 
                     for file_index in 0..archive.len() {
@@ -312,13 +306,22 @@ impl Package {
         let final_tasks = spawn(async move {
             extraction_handle.await.unwrap();
 
+            let extracted_path = glob(&format!(
+                "{}/*",
+                get_setting()
+                    .cache_dir
+                    .join(&package.name)
+                    .to_str()
+                    .unwrap()
+            ))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap();
+
             let mut package_path = get_setting().packages_dir.join(&package.name);
 
-            rename(
-                get_setting().cache_dir.join(get_extracted_name(&package)),
-                &package_path,
-            )
-            .unwrap();
+            rename(extracted_path, &package_path).unwrap();
 
             package_path.push("package_info.bin");
             let file = File::create(&package_path).unwrap();
