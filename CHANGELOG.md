@@ -21,13 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `GraphicsAdapterNotFound` on Linux with `noveau` and `radeon` drivers (due to missing Vulkan support)
+- Crash with `GraphicsAdapterNotFound` on Linux with `noveau` and `radeon` drivers (due to missing Vulkan support)
   by using `iced`'s `glow` rendering backend on Linux.
-- Self-updater not working anymore even though nothing changed and it still works in the 0.1.0 release.
-- Panic on finding new stable/LTS packages with outdated archived package list. Happened because the exact time was
+- Self-updater crashing even though nothing changed and it still works in the 0.1.0 release.
+- Crash when finding new stable/LTS packages with outdated archived package list. Happened because the exact time was
   taken from the equivalent package in the archived list. Now it'll just stay at 00:00:00 until the new archived
   packages are fetched.
-- `OutOfRangeError` due to the difference in timezones when calculating how long ago a package was released.
+- Crash with `OutOfRangeError` due to the difference in timezones when calculating how long ago a package was released.
 - Fetching of daily and experimental packages. Was broken due to a website redesign.
 
 ### Known issues
