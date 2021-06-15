@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fetching of daily and experimental packages. Was broken due to a website redesign.
+- Fetching of Long-term Support packages. Was broken due to the addition of the 2.93 LTS series.
 - Crash with `GraphicsAdapterNotFound` on Linux with `noveau` and `radeon` drivers (due to missing Vulkan support)
   by using `iced`'s `glow` rendering backend on Linux.
 - Self-updater crashing even though nothing changed and it still works in the 0.1.0 release.
@@ -28,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   taken from the equivalent package in the archived list. Now it'll just stay at 00:00:00 until the new archived
   packages are fetched.
 - Crash with `OutOfRangeError` due to the difference in timezones when calculating how long ago a package was released.
-- Fetching of daily and experimental packages. Was broken due to a website redesign.
 - Error on installing packages if cache directory was removed while the program was running.
 
 ### Known issues
@@ -49,7 +50,7 @@ Noncomprehensive list of features available at launch.
 - Installing [latest daily builds](https://builder.blender.org/download/daily/).
 - Installing [latest experimental builds](https://builder.blender.org/download/experimental/).
 - Installing [latest stable release](https://www.blender.org/download/).
-- Installing [long term support releases](https://www.blender.org/download/lts/).
+- Installing [Long-term Support releases](https://www.blender.org/download/lts/).
 - Installing [archived releases](https://download.blender.org/release/).
 - Uninstalling packages.
 - Settings for installing updates.
