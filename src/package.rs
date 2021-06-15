@@ -382,7 +382,7 @@ impl Eq for Package {}
 impl Ord for Package {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.build {
-            Build::Daily(_) | Build::Branched(_) => self
+            Build::Daily(_) | Build::Experimental(_) => self
                 .build
                 .cmp(&other.build)
                 .then(self.date.cmp(&other.date).reverse()),
@@ -402,7 +402,7 @@ impl PartialEq for Package {
     // whatsoever, removing the older package.
     fn eq(&self, other: &Self) -> bool {
         match self.build {
-            Build::Daily(_) | Build::Branched(_) => {
+            Build::Daily(_) | Build::Experimental(_) => {
                 self.build == other.build && self.date == other.date
             }
             Build::Stable | Build::Lts | Build::Archived => {
@@ -421,7 +421,7 @@ impl PartialOrd for Package {
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum Build {
     Daily(String),
-    Branched(String),
+    Experimental(String),
     Stable,
     Lts,
     Archived,
@@ -430,7 +430,7 @@ pub enum Build {
 impl std::fmt::Display for Build {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let printable = match self {
-            Build::Daily(s) | Build::Branched(s) => s,
+            Build::Daily(s) | Build::Experimental(s) => s,
             Build::Stable => "Stable Release",
             Build::Lts => "LTS Release",
             Build::Archived => "Archived Release",

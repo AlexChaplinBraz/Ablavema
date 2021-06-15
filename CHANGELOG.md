@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Name of the experimental builds category from "Branched" to "Experimental".
 - From `openssl` to `rustls`, eliminating the OpenSSL dependency.
 - From `msgbox` to `native-dialog`, eliminating the GTK3 dependency on Linux.
 
@@ -27,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   taken from the equivalent package in the archived list. Now it'll just stay at 00:00:00 until the new archived
   packages are fetched.
 - `OutOfRangeError` due to the difference in timezones when calculating how long ago a package was released.
-- Daily and branched package fetching. Was broken due to a website redesign.
+- Fetching of daily and experimental packages. Was broken due to a website redesign.
 
 ### Known issues
 
@@ -44,8 +45,8 @@ Noncomprehensive list of features available at launch.
 
 - Graphical user interface.
 - Command line interface.
-- Installing [latest daily builds](https://builder.blender.org/download/).
-- Installing [experimental branches](https://builder.blender.org/download/branches/).
+- Installing [latest daily builds](https://builder.blender.org/download/daily/).
+- Installing [latest experimental builds](https://builder.blender.org/download/experimental/).
 - Installing [latest stable release](https://www.blender.org/download/).
 - Installing [long term support releases](https://www.blender.org/download/lts/).
 - Installing [archived releases](https://download.blender.org/release/).

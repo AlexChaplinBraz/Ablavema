@@ -59,15 +59,15 @@ impl Installed {
 
     pub fn remove_old_packages(&self) -> (bool, bool) {
         let mut daily_removed = false;
-        let mut branched_removed = false;
+        let mut experimental_removed = false;
 
         if get_setting().keep_only_latest_daily
-            || get_setting().keep_only_latest_branched
+            || get_setting().keep_only_latest_experimental
             || get_setting().keep_only_latest_stable
             || get_setting().keep_only_latest_lts
         {
             let mut daily_count = Vec::new();
-            let mut branched_count = Vec::new();
+            let mut experimental_count = Vec::new();
             let mut stable_count = 0;
             let mut lts_count = Vec::new();
             for package in self.iter() {
@@ -84,16 +84,16 @@ impl Installed {
                             daily_removed = true;
                         }
                     }
-                    Build::Branched(s) if get_setting().keep_only_latest_branched => {
-                        branched_count.push((package.version.clone(), s.clone()));
-                        if branched_count
+                    Build::Experimental(s) if get_setting().keep_only_latest_experimental => {
+                        experimental_count.push((package.version.clone(), s.clone()));
+                        if experimental_count
                             .iter()
                             .filter(|(v, n)| v == &package.version && n == s)
                             .count()
                             > 1
                         {
                             package.remove();
-                            branched_removed = true;
+                            experimental_removed = true;
                         }
                     }
                     Build::Stable if get_setting().keep_only_latest_stable => {
@@ -121,7 +121,7 @@ impl Installed {
             }
         }
 
-        (daily_removed, branched_removed)
+        (daily_removed, experimental_removed)
     }
 
     pub fn remove_all(&mut self) {
@@ -138,9 +138,9 @@ impl Installed {
         }
     }
 
-    pub fn remove_branched(&mut self) {
+    pub fn remove_experimental(&mut self) {
         for package in self.iter() {
-            if matches!(package.build, Build::Branched { .. }) {
+            if matches!(package.build, Build::Experimental { .. }) {
                 package.remove();
             }
         }

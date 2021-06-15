@@ -11,7 +11,7 @@ use crate::{
     },
     package::{Build, Package, PackageState, PackageStatus},
     releases::{
-        archived::Archived, branched::Branched, daily::Daily, lts::Lts, stable::Stable,
+        archived::Archived, daily::Daily, experimental::Experimental, lts::Lts, stable::Stable,
         ReleaseType, Releases,
     },
     settings::{
@@ -79,8 +79,8 @@ impl Gui {
     }
 
     async fn check_for_updates(
-        packages: (Daily, Branched, Stable, Lts),
-    ) -> (bool, Daily, Branched, Stable, Lts) {
+        packages: (Daily, Experimental, Stable, Lts),
+    ) -> (bool, Daily, Experimental, Stable, Lts) {
         check_connection().await;
 
         if CAN_CONNECT.load(Ordering::Relaxed) {
@@ -92,24 +92,24 @@ impl Gui {
 
     async fn check_all(
         daily: Daily,
-        branched: Branched,
+        experimental: Experimental,
         stable: Stable,
         lts: Lts,
         archived: Archived,
-    ) -> (bool, Daily, Branched, Stable, Lts, Archived) {
+    ) -> (bool, Daily, Experimental, Stable, Lts, Archived) {
         check_connection().await;
 
         if CAN_CONNECT.load(Ordering::Relaxed) {
             (
                 true,
                 Releases::check_daily_updates(daily).await.1,
-                Releases::check_branched_updates(branched).await.1,
+                Releases::check_experimental_updates(experimental).await.1,
                 Releases::check_stable_updates(stable).await.1,
                 Releases::check_lts_updates(lts).await.1,
                 Releases::check_archived_updates(archived).await.1,
             )
         } else {
-            (false, daily, branched, stable, lts, archived)
+            (false, daily, experimental, stable, lts, archived)
         }
     }
 
@@ -123,11 +123,11 @@ impl Gui {
         }
     }
 
-    async fn check_branched(packages: Branched) -> (bool, Branched) {
+    async fn check_experimental(packages: Experimental) -> (bool, Experimental) {
         check_connection().await;
 
         if CAN_CONNECT.load(Ordering::Relaxed) {
-            Releases::check_branched_updates(packages).await
+            Releases::check_experimental_updates(packages).await
         } else {
             (false, packages)
         }
@@ -237,7 +237,7 @@ impl Application for Gui {
             Message::PackageMessage(index, package_message) => {
                 match iter::empty()
                     .chain(&mut self.releases.daily.iter_mut())
-                    .chain(&mut self.releases.branched.iter_mut())
+                    .chain(&mut self.releases.experimental.iter_mut())
                     .chain(&mut self.releases.stable.iter_mut())
                     .chain(&mut self.releases.lts.iter_mut())
                     .chain(&mut self.releases.archived.iter_mut())
@@ -266,19 +266,19 @@ impl Application for Gui {
                             }
                         }
                     }
-                    Build::Branched(_) => {
+                    Build::Experimental(_) => {
                         match self
                             .releases
-                            .branched
+                            .experimental
                             .iter_mut()
                             .find(|a_package| **a_package == package)
                         {
                             Some(found_package) => {
                                 found_package.bookmarked = !found_package.bookmarked;
-                                self.releases.branched.save();
+                                self.releases.experimental.save();
                             }
                             None => {
-                                unreachable!("Couldn't find branched package to bookmark");
+                                unreachable!("Couldn't find experimental package to bookmark");
                             }
                         }
                     }
@@ -350,8 +350,8 @@ impl Application for Gui {
                             ""
                         }
                     }
-                    Build::Branched(_) => {
-                        if get_setting().keep_only_latest_branched
+                    Build::Experimental(_) => {
+                        if get_setting().keep_only_latest_experimental
                             && package.status != PackageStatus::Update
                             && self
                                 .releases
@@ -360,7 +360,7 @@ impl Application for Gui {
                                 .find(|p| p.build == package.build)
                                 .is_some()
                         {
-                            "branched package of its build type"
+                            "experimental package of its build type"
                         } else {
                             ""
                         }
@@ -449,15 +449,15 @@ impl Application for Gui {
                                 self.releases.daily.remove(index);
                                 self.releases.daily.save();
                             }
-                            Build::Branched(_) => {
+                            Build::Experimental(_) => {
                                 let index = self
                                     .releases
-                                    .branched
+                                    .experimental
                                     .iter()
                                     .position(|a_package| *a_package == package)
                                     .unwrap();
-                                self.releases.branched.remove(index);
-                                self.releases.branched.save();
+                                self.releases.experimental.remove(index);
+                                self.releases.experimental.save();
                             }
                             Build::Stable => {
                                 let index = self
@@ -522,7 +522,7 @@ impl Application for Gui {
             Message::InstallPackage(package) => {
                 let (index, package) = iter::empty()
                     .chain(self.releases.daily.iter())
-                    .chain(self.releases.branched.iter())
+                    .chain(self.releases.experimental.iter())
                     .chain(self.releases.stable.iter())
                     .chain(self.releases.lts.iter())
                     .chain(self.releases.archived.iter())
@@ -600,7 +600,7 @@ impl Application for Gui {
                 Command::perform(
                     Gui::check_all(
                         self.releases.daily.take(),
-                        self.releases.branched.take(),
+                        self.releases.experimental.take(),
                         self.releases.stable.take(),
                         self.releases.lts.take(),
                         self.releases.archived.take(),
@@ -608,9 +608,9 @@ impl Application for Gui {
                     Message::AllFetched,
                 )
             }
-            Message::AllFetched((_, daily, branched, stable, lts, archived)) => {
+            Message::AllFetched((_, daily, experimental, stable, lts, archived)) => {
                 self.releases.daily = daily;
-                self.releases.branched = branched;
+                self.releases.experimental = experimental;
                 self.releases.stable = stable;
                 self.releases.lts = lts;
                 self.releases.archived = archived;
@@ -631,15 +631,15 @@ impl Application for Gui {
                 self.state.controls.checking_for_updates = false;
                 Command::none()
             }
-            Message::FetchBranched => {
+            Message::FetchExperimental => {
                 self.state.controls.checking_for_updates = true;
                 Command::perform(
-                    Gui::check_branched(self.releases.branched.take()),
-                    Message::BranchedFetched,
+                    Gui::check_experimental(self.releases.experimental.take()),
+                    Message::ExperimentalFetched,
                 )
             }
-            Message::BranchedFetched((_, branched)) => {
-                self.releases.branched = branched;
+            Message::ExperimentalFetched((_, experimental)) => {
+                self.releases.experimental = experimental;
                 self.releases.sync();
                 self.state.controls.checking_for_updates = false;
                 Command::none()
@@ -723,7 +723,7 @@ impl Application for Gui {
             Message::FilterAllChanged(change) => {
                 self.state.controls.filters.all = change;
                 self.state.controls.filters.daily = change;
-                self.state.controls.filters.branched = change;
+                self.state.controls.filters.experimental = change;
                 self.state.controls.filters.stable = change;
                 self.state.controls.filters.lts = change;
                 self.state.controls.filters.archived = change;
@@ -738,8 +738,8 @@ impl Application for Gui {
                 save_settings();
                 Command::none()
             }
-            Message::FilterBranchedChanged(change) => {
-                self.state.controls.filters.branched = change;
+            Message::FilterExperimentalChanged(change) => {
+                self.state.controls.filters.experimental = change;
                 self.state.controls.filters.refresh_all();
                 set_setting().filters = self.state.controls.filters;
                 save_settings();
@@ -831,10 +831,10 @@ impl Application for Gui {
                 self.releases.sync();
                 Command::none()
             }
-            Message::UpdateBranched(choice) => {
+            Message::UpdateExperimental(choice) => {
                 match choice {
-                    Choice::Enable => set_setting().update_branched = true,
-                    Choice::Disable => set_setting().update_branched = false,
+                    Choice::Enable => set_setting().update_experimental = true,
+                    Choice::Disable => set_setting().update_experimental = false,
                 }
                 save_settings();
                 self.releases.sync();
@@ -866,10 +866,10 @@ impl Application for Gui {
                 save_settings();
                 Command::none()
             }
-            Message::KeepOnlyLatestBranched(choice) => {
+            Message::KeepOnlyLatestExperimental(choice) => {
                 match choice {
-                    Choice::Enable => set_setting().keep_only_latest_branched = true,
-                    Choice::Disable => set_setting().keep_only_latest_branched = false,
+                    Choice::Enable => set_setting().keep_only_latest_experimental = true,
+                    Choice::Disable => set_setting().keep_only_latest_experimental = false,
                 }
                 save_settings();
                 Command::none()
@@ -942,7 +942,7 @@ impl Application for Gui {
                 match build_type {
                     BuildType::All => {
                         self.releases.daily.remove_db();
-                        self.releases.branched.remove_db();
+                        self.releases.experimental.remove_db();
                         self.releases.stable.remove_db();
                         self.releases.lts.remove_db();
                         self.releases.archived.remove_db();
@@ -950,8 +950,8 @@ impl Application for Gui {
                     BuildType::Daily => {
                         self.releases.daily.remove_db();
                     }
-                    BuildType::Branched => {
-                        self.releases.branched.remove_db();
+                    BuildType::Experimental => {
+                        self.releases.experimental.remove_db();
                     }
                     BuildType::Stable => {
                         self.releases.stable.remove_db();
@@ -973,8 +973,8 @@ impl Application for Gui {
                     BuildType::Daily => {
                         self.releases.installed.remove_daily();
                     }
-                    BuildType::Branched => {
-                        self.releases.installed.remove_branched();
+                    BuildType::Experimental => {
+                        self.releases.installed.remove_experimental();
                     }
                     BuildType::Stable => {
                         self.releases.installed.remove_stable();
@@ -1210,7 +1210,7 @@ impl Application for Gui {
                         Container::new(
                             iter::empty()
                                 .chain(&mut self.releases.daily.iter_mut())
-                                .chain(&mut self.releases.branched.iter_mut())
+                                .chain(&mut self.releases.experimental.iter_mut())
                                 .chain(&mut self.releases.stable.iter_mut())
                                 .chain(&mut self.releases.lts.iter_mut())
                                 .chain(&mut self.releases.archived.iter_mut())
@@ -1376,12 +1376,12 @@ impl Application for Gui {
                 };
 
                 let daily_db_exists = self.releases.daily.get_db_path().exists();
-                let branched_db_exists = self.releases.branched.get_db_path().exists();
+                let experimental_db_exists = self.releases.experimental.get_db_path().exists();
                 let stable_db_exists = self.releases.stable.get_db_path().exists();
                 let lts_db_exists = self.releases.lts.get_db_path().exists();
                 let archived_db_exists = self.releases.archived.get_db_path().exists();
                 let any_dbs_exist = daily_db_exists
-                    || branched_db_exists
+                    || experimental_db_exists
                     || stable_db_exists
                     || lts_db_exists
                     || archived_db_exists;
@@ -1413,11 +1413,11 @@ impl Application for Gui {
                 } else {
                     false
                 };
-                let branched_packages_exist = if self
+                let experimental_packages_exist = if self
                     .releases
                     .installed
                     .iter()
-                    .filter(|package| matches!(package.build, Build::Branched { .. }))
+                    .filter(|package| matches!(package.build, Build::Experimental { .. }))
                     .count()
                     > 0
                 {
@@ -1462,7 +1462,7 @@ impl Application for Gui {
                     false
                 };
                 let any_packages_exist = daily_packages_exist
-                    || branched_packages_exist
+                    || experimental_packages_exist
                     || stable_packages_exist
                     || lts_packages_exist
                     || archived_packages_exist;
@@ -1546,12 +1546,12 @@ Maximum is a day (1440 minutes).",
                     Message::UpdateDaily,
                 );
 
-                let check_branched = choice_setting!(
-                    "Check branched packages",
-                    "Look for new branched packages. Each branch is considered a separate build.",
+                let check_experimental = choice_setting!(
+                    "Check experimental packages",
+                    "Look for new experimental packages. Each branch is considered a separate build.",
                     &Choice::ALL,
-                    Some(choice(get_setting().update_branched).unwrap()),
-                    Message::UpdateBranched,
+                    Some(choice(get_setting().update_experimental).unwrap()),
+                    Message::UpdateExperimental,
                 );
 
                 let check_stable = choice_setting!(
@@ -1594,12 +1594,12 @@ LTS versions. So if needed, install those from the Archived packages.",
                     Message::KeepOnlyLatestDaily,
                 );
 
-                let keep_only_latest_branched = choice_setting!(
-                    "Keep only newest branched package",
-                    "Remove all older branched packages of its build type when installing an update.",
+                let keep_only_latest_experimental = choice_setting!(
+                    "Keep only newest experimental package",
+                    "Remove all older experimental packages of its build type when installing an update.",
                     &Choice::ALL,
-                    Some(choice(get_setting().keep_only_latest_branched).unwrap()),
-                    Message::KeepOnlyLatestBranched,
+                    Some(choice(get_setting().keep_only_latest_experimental).unwrap()),
+                    Message::KeepOnlyLatestExperimental,
                 );
 
                 let keep_only_latest_stable = choice_setting!(
@@ -1757,7 +1757,7 @@ whatever its name is.",
                                 "\
 Useful for when a release candidate is still available even though it doesn't appear in the \
 website anymore. Keep in mind that bookmarks are stored in the databases, so they will be lost. \
-Also, any installed package that's no longer available, like with old daily and branched \
+Also, any installed package that's no longer available, like with old daily and experimental \
 packages, won't reapear.",
                             ))
                             .push(
@@ -1776,10 +1776,10 @@ packages, won't reapear.",
                                         &mut self.state.remove_daily_db_button,
                                     ))
                                     .push(remove_db_button(
-                                        "Branched",
-                                        BuildType::Branched,
-                                        branched_db_exists,
-                                        &mut self.state.remove_branched_db_button,
+                                        "Experimental",
+                                        BuildType::Experimental,
+                                        experimental_db_exists,
+                                        &mut self.state.remove_experimental_db_button,
                                     ))
                                     .push(remove_db_button(
                                         "Stable",
@@ -1847,10 +1847,10 @@ Useful for getting rid of a large quantity of packages at the same time.",
                                         &mut self.state.remove_daily_packages_button,
                                     ))
                                     .push(remove_packages_button(
-                                        "Branched",
-                                        BuildType::Branched,
-                                        branched_packages_exist,
-                                        &mut self.state.remove_branched_packages_button,
+                                        "Experimental",
+                                        BuildType::Experimental,
+                                        experimental_packages_exist,
+                                        &mut self.state.remove_experimental_packages_button,
                                     ))
                                     .push(remove_packages_button(
                                         "Stable",
@@ -1945,7 +1945,7 @@ to see if a bug was there before or whatnot.",
                     .push(separator())
                     .push(check_daily)
                     .push(separator())
-                    .push(check_branched)
+                    .push(check_experimental)
                     .push(separator())
                     .push(check_stable)
                     .push(separator())
@@ -1957,7 +1957,7 @@ to see if a bug was there before or whatnot.",
                     .push(separator())
                     .push(keep_only_latest_daily)
                     .push(separator())
-                    .push(keep_only_latest_branched)
+                    .push(keep_only_latest_experimental)
                     .push(separator())
                     .push(keep_only_latest_stable)
                     .push(separator())
@@ -2215,13 +2215,13 @@ pub enum Message {
     OpenBlenderWithFile(Package),
     OpenBrowser(String),
     CheckForUpdates,
-    UpdatesChecked((bool, Daily, Branched, Stable, Lts)),
+    UpdatesChecked((bool, Daily, Experimental, Stable, Lts)),
     FetchAll,
-    AllFetched((bool, Daily, Branched, Stable, Lts, Archived)),
+    AllFetched((bool, Daily, Experimental, Stable, Lts, Archived)),
     FetchDaily,
     DailyFetched((bool, Daily)),
-    FetchBranched,
-    BranchedFetched((bool, Branched)),
+    FetchExperimental,
+    ExperimentalFetched((bool, Experimental)),
     FetchStable,
     StableFetched((bool, Stable)),
     FetchLts,
@@ -2233,7 +2233,7 @@ pub enum Message {
     FilterInstalledChanged(bool),
     FilterAllChanged(bool),
     FilterDailyChanged(bool),
-    FilterBranchedChanged(bool),
+    FilterExperimentalChanged(bool),
     FilterStableChanged(bool),
     FilterLtsChanged(bool),
     FilterArchivedChanged(bool),
@@ -2245,11 +2245,11 @@ pub enum Message {
     CheckUpdatesAtLaunch(Choice),
     MinutesBetweenUpdatesChanged(i64),
     UpdateDaily(Choice),
-    UpdateBranched(Choice),
+    UpdateExperimental(Choice),
     UpdateStable(Choice),
     UpdateLts(Choice),
     KeepOnlyLatestDaily(Choice),
-    KeepOnlyLatestBranched(Choice),
+    KeepOnlyLatestExperimental(Choice),
     KeepOnlyLatestStable(Choice),
     KeepOnlyLatestLts(Choice),
     ThemeChanged(Theme),
@@ -2303,13 +2303,13 @@ struct GuiState {
     reset_cache_location_button: button::State,
     remove_all_dbs_button: button::State,
     remove_daily_db_button: button::State,
-    remove_branched_db_button: button::State,
+    remove_experimental_db_button: button::State,
     remove_stable_db_button: button::State,
     remove_lts_db_button: button::State,
     remove_archived_db_button: button::State,
     remove_all_packages_button: button::State,
     remove_daily_packages_button: button::State,
-    remove_branched_packages_button: button::State,
+    remove_experimental_packages_button: button::State,
     remove_stable_packages_button: button::State,
     remove_lts_packages_button: button::State,
     remove_archived_packages_button: button::State,
@@ -2349,7 +2349,7 @@ struct Controls {
     filters: Filters,
     fetch_all_button: button::State,
     fetch_daily_button: button::State,
-    fetch_branched_button: button::State,
+    fetch_experimental_button: button::State,
     fetch_stable_button: button::State,
     fetch_lts_button: button::State,
     fetch_archived_button: button::State,
@@ -2468,16 +2468,16 @@ impl Controls {
                 Some(Message::FetchDaily),
             ))
             .push(filter_row(
-                self.filters.branched,
+                self.filters.experimental,
                 match update_count.2 {
                     Some(count) => {
-                        format!("Branched [{}]", count)
+                        format!("Experimental [{}]", count)
                     }
-                    None => String::from("Branched"),
+                    None => String::from("Experimental"),
                 },
-                Message::FilterBranchedChanged,
-                Some(&mut self.fetch_branched_button),
-                Some(Message::FetchBranched),
+                Message::FilterExperimentalChanged,
+                Some(&mut self.fetch_experimental_button),
+                Some(Message::FetchExperimental),
             ))
             .push(filter_row(
                 self.filters.stable,
@@ -2587,7 +2587,7 @@ pub struct Filters {
     installed: bool,
     all: bool,
     daily: bool,
-    branched: bool,
+    experimental: bool,
     lts: bool,
     stable: bool,
     archived: bool,
@@ -2598,7 +2598,9 @@ impl Filters {
         if self.updates {
             match package.build {
                 Build::Daily(_) if self.daily && package.status == PackageStatus::Update => true,
-                Build::Branched(_) if self.branched && package.status == PackageStatus::Update => {
+                Build::Experimental(_)
+                    if self.experimental && package.status == PackageStatus::Update =>
+                {
                     true
                 }
                 Build::Stable if self.stable && package.status == PackageStatus::Update => true,
@@ -2609,7 +2611,7 @@ impl Filters {
         } else if self.bookmarks {
             match package.build {
                 Build::Daily(_) if self.daily && package.bookmarked => true,
-                Build::Branched(_) if self.branched && package.bookmarked => true,
+                Build::Experimental(_) if self.experimental && package.bookmarked => true,
                 Build::Stable if self.stable && package.bookmarked => true,
                 Build::Lts if self.lts && package.bookmarked => true,
                 Build::Archived if self.archived && package.bookmarked => true,
@@ -2622,8 +2624,9 @@ impl Filters {
                 {
                     true
                 }
-                Build::Branched(_)
-                    if self.branched && matches!(package.state, PackageState::Installed { .. }) =>
+                Build::Experimental(_)
+                    if self.experimental
+                        && matches!(package.state, PackageState::Installed { .. }) =>
                 {
                     true
                 }
@@ -2647,7 +2650,7 @@ impl Filters {
         } else {
             match package.build {
                 Build::Daily(_) if self.daily => true,
-                Build::Branched(_) if self.branched => true,
+                Build::Experimental(_) if self.experimental => true,
                 Build::Stable if self.stable => true,
                 Build::Lts if self.lts => true,
                 Build::Archived if self.archived => true,
@@ -2657,7 +2660,7 @@ impl Filters {
     }
 
     fn refresh_all(&mut self) {
-        if self.daily && self.branched && self.stable && self.lts && self.archived {
+        if self.daily && self.experimental && self.stable && self.lts && self.archived {
             self.all = true
         } else {
             self.all = false
@@ -2673,7 +2676,7 @@ impl Default for Filters {
             installed: false,
             all: true,
             daily: true,
-            branched: true,
+            experimental: true,
             lts: true,
             stable: true,
             archived: true,
@@ -2758,7 +2761,7 @@ impl Choice {
 pub enum BuildType {
     All,
     Daily,
-    Branched,
+    Experimental,
     Stable,
     Lts,
     Archived,

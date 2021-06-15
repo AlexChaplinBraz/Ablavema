@@ -85,10 +85,10 @@ pub async fn run_cli() -> GuiFlags {
         get_setting().update_daily,
         right_ansi_code
     );
-    let help_update_branched = format!(
-        "Download the latest branched package [current: {}{}{}]",
+    let help_update_experimental = format!(
+        "Download the latest experimental package [current: {}{}{}]",
         left_ansi_code,
-        get_setting().update_branched,
+        get_setting().update_experimental,
         right_ansi_code
     );
     let help_update_stable = format!(
@@ -109,10 +109,10 @@ pub async fn run_cli() -> GuiFlags {
         get_setting().keep_only_latest_daily,
         right_ansi_code
     );
-    let help_keep_only_latest_branched = format!(
-        "Remove all branched packages other than the newest [current: {}{}{}]",
+    let help_keep_only_latest_experimental = format!(
+        "Remove all experimental packages other than the newest [current: {}{}{}]",
         left_ansi_code,
-        get_setting().keep_only_latest_branched,
+        get_setting().keep_only_latest_experimental,
         right_ansi_code
     );
     let help_keep_only_latest_stable = format!(
@@ -213,14 +213,14 @@ pub async fn run_cli() -> GuiFlags {
                         .help(&help_update_daily),
                 )
                 .arg(
-                    Arg::with_name("update_branched")
+                    Arg::with_name("update_experimental")
                         .display_order(40)
                         .takes_value(true)
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
                         .short("b")
-                        .long("update-branched")
-                        .help(&help_update_branched),
+                        .long("update-experimental")
+                        .help(&help_update_experimental),
                 )
                 .arg(
                     Arg::with_name("update_stable")
@@ -253,14 +253,14 @@ pub async fn run_cli() -> GuiFlags {
                         .help(&help_keep_only_latest_daily),
                 )
                 .arg(
-                    Arg::with_name("keep_only_latest_branched")
+                    Arg::with_name("keep_only_latest_experimental")
                         .display_order(80)
                         .takes_value(true)
                         .value_name("BOOL")
                         .possible_values(&["t", "f", "true", "false"])
                         .short("B")
-                        .long("keep-only-latest-branched")
-                        .help(&help_keep_only_latest_branched),
+                        .long("keep-only-latest-experimental")
+                        .help(&help_keep_only_latest_experimental),
                 )
                 .arg(
                     Arg::with_name("keep_only_latest_stable")
@@ -291,11 +291,11 @@ pub async fn run_cli() -> GuiFlags {
                             "check_updates_at_launch",
                             "minutes_between_updates",
                             "update_daily",
-                            "update_branched",
+                            "update_experimental",
                             "update_stable",
                             "update_lts",
                             "keep_only_latest_daily",
-                            "keep_only_latest_branched",
+                            "keep_only_latest_experimental",
                             "keep_only_latest_stable",
                             "keep_only_latest_lts"
                         ])
@@ -321,10 +321,10 @@ pub async fn run_cli() -> GuiFlags {
                         .help("Fetch daily packages"),
                 )
                 .arg(
-                    Arg::with_name("branched")
+                    Arg::with_name("experimental")
                         .short("b")
-                        .long("branched")
-                        .help("Fetch branched packages"),
+                        .long("experimental")
+                        .help("Fetch experimental packages"),
                 )
                 .arg(
                     Arg::with_name("stable")
@@ -346,7 +346,7 @@ pub async fn run_cli() -> GuiFlags {
                 )
                 .group(
                     ArgGroup::with_name("fetch_group")
-                        .args(&["all", "daily", "branched", "stable", "lts", "archived"])
+                        .args(&["all", "daily", "experimental", "stable", "lts", "archived"])
                         .required(true)
                         .multiple(true)
                 ),
@@ -391,9 +391,9 @@ pub async fn run_cli() -> GuiFlags {
                         ),
                 )
                 .subcommand(
-                    SubCommand::with_name("branched")
+                    SubCommand::with_name("experimental")
                         .setting(AppSettings::ArgRequiredElseHelp)
-                        .about("Install branched packages")
+                        .about("Install experimental packages")
                         .help_message("Print help and exit")
                         .arg(
                             Arg::with_name("id")
@@ -498,8 +498,8 @@ pub async fn run_cli() -> GuiFlags {
                         .help_message("Print help and exit"),
                 )
                 .subcommand(
-                    SubCommand::with_name("branched")
-                        .about("List branched packages")
+                    SubCommand::with_name("experimental")
+                        .about("List experimental packages")
                         .help_message("Print help and exit"),
                 )
                 .subcommand(
@@ -640,11 +640,11 @@ pub async fn run_cli() -> GuiFlags {
             }
 
             process_bool_arg(a, "update_daily");
-            process_bool_arg(a, "update_branched");
+            process_bool_arg(a, "update_experimental");
             process_bool_arg(a, "update_stable");
             process_bool_arg(a, "update_lts");
             process_bool_arg(a, "keep_only_latest_daily");
-            process_bool_arg(a, "keep_only_latest_branched");
+            process_bool_arg(a, "keep_only_latest_experimental");
             process_bool_arg(a, "keep_only_latest_stable");
             process_bool_arg(a, "keep_only_latest_lts");
 
@@ -654,7 +654,10 @@ pub async fn run_cli() -> GuiFlags {
             if CAN_CONNECT.load(Ordering::Relaxed) {
                 if a.is_present("all") {
                     releases.daily = Releases::check_daily_updates(releases.daily).await.1;
-                    releases.branched = Releases::check_branched_updates(releases.branched).await.1;
+                    releases.experimental =
+                        Releases::check_experimental_updates(releases.experimental)
+                            .await
+                            .1;
                     releases.stable = Releases::check_stable_updates(releases.stable).await.1;
                     releases.lts = Releases::check_lts_updates(releases.lts).await.1;
                     releases.archived = Releases::check_archived_updates(releases.archived).await.1;
@@ -663,9 +666,9 @@ pub async fn run_cli() -> GuiFlags {
                         releases.daily =
                             Releases::check_daily_updates(releases.daily.take()).await.1;
                     }
-                    if a.is_present("branched") {
-                        releases.branched =
-                            Releases::check_branched_updates(releases.branched.take())
+                    if a.is_present("experimental") {
+                        releases.experimental =
+                            Releases::check_experimental_updates(releases.experimental.take())
                                 .await
                                 .1;
                     }
@@ -690,7 +693,9 @@ pub async fn run_cli() -> GuiFlags {
         }
         ("install", Some(a)) => match a.subcommand() {
             ("daily", Some(b)) => cli_install(b, &releases.daily, "daily").await,
-            ("branched", Some(b)) => cli_install(b, &releases.branched, "branched").await,
+            ("experimental", Some(b)) => {
+                cli_install(b, &releases.experimental, "experimental").await
+            }
             ("stable", Some(b)) => cli_install(b, &releases.stable, "stable").await,
             ("lts", Some(b)) => cli_install(b, &releases.lts, "LTS").await,
             ("archived", Some(b)) => cli_install(b, &releases.archived, "archived").await,
@@ -704,11 +709,19 @@ pub async fn run_cli() -> GuiFlags {
                     cli_list_narrow(&releases.daily, "daily", b.is_present("invert"));
                 }
             }
-            ("branched", Some(b)) => {
+            ("experimental", Some(b)) => {
                 if b.is_present("wide") {
-                    cli_list_wide(&releases.branched, "branched", b.is_present("invert"));
+                    cli_list_wide(
+                        &releases.experimental,
+                        "experimental",
+                        b.is_present("invert"),
+                    );
                 } else {
-                    cli_list_narrow(&releases.branched, "branched", b.is_present("invert"));
+                    cli_list_narrow(
+                        &releases.experimental,
+                        "experimental",
+                        b.is_present("invert"),
+                    );
                 }
             }
             ("stable", Some(b)) => {

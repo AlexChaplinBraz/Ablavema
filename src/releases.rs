@@ -1,11 +1,11 @@
 pub mod archived;
-pub mod branched;
 pub mod daily;
+pub mod experimental;
 pub mod installed;
 pub mod lts;
 pub mod stable;
 use self::{
-    archived::Archived, branched::Branched, daily::Daily, installed::Installed, lts::Lts,
+    archived::Archived, daily::Daily, experimental::Experimental, installed::Installed, lts::Lts,
     stable::Stable,
 };
 use crate::{
@@ -32,7 +32,7 @@ use versions::Versioning;
 #[derive(Debug, Default)]
 pub struct Releases {
     pub daily: Daily,
-    pub branched: Branched,
+    pub experimental: Experimental,
     pub stable: Stable,
     pub lts: Lts,
     pub archived: Archived,
@@ -64,12 +64,12 @@ impl Releases {
             initialised = self.daily.init().await;
         }
 
-        if self.branched.get_db_path().exists() {
-            if self.branched.load() {
-                initialised = self.branched.init().await;
+        if self.experimental.get_db_path().exists() {
+            if self.experimental.load() {
+                initialised = self.experimental.init().await;
             }
         } else {
-            initialised = self.branched.init().await;
+            initialised = self.experimental.init().await;
         }
 
         if self.stable.get_db_path().exists() {
@@ -106,8 +106,9 @@ impl Releases {
         self.daily.refresh_state(&self.installed);
         self.daily.refresh_status(get_setting().update_daily);
 
-        self.branched.refresh_state(&self.installed);
-        self.branched.refresh_status(get_setting().update_branched);
+        self.experimental.refresh_state(&self.installed);
+        self.experimental
+            .refresh_status(get_setting().update_experimental);
 
         self.stable.refresh_state(&self.installed);
         self.stable.refresh_status(get_setting().update_stable);
@@ -123,12 +124,12 @@ impl Releases {
     /// Check for new packages. This returns a tuple where the first item is a boolean
     /// that indicates whether there were any new packages found.
     pub async fn check_updates(
-        packages: (Daily, Branched, Stable, Lts),
-    ) -> (bool, Daily, Branched, Stable, Lts) {
+        packages: (Daily, Experimental, Stable, Lts),
+    ) -> (bool, Daily, Experimental, Stable, Lts) {
         set_setting().last_update_time = SystemTime::now();
         save_settings();
 
-        let (mut daily, mut branched, mut stable, mut lts) = packages;
+        let (mut daily, mut experimental, mut stable, mut lts) = packages;
 
         let mut updated_daily = false;
         if get_setting().update_daily {
@@ -137,11 +138,12 @@ impl Releases {
             daily = fetched_daily;
         }
 
-        let mut updated_branched = false;
-        if get_setting().update_branched {
-            let (updated, fetched_branched) = Releases::check_branched_updates(branched).await;
-            updated_branched = updated;
-            branched = fetched_branched;
+        let mut updated_experimental = false;
+        if get_setting().update_experimental {
+            let (updated, fetched_experimental) =
+                Releases::check_experimental_updates(experimental).await;
+            updated_experimental = updated;
+            experimental = fetched_experimental;
         }
 
         let mut updated_stable = false;
@@ -159,19 +161,19 @@ impl Releases {
         }
 
         (
-            updated_daily || updated_branched || updated_stable || updated_lts,
+            updated_daily || updated_experimental || updated_stable || updated_lts,
             daily,
-            branched,
+            experimental,
             stable,
             lts,
         )
     }
 
     /// Used for getting the packages for `Releases::check_updates()`.
-    pub fn take(&mut self) -> (Daily, Branched, Stable, Lts) {
+    pub fn take(&mut self) -> (Daily, Experimental, Stable, Lts) {
         (
             self.daily.take(),
-            self.branched.take(),
+            self.experimental.take(),
             self.stable.take(),
             self.lts.take(),
         )
@@ -179,9 +181,9 @@ impl Releases {
 
     /// Used for adding the results of `Releases::check_updates()`
     /// back into the variable and syncing.
-    pub fn add_new_packages(&mut self, packages: (bool, Daily, Branched, Stable, Lts)) {
+    pub fn add_new_packages(&mut self, packages: (bool, Daily, Experimental, Stable, Lts)) {
         self.daily = packages.1;
-        self.branched = packages.2;
+        self.experimental = packages.2;
         self.stable = packages.3;
         self.lts = packages.4;
         self.sync();
@@ -204,19 +206,21 @@ impl Releases {
         }
     }
 
-    pub async fn check_branched_updates(mut branched: Branched) -> (bool, Branched) {
-        print!("Checking for branched updates... ");
-        match branched.get_new_packages().await {
+    pub async fn check_experimental_updates(
+        mut experimental: Experimental,
+    ) -> (bool, Experimental) {
+        print!("Checking for experimental updates... ");
+        match experimental.get_new_packages().await {
             Some(new_packages) => {
                 println!("Found:");
-                branched.add_new_packages(new_packages);
-                branched.remove_dead_packages().await;
-                branched.save();
-                (true, branched)
+                experimental.add_new_packages(new_packages);
+                experimental.remove_dead_packages().await;
+                experimental.save();
+                (true, experimental)
             }
             None => {
                 println!("None found.");
-                (false, branched)
+                (false, experimental)
             }
         }
     }
@@ -271,7 +275,7 @@ impl Releases {
 
     /// Returns the amount of updates for each build type if there are any.
     /// The returned tuple of options is:
-    /// (all_count, daily_count, branched_count, stable_count, lts_count)
+    /// (all_count, daily_count, experimental_count, stable_count, lts_count)
     pub fn count_updates(
         &self,
     ) -> (
@@ -286,8 +290,8 @@ impl Releases {
             .iter()
             .filter(|package| package.status == PackageStatus::Update)
             .count();
-        let branched_count = self
-            .branched
+        let experimental_count = self
+            .experimental
             .iter()
             .filter(|package| package.status == PackageStatus::Update)
             .count();
@@ -301,12 +305,12 @@ impl Releases {
             .iter()
             .filter(|package| package.status == PackageStatus::Update)
             .count();
-        let all_count = daily_count + branched_count + stable_count + lts_count;
+        let all_count = daily_count + experimental_count + stable_count + lts_count;
 
         (
             all_count.return_option(),
             daily_count.return_option(),
-            branched_count.return_option(),
+            experimental_count.return_option(),
             stable_count.return_option(),
             lts_count.return_option(),
         )
@@ -319,7 +323,7 @@ impl Releases {
     pub async fn cli_install_updates(&mut self) {
         let updates_found = iter::empty()
             .chain(self.daily.iter())
-            .chain(self.branched.iter())
+            .chain(self.experimental.iter())
             .chain(self.stable.iter())
             .chain(self.lts.iter())
             .chain(self.archived.iter())
@@ -348,15 +352,15 @@ impl Releases {
 
             self.installed.fetch();
             self.installed.update_default();
-            let (daily_removed, branched_removed) = self.installed.remove_old_packages();
+            let (daily_removed, experimental_removed) = self.installed.remove_old_packages();
             self.sync();
 
             if get_setting().keep_only_latest_daily && daily_removed {
                 self.daily.remove_dead_packages().await;
             }
 
-            if get_setting().keep_only_latest_branched && branched_removed {
-                self.branched.remove_dead_packages().await;
+            if get_setting().keep_only_latest_experimental && experimental_removed {
+                self.experimental.remove_dead_packages().await;
             }
         }
     }
@@ -414,7 +418,7 @@ pub trait ReleaseType:
             let build_name = build.find(Class("build-var")).next().unwrap().text();
             package.build = match builder_builds_type {
                 BuilderBuildsType::Daily => Build::Daily(build_name),
-                BuilderBuildsType::Branched => Build::Branched(build_name),
+                BuilderBuildsType::Experimental => Build::Experimental(build_name),
             };
 
             package.version = Versioning::new(
@@ -498,7 +502,7 @@ pub trait ReleaseType:
             for package in self.iter() {
                 if matches!(package.state, PackageState::Installed { .. }) {
                     match package.build {
-                        Build::Daily(_) | Build::Branched(_) => {
+                        Build::Daily(_) | Build::Experimental(_) => {
                             match installed_packages.iter().find(|installed_package| {
                                 installed_package.version == package.version
                                     && installed_package.build == package.build
@@ -531,7 +535,7 @@ pub trait ReleaseType:
 
             for installed_package in installed_packages {
                 match installed_package.build {
-                    Build::Daily(_) | Build::Branched(_) => {
+                    Build::Daily(_) | Build::Experimental(_) => {
                         if let Some(package) = self.iter_mut().find(|package| {
                             installed_package.version == package.version
                                 && installed_package.build == package.build
@@ -674,21 +678,17 @@ pub enum BuilderBuildsType {
     // TODO: Add support for all the other new types.
     // Would require more than a few changes to the GUI and the logic behind some parts.
     Daily,
-    // TODO: Rename "Branched" back to "Experimental".
-    // I used "branched" to have more or less the same character width for easier GUI building,
-    // but after adding the archived types for each of the four build types, the names will be too
-    // long anyway, so I might as well use the official "experimental" moniker.
-    Branched,
+    Experimental,
 }
 
 impl BuilderBuildsType {
     const DAILY_URL: &'static str = "https://builder.blender.org/download/daily/";
-    const BRANCHED_URL: &'static str = "https://builder.blender.org/download/experimental/";
+    const EXPERIMENTAL_URL: &'static str = "https://builder.blender.org/download/experimental/";
 
     fn get_url(&self) -> &'static str {
         match self {
             BuilderBuildsType::Daily => Self::DAILY_URL,
-            BuilderBuildsType::Branched => Self::BRANCHED_URL,
+            BuilderBuildsType::Experimental => Self::EXPERIMENTAL_URL,
         }
     }
 }

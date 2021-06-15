@@ -100,7 +100,7 @@ where
                                     // Also worth considering not deleting the entry from the
                                     // database if there's a valid downloaded archive, so the user
                                     // can reinstall it even if it becomes unavailable like is the
-                                    // case with daily and branched packages.
+                                    // case with daily and experimental packages.
                                     if file.exists() {
                                         unwrap_or_return!(index, remove_file(&file).await);
                                     }
