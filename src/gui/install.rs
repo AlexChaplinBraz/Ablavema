@@ -7,7 +7,7 @@ use iced_futures::{
 };
 use reqwest;
 use std::{
-    fs::{rename, File},
+    fs::{create_dir_all, rename, File},
     hash::{Hash, Hasher},
     path::PathBuf,
 };
@@ -24,7 +24,6 @@ use xz2::read::XzDecoder;
 
 #[cfg(target_os = "windows")]
 use std::{
-    fs::create_dir_all,
     io::{Read, Write},
     thread::sleep,
     time::Duration,
@@ -85,6 +84,8 @@ where
                         match response {
                             Ok(response) => {
                                 if let Some(total) = response.content_length() {
+                                    create_dir_all(&get_setting().cache_dir).unwrap();
+
                                     let file = get_setting()
                                         .cache_dir
                                         .join(package.url.split_terminator('/').last().unwrap());

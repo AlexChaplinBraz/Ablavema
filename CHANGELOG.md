@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   packages are fetched.
 - Crash with `OutOfRangeError` due to the difference in timezones when calculating how long ago a package was released.
 - Fetching of daily and experimental packages. Was broken due to a website redesign.
+- Error on installing packages if cache directory was removed while the program was running.
 
 ### Known issues
 
