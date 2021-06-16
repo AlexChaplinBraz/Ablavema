@@ -37,10 +37,16 @@ macro_rules! unwrap_or_return {
         match $result {
             Ok(x) => x,
             Err(e) => {
+                eprintln!(
+                    "GUI install error at {}:{}, which was:\n{:#?}",
+                    file!(),
+                    line!(),
+                    e
+                );
                 return Some((
                     ($index, Progress::Errored(e.to_string())),
                     State::FinishedInstalling,
-                ))
+                ));
             }
         }
     };
