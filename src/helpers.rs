@@ -173,6 +173,33 @@ pub fn open_blender(package: String, file_path: Option<String>) {
     if let Some(path) = file_path {
         cmd.arg(path);
     }
+    // TODO: Consider handling possible errors when launching Blender.
+    // I've seen this panic inside a Windows VM with:
+    // "The application has failed to start because its side-by-side configuration is incorrect.
+    // Please see the application event log or use the command-line sxstrace.exe tool for more detail."
+    // Which is the same message that appears on a dialog if I try to launch that same package from
+    // the explorer, so it should probably be displayed as a dialog as well.
+    //
+    // The problem is that there are also messages like these:
+    //
+    // ---------------------------
+    // Blender - Can't detect 3D hardware accelerated Driver!
+    // ---------------------------
+    // Your system does not use 3D hardware acceleration.
+    // Blender requires a graphics driver with OpenGL 2.1 support.
+    //
+    // This may be caused by:
+    // * A missing or faulty graphics driver installation.
+    //   Blender needs a graphics card driver to work correctly.
+    // * Accessing Blender through a remote connection.
+    // * Using Blender through a virtual machine.
+    //
+    // The program will now close.
+    // ---------------------------
+    // OK
+    // ---------------------------
+    //
+    // Which do not panic here and just seem to be eaten up, not displaying the dialog at all.
     cmd.spawn().unwrap();
 }
 

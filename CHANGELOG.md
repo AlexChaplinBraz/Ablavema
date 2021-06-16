@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are located on different mount points.
 - The "how long ago" indicator for the package dates is inaccurate if the user's timezone differs from the one used
   by the Blender Foundation. 
+- Failure to launch the selected Blender version does not show a dialog the same way it would if executed directly.
 
 ## [0.1.0] - 2021-05-03: Minimum Viable Product release
 <!--BEGIN=0.1.0-->
