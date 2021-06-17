@@ -1,7 +1,6 @@
 use crate::{helpers::get_count, settings::get_setting};
 use bincode;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use glob::glob;
 use iced::button;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::{header, Client};
@@ -22,6 +21,8 @@ use versions::Versioning;
 use bzip2::read::BzDecoder;
 #[cfg(target_os = "linux")]
 use flate2::read::GzDecoder;
+#[cfg(target_os = "linux")]
+use glob::glob;
 #[cfg(target_os = "linux")]
 use tar::Archive;
 #[cfg(target_os = "linux")]
@@ -274,15 +275,16 @@ impl Package {
                     for file_index in 0..archive.len() {
                         progress_bar.inc(1);
                         let mut entry: ZipFile<'_> = archive.by_index(file_index).unwrap();
-                        let name = entry.name().to_owned();
+                        let (_, path) = entry.name().split_once('/').unwrap();
+                        let entry_path = format!("inner/{}", path);
 
                         if entry.is_dir() {
-                            let extracted_dir_path = extraction_dir.join(name);
+                            let extracted_dir_path = extraction_dir.join(entry_path);
                             create_dir_all(extracted_dir_path).unwrap();
                         } else if entry.is_file() {
                             let mut buffer: Vec<u8> = Vec::new();
                             let _bytes_read = entry.read_to_end(&mut buffer).unwrap();
-                            let extracted_file_path = extraction_dir.join(name);
+                            let extracted_file_path = extraction_dir.join(entry_path);
                             create_dir_all(extracted_file_path.parent().unwrap()).unwrap();
                             let mut file = File::create(extracted_file_path).unwrap();
                             file.write(&buffer).unwrap();
@@ -306,6 +308,7 @@ impl Package {
         let final_tasks = spawn(async move {
             extraction_handle.await.unwrap();
 
+            #[cfg(target_os = "linux")]
             let extracted_path = glob(&format!(
                 "{}/*",
                 get_setting()
@@ -318,6 +321,9 @@ impl Package {
             .next()
             .unwrap()
             .unwrap();
+
+            #[cfg(target_os = "windows")]
+            let extracted_path = get_setting().cache_dir.join(&package.name).join("inner");
 
             let mut package_path = get_setting().packages_dir.join(&package.name);
 

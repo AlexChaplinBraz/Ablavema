@@ -1,7 +1,6 @@
 use super::{Message, PackageMessage};
 use crate::{package::Package, settings::get_setting};
 use bincode;
-use glob::glob;
 use iced_futures::{
     futures::stream::{unfold, BoxStream},
     subscription,
@@ -18,6 +17,8 @@ use tokio::fs::{remove_dir_all, remove_file};
 use bzip2::read::BzDecoder;
 #[cfg(target_os = "linux")]
 use flate2::read::GzDecoder;
+#[cfg(target_os = "linux")]
+use glob::glob;
 #[cfg(target_os = "linux")]
 use tar::Archive;
 #[cfg(target_os = "linux")]
@@ -353,15 +354,16 @@ where
                                 // TODO: Show progress with bytes to avoid looking stuck.
                                 let mut entry: ZipFile<'_> =
                                     unwrap_or_return!(index, archive.by_index(extracted as usize));
-                                let entry_name = entry.name().to_owned();
+                                let (_, path) = entry.name().split_once('/').unwrap();
+                                let entry_path = format!("inner/{}", path);
 
                                 if entry.is_dir() {
-                                    let extracted_dir_path = extraction_dir.join(entry_name);
+                                    let extracted_dir_path = extraction_dir.join(entry_path);
                                     unwrap_or_return!(index, create_dir_all(extracted_dir_path));
                                 } else if entry.is_file() {
                                     let mut buffer: Vec<u8> = Vec::new();
                                     unwrap_or_return!(index, entry.read_to_end(&mut buffer));
-                                    let extracted_file_path = extraction_dir.join(entry_name);
+                                    let extracted_file_path = extraction_dir.join(entry_path);
                                     unwrap_or_return!(
                                         index,
                                         create_dir_all(extracted_file_path.parent().unwrap())
@@ -401,6 +403,7 @@ where
                         }
                     },
                     State::FinishedExtracting { package, index } => {
+                        #[cfg(target_os = "linux")]
                         let extracted_path = glob(&format!(
                             "{}/*",
                             get_setting()
@@ -413,6 +416,10 @@ where
                         .next()
                         .unwrap()
                         .unwrap();
+
+                        #[cfg(target_os = "windows")]
+                        let extracted_path =
+                            get_setting().cache_dir.join(&package.name).join("inner");
 
                         let mut package_path = get_setting().packages_dir.join(&package.name);
 
