@@ -53,23 +53,16 @@ async fn run() {
     if !ONLY_CLI.load(Ordering::Relaxed) {
         if LAUNCH_GUI.load(Ordering::Relaxed) || get_setting().default_package.is_none() {
             let mut window = iced::window::Settings::default();
-
-            #[cfg(target_os = "windows")]
-            {
-                let data = include_bytes!("../extra/temp/iced_icon_data");
-                let width = env!("ICED_ICON_WIDTH");
-                let height = env!("ICED_ICON_HEIGHT");
-                window.icon = Some(
-                    iced::window::Icon::from_rgba(
-                        data.to_vec(),
-                        width.parse().unwrap(),
-                        height.parse().unwrap(),
-                    )
-                    .unwrap(),
-                );
-            }
             window.size = (650, 570);
             window.min_size = Some((650, 570));
+            window.icon = Some(
+                iced::window::Icon::from_rgba(
+                    include_bytes!("../extra/temp/iced_icon_data").to_vec(),
+                    env!("ICED_ICON_WIDTH").parse().unwrap(),
+                    env!("ICED_ICON_HEIGHT").parse().unwrap(),
+                )
+                .unwrap(),
+            );
 
             let default_settings = iced::Settings::<()>::default();
 

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- No icon on window decorations on Linux.
 - Text clipping on the About page on some systems.
 
 ## [0.2.0] - 2021-06-17: Goodbye iconless life

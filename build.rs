@@ -1,8 +1,6 @@
-#[cfg(target_os = "windows")]
 fn main() {
     use png::Decoder;
     use std::{fs::File, io::Write};
-    use winres::WindowsResource;
 
     let ablavema32_file = File::open("extra/logo/ablavema32.png").unwrap();
     let decoder = Decoder::new(ablavema32_file);
@@ -15,13 +13,13 @@ fn main() {
     println!("cargo:rustc-env=ICED_ICON_WIDTH={}", info.width);
     println!("cargo:rustc-env=ICED_ICON_HEIGHT={}", info.height);
 
-    let mut resource = WindowsResource::new();
-    resource.set_icon("extra/windows/ablavema.ico");
-    resource.set("FileDescription", "Ablavema");
-    resource.set("ProductName", "Ablavema");
-    resource.set("OriginalFilename", "ablavema.exe");
-    resource.compile().unwrap();
+    #[cfg(target_os = "windows")]
+    {
+        let mut resource = winres::WindowsResource::new();
+        resource.set_icon("extra/windows/ablavema.ico");
+        resource.set("FileDescription", "Ablavema");
+        resource.set("ProductName", "Ablavema");
+        resource.set("OriginalFilename", "ablavema.exe");
+        resource.compile().unwrap();
+    }
 }
-
-#[cfg(target_os = "linux")]
-fn main() {}
