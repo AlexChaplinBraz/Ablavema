@@ -5,14 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
+## [0.2.1] - 2021-06-17: Stomping on runaway bugs
+<!--BEGIN=0.2.1-->
 ### Fixed
 
 - No icon on window decorations on Linux.
 - Self-updater error when the folders of the cache and the executable reside on different filesystems.
 - Text clipping on the About page on some systems.
-
+<!--END=0.2.1-->
 ## [0.2.0] - 2021-06-17: Goodbye iconless life
 <!--BEGIN=0.2.0-->
 ### Added
@@ -87,6 +87,7 @@ Noncomprehensive list of features available at launch.
 - CLI on Windows has no colour. Waiting for `clap` 3.0.0 to be released.
 - No macOS release.
 <!--END=0.1.0-->
-[Unreleased]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/AlexChaplinBraz/Ablavema/releases/tag/0.1.0
