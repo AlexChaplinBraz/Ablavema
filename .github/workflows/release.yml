@@ -122,6 +122,8 @@ jobs:
             7z a "$staging.zip" "$staging"
             echo "ASSET=$staging.zip" >> $GITHUB_ENV
           else
+            mv extra/logo/ablavema256.png "$staging/Ablavema.png"
+            mv extra/linux/Ablavema.desktop "$staging"
             mv "target/${{ matrix.target }}/release/ablavema" "$staging"
             tar czf "$staging.tar.gz" "$staging"
             echo "ASSET=$staging.tar.gz" >> $GITHUB_ENV
