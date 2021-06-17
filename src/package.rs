@@ -1,5 +1,4 @@
 use crate::{helpers::get_count, settings::get_setting};
-use bincode;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use iced::button;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};

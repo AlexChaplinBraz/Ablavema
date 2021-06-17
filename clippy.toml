@@ -1,0 +1,2 @@
+enum-variant-size-threshold = 600
+enum-variant-name-threshold = 4

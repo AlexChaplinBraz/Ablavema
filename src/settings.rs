@@ -2,7 +2,6 @@ use crate::{
     gui::{style::Theme, Filters, SortBy},
     package::Package,
 };
-use bincode;
 use device_query::Keycode;
 use directories_next::ProjectDirs;
 use lazy_static::{initialize, lazy_static};
@@ -157,7 +156,7 @@ impl Default for Settings {
             cache_dir: PROJECT_DIRS.cache_dir().to_path_buf(),
             last_update_time: SystemTime::now()
                 .checked_sub(Duration::from_secs(minutes_between_updates * 60))
-                .unwrap_or_else(|| SystemTime::now()),
+                .unwrap_or_else(SystemTime::now),
             filters: Filters::default(),
             sort_by: SortBy::default(),
             theme: Theme::default(),

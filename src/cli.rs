@@ -600,7 +600,7 @@ pub async fn run_cli() -> GuiFlags {
 
             if a.is_present("modifier_key") {
                 let new_arg = a.value_of("modifier_key").unwrap();
-                let old_arg = get_setting().modifier_key.clone();
+                let old_arg = get_setting().modifier_key;
 
                 if new_arg == old_arg.to_string() {
                     println!("'modifier-key' is unchanged from '{}'.", old_arg);
@@ -770,7 +770,7 @@ pub async fn run_cli() -> GuiFlags {
 
                 println!("Removed all packages.");
 
-                if !get_setting().default_package.is_none() {
+                if get_setting().default_package.is_some() {
                     set_setting().default_package = None;
                     save_settings();
 
@@ -951,10 +951,9 @@ pub async fn run_cli() -> GuiFlags {
 
     GuiFlags {
         releases,
-        file_path: if args.is_present("path") {
-            Some(String::from(args.value_of("path").unwrap()))
-        } else {
-            None
+        file_path: match args.value_of("path") {
+            Some(file_path) => Some(file_path.to_string()),
+            None => None,
         },
         self_releases,
     }

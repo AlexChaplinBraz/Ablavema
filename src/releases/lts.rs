@@ -58,8 +58,7 @@ impl ReleaseType for Lts {
                 }
                 .text();
 
-                let version =
-                    Versioning::new(version.split_whitespace().skip(2).next().unwrap()).unwrap();
+                let version = Versioning::new(version.split_whitespace().nth(2).unwrap()).unwrap();
 
                 let lts_date_id = format!("faq-lts-release-{}{}-1", lts_ver, rev);
                 let section_1 = document
@@ -114,21 +113,16 @@ impl ReleaseType for Lts {
                         continue;
                     }
 
-                    let mut package = Package::default();
-
-                    package.name = format!("{}-lts", get_file_stem(archive_name));
-
-                    package.build = Build::Lts;
-
-                    package.url = format!("{}{}/{}", download_path, lts_ver_path, archive_name);
-
-                    package.os = os;
-
-                    package.version = version.clone();
-
-                    package.date = date.clone();
-
-                    package.changelog = changelog.clone();
+                    let package = Package {
+                        version: version.clone(),
+                        name: format!("{}-lts", get_file_stem(archive_name)),
+                        build: Build::Lts,
+                        date,
+                        url: format!("{}{}/{}", download_path, lts_ver_path, archive_name),
+                        os,
+                        changelog: changelog.clone(),
+                        ..Default::default()
+                    };
 
                     lts.push(package);
                 }

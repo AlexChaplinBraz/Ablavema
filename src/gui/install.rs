@@ -1,11 +1,9 @@
 use super::{Message, PackageMessage};
 use crate::{package::Package, settings::get_setting};
-use bincode;
 use iced_futures::{
     futures::stream::{unfold, BoxStream},
     subscription,
 };
-use reqwest;
 use std::{
     fs::{create_dir_all, rename, File},
     hash::{Hash, Hasher},

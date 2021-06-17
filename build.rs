@@ -9,7 +9,7 @@ fn main() {
     reader.next_frame(&mut buf).unwrap();
     let mut iced_icon_data_file = File::create("extra/temp/iced_icon_data").unwrap();
 
-    iced_icon_data_file.write(&buf).unwrap();
+    iced_icon_data_file.write_all(&buf).unwrap();
     println!("cargo:rustc-env=ICED_ICON_WIDTH={}", info.width);
     println!("cargo:rustc-env=ICED_ICON_HEIGHT={}", info.height);
 

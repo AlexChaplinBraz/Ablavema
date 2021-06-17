@@ -14,10 +14,8 @@ use crate::{
     settings::{get_setting, init_settings, save_settings, set_setting, CAN_CONNECT},
 };
 use async_trait::async_trait;
-use bincode;
 use chrono::{Datelike, NaiveDateTime, NaiveTime, Utc};
 use indicatif::MultiProgress;
-use reqwest;
 use select::predicate::{And, Class, Name};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -276,15 +274,7 @@ impl Releases {
     /// Returns the amount of updates for each build type if there are any.
     /// The returned tuple of options is:
     /// (all_count, daily_count, experimental_count, stable_count, lts_count)
-    pub fn count_updates(
-        &self,
-    ) -> (
-        Option<usize>,
-        Option<usize>,
-        Option<usize>,
-        Option<usize>,
-        Option<usize>,
-    ) {
+    pub fn count_updates(&self) -> UpdateCount {
         let daily_count = self
             .daily
             .iter()
@@ -307,13 +297,13 @@ impl Releases {
             .count();
         let all_count = daily_count + experimental_count + stable_count + lts_count;
 
-        (
-            all_count.return_option(),
-            daily_count.return_option(),
-            experimental_count.return_option(),
-            stable_count.return_option(),
-            lts_count.return_option(),
-        )
+        UpdateCount {
+            all: all_count.return_option(),
+            daily: daily_count.return_option(),
+            experimental: experimental_count.return_option(),
+            stable: stable_count.return_option(),
+            lts: lts_count.return_option(),
+        }
     }
 
     /// Installs the latest packages for each build, as long as there's one older package
@@ -366,6 +356,14 @@ impl Releases {
     }
 }
 
+pub struct UpdateCount {
+    pub all: Option<usize>,
+    pub daily: Option<usize>,
+    pub experimental: Option<usize>,
+    pub stable: Option<usize>,
+    pub lts: Option<usize>,
+}
+
 #[async_trait]
 pub trait ReleaseType:
     Sized
@@ -398,10 +396,8 @@ pub trait ReleaseType:
             .next()
             .unwrap();
 
-        for build in builds_list.find(Class("os")) {
-            let mut package = Package::default();
-
-            package.url = build
+        for build_node in builds_list.find(Class("os")) {
+            let url = build_node
                 .find(Name("a"))
                 .next()
                 .unwrap()
@@ -409,38 +405,45 @@ pub trait ReleaseType:
                 .unwrap()
                 .to_string();
 
-            if package.url.ends_with(".sha256") {
+            if url.ends_with(".sha256") {
                 continue;
             }
 
-            package.name = get_file_stem(&package.url).to_string();
+            let name = get_file_stem(&url).to_string();
 
-            let build_name = build.find(Class("build-var")).next().unwrap().text();
-            package.build = match builder_builds_type {
+            let build_name = build_node.find(Class("build-var")).next().unwrap().text();
+            let build = match builder_builds_type {
                 BuilderBuildsType::Daily => Build::Daily(build_name),
                 BuilderBuildsType::Experimental => Build::Experimental(build_name),
             };
 
-            package.version = Versioning::new(
-                build
+            let version = Versioning::new(
+                build_node
                     .find(Class("name"))
                     .next()
                     .unwrap()
                     .text()
                     .split_whitespace()
-                    .skip(1)
-                    .next()
+                    .nth(1)
                     .unwrap(),
             )
             .unwrap();
 
-            let small_subtext = build.find(Name("small")).next().unwrap().text();
+            let small_subtext = build_node.find(Name("small")).next().unwrap().text();
             let parts: Vec<&str> = small_subtext.split_terminator(" - ").collect();
-            let date = format!("{}-{}", parts[0], Utc::today().year());
-            package.date = NaiveDateTime::parse_from_str(&date, "%B %d, %T-%Y").unwrap();
-            package.commit = parts[2].to_string();
+            let date_string = format!("{}-{}", parts[0], Utc::today().year());
+            let date = NaiveDateTime::parse_from_str(&date_string, "%B %d, %T-%Y").unwrap();
 
-            package.os = os;
+            let package = Package {
+                version,
+                name,
+                build,
+                date,
+                commit: parts[2].to_string(),
+                url,
+                os,
+                ..Default::default()
+            };
 
             packages.push(package);
         }

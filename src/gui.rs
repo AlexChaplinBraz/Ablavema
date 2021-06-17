@@ -12,7 +12,7 @@ use crate::{
     package::{Build, Package, PackageState, PackageStatus},
     releases::{
         archived::Archived, daily::Daily, experimental::Experimental, lts::Lts, stable::Stable,
-        ReleaseType, Releases,
+        ReleaseType, Releases, UpdateCount,
     },
     settings::{
         get_setting, save_settings, set_setting, ModifierKey, CAN_CONNECT, CONFIG_FILE_ENV,
@@ -29,7 +29,6 @@ use iced::{
 };
 use itertools::Itertools;
 use native_dialog::{FileDialog, MessageDialog, MessageType};
-use reqwest;
 use self_update::update::Release;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -39,7 +38,6 @@ use std::{
     sync::atomic::Ordering,
 };
 use tokio::task::spawn_blocking;
-use webbrowser;
 
 #[derive(Debug)]
 pub struct Gui {
@@ -100,14 +98,13 @@ impl Gui {
         check_connection().await;
 
         if CAN_CONNECT.load(Ordering::Relaxed) {
-            (
-                true,
-                Releases::check_daily_updates(daily).await.1,
-                Releases::check_experimental_updates(experimental).await.1,
-                Releases::check_stable_updates(stable).await.1,
-                Releases::check_lts_updates(lts).await.1,
-                Releases::check_archived_updates(archived).await.1,
-            )
+            let daily = Releases::check_daily_updates(daily).await.1;
+            let experimental = Releases::check_experimental_updates(experimental).await.1;
+            let stable = Releases::check_stable_updates(stable).await.1;
+            let lts = Releases::check_lts_updates(lts).await.1;
+            let archived = Releases::check_archived_updates(archived).await.1;
+
+            (true, daily, experimental, stable, lts, archived)
         } else {
             (false, daily, experimental, stable, lts, archived)
         }
@@ -168,7 +165,7 @@ impl Gui {
     }
 
     async fn fetch_self_releases() -> Option<Vec<Release>> {
-        spawn_blocking(|| fetch_self_releases()).await.unwrap()
+        spawn_blocking(fetch_self_releases).await.unwrap()
     }
 
     async fn change_self_version(releases: Vec<Release>, version: String) {
@@ -222,7 +219,7 @@ impl Application for Gui {
     }
 
     fn title(&self) -> String {
-        match self.releases.count_updates().0 {
+        match self.releases.count_updates().all {
             Some(count) => format!(
                 "Ablavema - {} update{} available!",
                 count,
@@ -342,8 +339,7 @@ impl Application for Gui {
                                 .releases
                                 .installed
                                 .iter()
-                                .find(|p| p.build == package.build)
-                                .is_some()
+                                .any(|p| p.build == package.build)
                         {
                             "daily package of its build type"
                         } else {
@@ -357,8 +353,7 @@ impl Application for Gui {
                                 .releases
                                 .installed
                                 .iter()
-                                .find(|p| p.build == package.build)
-                                .is_some()
+                                .any(|p| p.build == package.build)
                         {
                             "experimental package of its build type"
                         } else {
@@ -372,8 +367,7 @@ impl Application for Gui {
                                 .releases
                                 .installed
                                 .iter()
-                                .find(|p| p.build == package.build)
-                                .is_some()
+                                .any(|p| p.build == package.build)
                         {
                             "stable package"
                         } else {
@@ -387,8 +381,7 @@ impl Application for Gui {
                                 .releases
                                 .installed
                                 .iter()
-                                .find(|p| p.build == package.build)
-                                .is_some()
+                                .any(|p| p.build == package.build)
                         {
                             "LTS package"
                         } else {
@@ -409,11 +402,12 @@ impl Application for Gui {
                         "Can't install '{}' because the setting to keep only latest {} is enabled.",
                         package.name, message
                     );
-                    if let Err(_) = MessageDialog::new()
+                    if MessageDialog::new()
                         .set_type(MessageType::Info)
                         .set_title("Ablavema")
                         .set_text(&message)
                         .show_alert()
+                        .is_err()
                     {
                         if cfg!(target_os = "linux") {
                             println!(
@@ -493,11 +487,12 @@ impl Application for Gui {
                         if for_install {
                             let message =
                                 format!("Package '{}' is no longer available.", package.name);
-                            if let Err(_) = MessageDialog::new()
+                            if MessageDialog::new()
                                 .set_type(MessageType::Info)
                                 .set_title("Ablavema")
                                 .set_text(&message)
                                 .show_alert()
+                                .is_err()
                             {
                                 if cfg!(target_os = "linux") {
                                     // TODO: Show a tooltip if dependencies not found.
@@ -1137,10 +1132,9 @@ impl Application for Gui {
                 let button = |label, package_message: Option<Message>, state| {
                     let button = Button::new(state, Text::new(label)).style(theme);
 
-                    if package_message.is_some() {
-                        button.on_press(package_message.unwrap())
-                    } else {
-                        button
+                    match package_message {
+                        Some(package_message) => button.on_press(package_message),
+                        None => button,
                     }
                 };
 
@@ -1154,18 +1148,16 @@ impl Application for Gui {
                                 .align_items(Align::Center)
                                 .push(button(
                                     "[=]",
-                                    match get_setting().default_package.clone() {
-                                        Some(package) => Some(Message::OpenBlender(package)),
-                                        None => None,
-                                    },
+                                    get_setting()
+                                        .default_package
+                                        .clone()
+                                        .map(Message::OpenBlender),
                                     &mut self.state.open_default_button,
                                 ))
                                 .push(Text::new("Default package:"))
                                 .push(
                                     Text::new(match get_setting().default_package.clone() {
-                                        Some(package) => {
-                                            format!("{}", package.name)
-                                        }
+                                        Some(package) => package.name,
                                         None => String::from("not set"),
                                     })
                                     .color(theme.highlight_text()),
@@ -1191,10 +1183,8 @@ impl Application for Gui {
                                 .push(Text::new("File:"))
                                 .push(
                                     Text::new(match &self.file_path {
-                                        Some(file_path) => {
-                                            format!("{}", file_path)
-                                        }
-                                        None => String::from("none"),
+                                        Some(file_path) => file_path,
+                                        None => "none",
                                     })
                                     .color(theme.highlight_text()),
                                 ),
@@ -1401,66 +1391,41 @@ impl Application for Gui {
                     }
                 };
 
-                let daily_packages_exist = if self
+                let daily_packages_exist = self
                     .releases
                     .installed
                     .iter()
                     .filter(|package| matches!(package.build, Build::Daily { .. }))
                     .count()
-                    > 0
-                {
-                    true
-                } else {
-                    false
-                };
-                let experimental_packages_exist = if self
+                    > 0;
+                let experimental_packages_exist = self
                     .releases
                     .installed
                     .iter()
                     .filter(|package| matches!(package.build, Build::Experimental { .. }))
                     .count()
-                    > 0
-                {
-                    true
-                } else {
-                    false
-                };
-                let stable_packages_exist = if self
+                    > 0;
+                let stable_packages_exist = self
                     .releases
                     .installed
                     .iter()
                     .filter(|package| package.build == Build::Stable)
                     .count()
-                    > 0
-                {
-                    true
-                } else {
-                    false
-                };
-                let lts_packages_exist = if self
+                    > 0;
+                let lts_packages_exist = self
                     .releases
                     .installed
                     .iter()
                     .filter(|package| package.build == Build::Lts)
                     .count()
-                    > 0
-                {
-                    true
-                } else {
-                    false
-                };
-                let archived_packages_exist = if self
+                    > 0;
+                let archived_packages_exist = self
                     .releases
                     .installed
                     .iter()
                     .filter(|package| package.build == Build::Archived)
                     .count()
-                    > 0
-                {
-                    true
-                } else {
-                    false
-                };
+                    > 0;
                 let any_packages_exist = daily_packages_exist
                     || experimental_packages_exist
                     || stable_packages_exist
@@ -2032,7 +1997,7 @@ downgrade you will be prompted to update Ablavema every time updates are checked
                                     PickList::new(
                                         &mut self.state.self_updater_pick_list,
                                         &self.state.release_versions,
-                                        Some(self_updater_pick_list_selected.clone()),
+                                        Some(self_updater_pick_list_selected),
                                         Message::PickListVersionSelected,
                                     )
                                     .width(Length::Units(60))
@@ -2361,17 +2326,7 @@ struct Controls {
 }
 
 impl Controls {
-    fn view(
-        &mut self,
-        update_count: (
-            Option<usize>,
-            Option<usize>,
-            Option<usize>,
-            Option<usize>,
-            Option<usize>,
-        ),
-        theme: Theme,
-    ) -> Container<'_, Message> {
+    fn view(&mut self, update_count: UpdateCount, theme: Theme) -> Container<'_, Message> {
         let checking_for_updates = self.checking_for_updates;
 
         let update_button = {
@@ -2405,13 +2360,15 @@ impl Controls {
                 Some(state) => {
                     let button = Button::new(state, Text::new("[O]")).style(theme);
 
-                    if button_message.is_some()
-                        && CAN_CONNECT.load(Ordering::Relaxed)
-                        && !checking_for_updates
-                    {
-                        row.push(button.on_press(button_message.unwrap()))
-                    } else {
-                        row.push(button)
+                    match button_message {
+                        Some(button_message) => {
+                            if CAN_CONNECT.load(Ordering::Relaxed) && !checking_for_updates {
+                                row.push(button.on_press(button_message))
+                            } else {
+                                row.push(button)
+                            }
+                        }
+                        None => row.push(button),
                     }
                 }
                 None => row,
@@ -2423,7 +2380,7 @@ impl Controls {
             .push(Text::new("Filters"))
             .push(filter_row(
                 self.filters.updates,
-                match update_count.0 {
+                match update_count.all {
                     Some(count) => {
                         format!("Updates [{}]", count)
                     }
@@ -2457,7 +2414,7 @@ impl Controls {
             ))
             .push(filter_row(
                 self.filters.daily,
-                match update_count.1 {
+                match update_count.daily {
                     Some(count) => {
                         format!("Daily [{}]", count)
                     }
@@ -2469,7 +2426,7 @@ impl Controls {
             ))
             .push(filter_row(
                 self.filters.experimental,
-                match update_count.2 {
+                match update_count.experimental {
                     Some(count) => {
                         format!("Experimental [{}]", count)
                     }
@@ -2481,7 +2438,7 @@ impl Controls {
             ))
             .push(filter_row(
                 self.filters.stable,
-                match update_count.3 {
+                match update_count.stable {
                     Some(count) => {
                         format!("Stable [{}]", count)
                     }
@@ -2493,7 +2450,7 @@ impl Controls {
             ))
             .push(filter_row(
                 self.filters.lts,
-                match update_count.4 {
+                match update_count.lts {
                     Some(count) => {
                         format!("LTS [{}]", count)
                     }
@@ -2543,7 +2500,6 @@ impl Controls {
                 .width(Length::Units(190))
                 .height(Length::Fill)
                 .style(theme.sidebar_container())
-                .into()
         } else {
             Container::new(
                 Column::new().push(scrollable.height(Length::Fill)).push(
@@ -2575,7 +2531,6 @@ impl Controls {
             .width(Length::Units(190))
             .height(Length::Fill)
             .style(theme.sidebar_container())
-            .into()
         }
     }
 }
@@ -2951,10 +2906,9 @@ impl Package {
             .width(Length::Fill)
             .style(theme);
 
-            if package_message.is_some() {
-                button.on_press(package_message.unwrap())
-            } else {
-                button
+            match package_message {
+                Some(package_message) => button.on_press(package_message),
+                None => button,
             }
         };
 
@@ -3003,7 +2957,7 @@ impl Package {
                     Row::new()
                         .align_items(Align::Center)
                         .push(
-                            Text::new(format!("Extracting..."))
+                            Text::new("Extracting...")
                                 .width(Length::Fill)
                                 .horizontal_alignment(HorizontalAlignment::Center),
                         )

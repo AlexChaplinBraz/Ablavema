@@ -276,7 +276,7 @@ pub fn get_file_stem(filename: &str) -> &str {
 }
 
 pub fn is_time_to_update() -> bool {
-    if get_setting()
+    get_setting()
         .last_update_time
         .elapsed()
         .unwrap()
@@ -284,14 +284,9 @@ pub fn is_time_to_update() -> bool {
         .checked_div(60)
         .unwrap()
         >= get_setting().minutes_between_updates
-    {
-        true
-    } else {
-        false
-    }
 }
 
-pub async fn cli_install(args: &ArgMatches<'_>, packages: &Vec<Package>, name: &str) {
+pub async fn cli_install(args: &ArgMatches<'_>, packages: &[Package], name: &str) {
     if CAN_CONNECT.load(Ordering::Relaxed) {
         let multi_progress = MultiProgress::new();
         let flags = (args.is_present("reinstall"), args.is_present("redownload"));
@@ -334,7 +329,7 @@ pub async fn cli_install(args: &ArgMatches<'_>, packages: &Vec<Package>, name: &
     }
 }
 
-pub fn cli_list_narrow(packages: &Vec<Package>, name: &str, invert: bool) {
+pub fn cli_list_narrow(packages: &[Package], name: &str, invert: bool) {
     let mut table = Table::new();
     table.set_titles(row!["ID", "Package"]);
 
@@ -369,7 +364,7 @@ pub fn cli_list_narrow(packages: &Vec<Package>, name: &str, invert: bool) {
     }
 }
 
-pub fn cli_list_wide(packages: &Vec<Package>, name: &str, invert: bool) {
+pub fn cli_list_wide(packages: &[Package], name: &str, invert: bool) {
     let mut table = Table::new();
     table.set_titles(row!["ID", "Package", "Version", "Build", "Date"]);
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);

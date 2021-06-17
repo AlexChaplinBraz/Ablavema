@@ -67,7 +67,7 @@ impl ReleaseType for Archived {
                     builds.push(node.attr("href").unwrap());
                 }
 
-                builds.retain(|x| !x.ends_with('/') && !x.contains("?"));
+                builds.retain(|x| !x.ends_with('/') && !x.contains('?'));
                 builds.reverse();
 
                 for name in builds {
@@ -166,10 +166,8 @@ impl ReleaseType for Archived {
                         "2.56beta" => Versioning::new("2.56beta").unwrap(),
                         "2.56abeta" => Versioning::new("2.56abeta").unwrap(),
                         "2.79latest" => Versioning::new("2.79latest").unwrap(),
-                        _ => Versioning::new(
-                            package.name.split_terminator("-").skip(1).next().unwrap(),
-                        )
-                        .unwrap(),
+                        _ => Versioning::new(package.name.split_terminator('-').nth(1).unwrap())
+                            .unwrap(),
                     };
 
                     package.date = NaiveDateTime::parse_from_str(&date, "%d-%b-%Y %T").unwrap();

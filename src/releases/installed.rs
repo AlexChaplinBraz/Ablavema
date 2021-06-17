@@ -2,7 +2,6 @@ use crate::{
     package::{Build, Package},
     settings::{get_setting, save_settings, set_setting},
 };
-use bincode;
 use derive_deref::{Deref, DerefMut};
 use std::fs::{read_dir, remove_dir_all, File};
 
@@ -31,7 +30,7 @@ impl Installed {
             }
         }
 
-        self.sort_by_key(|x| x.date.clone());
+        self.sort_by_key(|x| x.date);
         self.reverse();
     }
 
