@@ -205,7 +205,7 @@ jobs:
           sed -i "s/REPLACE_RELEASE_VERSION/${{ env.RELEASE_VERSION }}/;s/REPLACE_SHA256SUMS_X86_64/$sha256/" extra/linux/PKGBUILD
 
       - name: Publish to the AUR
-        uses: KSXGitHub/github-actions-deploy-aur@v2
+        uses: KSXGitHub/github-actions-deploy-aur@v2.2.5
         with:
           pkgname: ablavema-bin
           pkgbuild: extra/linux/PKGBUILD
