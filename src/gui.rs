@@ -2123,7 +2123,7 @@ downgrade you will be prompted to update Ablavema every time updates are checked
                         .align_items(Align::Center)
                         .push(
                             Text::new(label)
-                                .width(Length::Units(70))
+                                .width(Length::Units(100))
                                 .color(theme.highlight_text()),
                         )
                         .push(
