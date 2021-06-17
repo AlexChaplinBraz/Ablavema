@@ -53,13 +53,13 @@ bzip2 = "0.4"
 flate2 = "1"
 glob = "0.3"
 iced = { version = "0.3", default-features = false, features = ["glow", "glow_default_system_font"] }
-self_update = { version = "0.26", default-features = false, features = ["archive-tar", "compression-flate2", "rustls"] }
+self_update = { version = "0.27", default-features = false, features = ["archive-tar", "compression-flate2", "rustls"] }
 tar = "0.4"
 xz2 = "0.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 iced = "0.3"
-self_update = { version = "0.26", default-features = false, features = ["archive-zip", "rustls"] }
+self_update = { version = "0.27", default-features = false, features = ["archive-zip", "rustls"] }
 winapi = { version = "0.3", features = ["wincon"] }
 zip = "0.5"
 

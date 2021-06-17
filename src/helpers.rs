@@ -3,6 +3,7 @@ use crate::{
     settings::{get_setting, set_setting, CAN_CONNECT},
 };
 use clap::{crate_version, ArgMatches};
+use fs_extra::file::{move_file, CopyOptions};
 use indicatif::MultiProgress;
 use lazy_static::lazy_static;
 use prettytable::{
@@ -16,7 +17,7 @@ use self_update::{backends::github::ReleaseList, update::Release};
 use std::{
     collections::HashMap,
     env::current_exe,
-    fs::File,
+    fs::{rename, File},
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
@@ -147,15 +148,11 @@ pub fn change_self_version(releases: Vec<Release>, version: String) {
         .extract_file(&get_setting().cache_dir, &bin_archive_path)
         .unwrap();
 
-    // TODO: Offer an option to restore previous version.
-    // Could maybe even save them with their versions in the name so it'd be possible
-    // to quickly swich them around without having to redownload.
-    let tmp_file = get_setting().cache_dir.join("ablavema_backup");
     let bin_path = get_setting().cache_dir.join(bin_archive_path);
-    self_update::Move::from_source(&bin_path)
-        .replace_using_temp(&tmp_file)
-        .to_dest(&current_exe().unwrap())
-        .unwrap();
+    let temp_path = current_exe().unwrap().parent().unwrap().join("temp");
+
+    move_file(bin_path, &temp_path, &CopyOptions::new()).unwrap();
+    rename(temp_path, current_exe().unwrap()).unwrap();
 }
 
 pub fn open_blender(package: String, file_path: Option<String>) {

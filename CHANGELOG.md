@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - No icon on window decorations on Linux.
+- Self-updater error when the folders of the cache and the executable reside on different filesystems.
 - Text clipping on the About page on some systems.
 
 ## [0.2.0] - 2021-06-17: Goodbye iconless life
@@ -39,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   taken from the equivalent package in the archived list. Now it'll just stay at 00:00:00 until the new archived
   packages are fetched.
 - Crash with `OutOfRangeError` due to the difference in timezones when calculating how long ago a package was released.
-- Error on installing packages if cache directory was removed while the program was running.
+- Error on installing packages if cache folder was removed while the program was running.
 - Error `The system cannot find the path specified. (os error 3)` on Windows during extraction due to long path.
 
 ### Known issues
@@ -71,7 +72,7 @@ Noncomprehensive list of features available at launch.
 - Settings for bypassing the launcher if a default package is set.
 - Updating the launcher itself.
 - Light and dark themes based on Blender.
-- Working as portable by creating an empty file named "portable" in the same directory as the executable.
+- Working as portable by creating an empty file named "portable" in the same folder as the executable.
 
 ### Known issues
 
