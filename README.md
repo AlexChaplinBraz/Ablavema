@@ -54,7 +54,7 @@ next to it. This would allow one to store everything on a flash drive, for examp
 Pull requests are welcomed, but please follow my general coding style
 (which mostly amounts to running `rustfmt` on save).
 
-You can contact me most easily through Ablavema's Discord server with
+You can contact me most easily through my Discord server with
 [discord.gg/D6gmhMUrrH](https://discord.gg/D6gmhMUrrH).
 
 But you can also contact me directly as listed at
