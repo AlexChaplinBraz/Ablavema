@@ -5,8 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
+## [0.2.0] - 2021-06-17: Goodbye iconless life
+<!--BEGIN=0.2.0-->
 ### Added
 
 - Windows icon.
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Name of the experimental builds category from "Branched" to "Experimental".
-- From `openssl` to `rustls`, eliminating the OpenSSL dependency.
+- From `openssl` to `rustls`, eliminating the OpenSSL dependency on Linux.
 - From `msgbox` to `native-dialog`, eliminating the GTK3 dependency on Linux.
 
 ### Fixed
@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The "how long ago" indicator for the package dates is inaccurate if the user's timezone differs from the one used
   by the Blender Foundation. 
 - Failure to launch the selected Blender version does not show a dialog the same way it would if executed directly.
-
+<!--END=0.2.0-->
 ## [0.1.0] - 2021-05-03: Minimum Viable Product release
 <!--BEGIN=0.1.0-->
 ### Added
@@ -79,5 +79,6 @@ Noncomprehensive list of features available at launch.
 - CLI on Windows has no colour. Waiting for `clap` 3.0.0 to be released.
 - No macOS release.
 <!--END=0.1.0-->
-[Unreleased]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/AlexChaplinBraz/Ablavema/releases/tag/0.1.0

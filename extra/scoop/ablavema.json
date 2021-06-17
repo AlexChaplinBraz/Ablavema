@@ -1,15 +1,15 @@
 {
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "A Blender launcher and version manager",
     "homepage": "https://github.com/AlexChaplinBraz/Ablavema",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/AlexChaplinBraz/Ablavema/releases/download/0.1.0/ablavema-0.1.0-x86_64-pc-windows-msvc.zip",
+            "url": "https://github.com/AlexChaplinBraz/Ablavema/releases/download/0.2.0/ablavema-0.2.0-x86_64-pc-windows-msvc.zip",
             "hash": "cbb4c41b462f4fdbd9b3503f45fab3ecad9601a8351c75416bffaea66eb7f765"
         }
     },
-    "extract_dir": "ablavema-0.1.0-x86_64-pc-windows-msvc",
+    "extract_dir": "ablavema-0.2.0-x86_64-pc-windows-msvc",
     "bin": "ablavema.exe",
     "shortcuts": [
         [
@@ -17,9 +17,7 @@
             "Ablavema"
         ]
     ],
-    "checkver": {
-        "github": "https://github.com/AlexChaplinBraz/Ablavema"
-    },
+    "checkver": "github",
     "autoupdate": {
         "architecture": {
             "64bit": {
