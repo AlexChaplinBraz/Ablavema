@@ -1899,52 +1899,39 @@ to see if a bug was there before or whatnot.",
                     Message::SelfUpdater,
                 );
 
-                let settings = Column::new()
-                    .padding(10)
-                    .spacing(10)
-                    .push(checking_for_updates_block)
-                    .push(separator())
-                    .push(check_updates_at_launch)
-                    .push(separator())
-                    .push(minutes_between_updates)
-                    .push(separator())
-                    .push(check_daily)
-                    .push(separator())
-                    .push(check_experimental)
-                    .push(separator())
-                    .push(check_stable)
-                    .push(separator())
-                    .push(check_lts)
-                    .push(separator())
-                    .push(installing_updates_block)
-                    .push(separator())
-                    .push(use_latest_as_default)
-                    .push(separator())
-                    .push(keep_only_latest_daily)
-                    .push(separator())
-                    .push(keep_only_latest_experimental)
-                    .push(separator())
-                    .push(keep_only_latest_stable)
-                    .push(separator())
-                    .push(keep_only_latest_lts)
-                    .push(separator())
-                    .push(others_block)
-                    .push(separator())
-                    .push(bypass_launcher)
-                    .push(separator())
-                    .push(modifier_key)
-                    .push(separator())
-                    .push(choose_theme)
-                    .push(separator())
-                    .push(change_location)
-                    .push(separator())
-                    .push(remove_databases)
-                    .push(separator())
-                    .push(remove_packages)
-                    .push(separator())
-                    .push(remove_cache)
-                    .push(separator())
-                    .push(self_updater);
+                let items = [
+                    iced::Element::from(checking_for_updates_block),
+                    check_updates_at_launch.into(),
+                    minutes_between_updates.into(),
+                    check_daily.into(),
+                    check_experimental.into(),
+                    check_stable.into(),
+                    check_lts.into(),
+                    installing_updates_block.into(),
+                    use_latest_as_default.into(),
+                    keep_only_latest_daily.into(),
+                    keep_only_latest_experimental.into(),
+                    keep_only_latest_stable.into(),
+                    keep_only_latest_lts.into(),
+                    others_block.into(),
+                    bypass_launcher.into(),
+                    modifier_key.into(),
+                    choose_theme.into(),
+                    change_location.into(),
+                    remove_databases.into(),
+                    remove_packages.into(),
+                    remove_cache.into(),
+                    self_updater.into(),
+                ];
+
+                let num_items = items.len();
+                let mut settings = Column::new().padding(10).spacing(10);
+                for (i, setting) in std::array::IntoIter::new(items).enumerate() {
+                    settings = settings.push(setting);
+                    if i + 1 < num_items {
+                        settings = settings.push(separator());
+                    }
+                }
 
                 Container::new(Scrollable::new(&mut self.state.settings_scroll).push(
                     if get_setting().self_updater {
