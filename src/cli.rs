@@ -951,10 +951,7 @@ pub async fn run_cli() -> GuiFlags {
 
     GuiFlags {
         releases,
-        file_path: match args.value_of("path") {
-            Some(file_path) => Some(file_path.to_string()),
-            None => None,
-        },
+        file_path: args.value_of("path").map(|file_path| file_path.to_string()),
         self_releases,
     }
 }
