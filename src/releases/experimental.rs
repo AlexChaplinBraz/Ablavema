@@ -11,7 +11,7 @@ pub struct Experimental(Vec<Package>);
 #[async_trait]
 impl ReleaseType for Experimental {
     async fn fetch() -> Self {
-        Self::fetch_from_builder(BuilderBuildsType::Experimental).await
+        Self(BuilderBuildsType::Experimental.fetch().await)
     }
 
     fn get_name(&self) -> String {

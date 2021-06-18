@@ -375,83 +375,6 @@ pub trait ReleaseType:
 {
     async fn fetch() -> Self;
 
-    async fn fetch_from_builder(builder_builds_type: BuilderBuildsType) -> Self {
-        let document = get_document(builder_builds_type.get_url()).await;
-        let mut packages = Self::default();
-
-        let (platform, os) = {
-            if cfg!(target_os = "linux") {
-                ("platform-linux", Os::Linux)
-            } else if cfg!(target_os = "windows") {
-                ("platform-windows", Os::Windows)
-            } else if cfg!(target_os = "macos") {
-                ("platform-darwin", Os::MacOs)
-            } else {
-                unreachable!("Unsupported OS");
-            }
-        };
-
-        let builds_list = document
-            .find(And(Class("builds-list"), Class(platform)))
-            .next()
-            .unwrap();
-
-        for build_node in builds_list.find(Class("os")) {
-            let url = build_node
-                .find(Name("a"))
-                .next()
-                .unwrap()
-                .attr("href")
-                .unwrap()
-                .to_string();
-
-            if url.ends_with(".sha256") {
-                continue;
-            }
-
-            let name = get_file_stem(&url).to_string();
-
-            let build_name = build_node.find(Class("build-var")).next().unwrap().text();
-            let build = match builder_builds_type {
-                BuilderBuildsType::Daily => Build::Daily(build_name),
-                BuilderBuildsType::Experimental => Build::Experimental(build_name),
-            };
-
-            let version = Versioning::new(
-                build_node
-                    .find(Class("name"))
-                    .next()
-                    .unwrap()
-                    .text()
-                    .split_whitespace()
-                    .nth(1)
-                    .unwrap(),
-            )
-            .unwrap();
-
-            let small_subtext = build_node.find(Name("small")).next().unwrap().text();
-            let parts: Vec<&str> = small_subtext.split_terminator(" - ").collect();
-            let date_string = format!("{}-{}", parts[0], Utc::today().year());
-            let date = NaiveDateTime::parse_from_str(&date_string, "%B %d, %T-%Y").unwrap();
-
-            let package = Package {
-                version,
-                name,
-                build,
-                date,
-                commit: parts[2].to_string(),
-                url,
-                os,
-                ..Default::default()
-            };
-
-            packages.push(package);
-        }
-
-        packages.sort();
-        packages
-    }
-
     async fn get_new_packages(&self) -> Option<Self> {
         let mut fetched_packages = Self::fetch().await;
         let mut new_packages = Self::default();
@@ -688,10 +611,84 @@ impl BuilderBuildsType {
     const DAILY_URL: &'static str = "https://builder.blender.org/download/daily/";
     const EXPERIMENTAL_URL: &'static str = "https://builder.blender.org/download/experimental/";
 
-    fn get_url(&self) -> &'static str {
-        match self {
+    pub async fn fetch(&self) -> Vec<Package> {
+        let url = match self {
             BuilderBuildsType::Daily => Self::DAILY_URL,
             BuilderBuildsType::Experimental => Self::EXPERIMENTAL_URL,
+        };
+        let document = get_document(url).await;
+        let mut packages = Vec::new();
+
+        let (platform, os) = {
+            if cfg!(target_os = "linux") {
+                ("platform-linux", Os::Linux)
+            } else if cfg!(target_os = "windows") {
+                ("platform-windows", Os::Windows)
+            } else if cfg!(target_os = "macos") {
+                ("platform-darwin", Os::MacOs)
+            } else {
+                unreachable!("Unsupported OS");
+            }
+        };
+
+        let builds_list = document
+            .find(And(Class("builds-list"), Class(platform)))
+            .next()
+            .unwrap();
+
+        for build_node in builds_list.find(Class("os")) {
+            let url = build_node
+                .find(Name("a"))
+                .next()
+                .unwrap()
+                .attr("href")
+                .unwrap()
+                .to_string();
+
+            if url.ends_with(".sha256") {
+                continue;
+            }
+
+            let name = get_file_stem(&url).to_string();
+
+            let build_name = build_node.find(Class("build-var")).next().unwrap().text();
+            let build = match self {
+                BuilderBuildsType::Daily => Build::Daily(build_name),
+                BuilderBuildsType::Experimental => Build::Experimental(build_name),
+            };
+
+            let version = Versioning::new(
+                build_node
+                    .find(Class("name"))
+                    .next()
+                    .unwrap()
+                    .text()
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap(),
+            )
+            .unwrap();
+
+            let small_subtext = build_node.find(Name("small")).next().unwrap().text();
+            let parts: Vec<&str> = small_subtext.split_terminator(" - ").collect();
+            let date_string = format!("{}-{}", parts[0], Utc::today().year());
+            let date = NaiveDateTime::parse_from_str(&date_string, "%B %d, %T-%Y").unwrap();
+
+            let package = Package {
+                version,
+                name,
+                build,
+                date,
+                commit: parts[2].to_string(),
+                url,
+                os,
+                ..Default::default()
+            };
+
+            packages.push(package);
         }
+
+        packages.sort();
+        packages
     }
 }

@@ -11,7 +11,7 @@ pub struct Daily(Vec<Package>);
 #[async_trait]
 impl ReleaseType for Daily {
     async fn fetch() -> Self {
-        Self::fetch_from_builder(BuilderBuildsType::Daily).await
+        Self(BuilderBuildsType::Daily.fetch().await)
     }
 
     fn get_name(&self) -> String {
