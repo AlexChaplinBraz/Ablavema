@@ -2,7 +2,7 @@ use crate::settings::get_setting;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use iced::button;
 use serde::{Deserialize, Serialize};
-use std::mem;
+use std::{fs::remove_dir_all, mem};
 use timeago::{self, TimeUnit::Minutes};
 use versions::Versioning;
 
@@ -45,7 +45,7 @@ impl Package {
 
     pub fn remove(&self) {
         let path = get_setting().packages_dir.join(&self.name);
-        std::fs::remove_dir_all(path).unwrap();
+        let _ = remove_dir_all(path);
         println!("Removed: {}", self.name);
     }
 

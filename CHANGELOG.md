@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Default 00:00:00 time on newest stable and LTS packages if archived packages are out of sync.
+- Crash on double clicking "Uninstall".
 
 ## [0.2.1] - 2021-06-17: Stomping on runaway bugs
 <!--BEGIN=0.2.1-->
