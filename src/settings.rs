@@ -5,6 +5,7 @@ use crate::{
 use device_query::Keycode;
 use directories_next::ProjectDirs;
 use lazy_static::{initialize, lazy_static};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     env::current_exe,
@@ -64,6 +65,7 @@ lazy_static! {
         }
     };
     static ref SETTINGS: RwLock<Settings> = RwLock::new(Settings::init());
+    pub static ref ARCHIVE_DATE_RE: Regex = Regex::new(r"\d{2}-\w{3}-\d{4}\s\d{2}:\d{2}").unwrap();
 }
 
 #[derive(Debug, Deserialize, Serialize)]

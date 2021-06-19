@@ -14,7 +14,7 @@ use crate::{
     settings::{get_setting, init_settings, save_settings, set_setting, CAN_CONNECT},
 };
 use async_trait::async_trait;
-use chrono::{Datelike, NaiveDateTime, NaiveTime, Utc};
+use chrono::{Datelike, NaiveDateTime, Utc};
 use indicatif::MultiProgress;
 use select::predicate::{And, Class, Name};
 use serde::{de::DeserializeOwned, Serialize};
@@ -110,11 +110,9 @@ impl Releases {
 
         self.stable.refresh_state(&self.installed);
         self.stable.refresh_status(get_setting().update_stable);
-        self.stable.correct_date_time(&self.archived);
 
         self.lts.refresh_state(&self.installed);
         self.lts.refresh_status(get_setting().update_lts);
-        self.lts.correct_date_time(&self.archived);
 
         self.archived.refresh_state(&self.installed);
     }
@@ -496,20 +494,6 @@ pub trait ReleaseType:
                     Build::Archived => {
                         continue;
                     }
-                }
-            }
-        }
-    }
-
-    /// Get the full date-time for stable and LTS packages from their archived counterparts.
-    fn correct_date_time(&mut self, archived: &Archived) {
-        for package in self.iter_mut() {
-            if package.date.time() == NaiveTime::from_hms(0, 0, 0) {
-                if let Some(matching_package) = archived
-                    .iter()
-                    .find(|a_package| a_package.url == package.url)
-                {
-                    package.date = matching_package.date;
                 }
             }
         }

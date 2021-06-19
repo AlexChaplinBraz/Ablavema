@@ -1,7 +1,7 @@
 use crate::{
     helpers::{get_document, get_file_stem},
     package::{Build, Change, Os, Package},
-    releases::ReleaseType,
+    releases::{archived::fetch_archive_version, ReleaseType},
     settings::get_setting,
 };
 use async_trait::async_trait;
@@ -26,12 +26,12 @@ impl ReleaseType for Lts {
             (
                 "https://www.blender.org/download/lts/2-83/",
                 "283",
-                "Blender2.83",
+                "Blender2.83/",
             ),
             (
                 "https://www.blender.org/download/lts/2-93/",
                 "293",
-                "Blender2.93",
+                "Blender2.93/",
             ),
         ];
 
@@ -45,6 +45,14 @@ impl ReleaseType for Lts {
             } else {
                 unreachable!("Unexpected OS");
             }
+        };
+
+        let archived_packages = {
+            let mut packages = Vec::new();
+            for (_, _, version) in lts_info {
+                packages.append(&mut fetch_archive_version(version.to_string()).await);
+            }
+            packages
         };
 
         for (lts_url, lts_ver, lts_ver_path) in lts_info {
@@ -66,21 +74,23 @@ impl ReleaseType for Lts {
                     .next()
                     .unwrap();
 
-                let mut date = match section_1
-                    .find(Name("p"))
-                    .next()
+                let date = {
+                    let mut date = match section_1
+                        .find(Name("p"))
+                        .next()
+                        .unwrap()
+                        .text()
+                        .strip_prefix("Released on ")
+                    {
+                        Some(a) => a,
+                        None => continue,
+                    }
+                    .strip_suffix(".")
                     .unwrap()
-                    .text()
-                    .strip_prefix("Released on ")
-                {
-                    Some(a) => a,
-                    None => continue,
-                }
-                .strip_suffix(".")
-                .unwrap()
-                .to_string();
-                date.push_str("-00:00:00");
-                let date = NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap();
+                    .to_string();
+                    date.push_str("-00:00:00");
+                    NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap()
+                };
 
                 let lts_changelog_id = format!("faq-lts-release-{}{}-2", lts_ver, rev);
                 let section_2 = document
@@ -88,17 +98,20 @@ impl ReleaseType for Lts {
                     .next()
                     .unwrap();
 
-                let mut changelog = Vec::new();
-                for node in section_2.find(Name("li")) {
-                    let text = node.text();
+                let changelog = {
+                    let mut changelog = Vec::new();
+                    for node in section_2.find(Name("li")) {
+                        let text = node.text();
 
-                    let url = match node.find(Name("a")).next() {
-                        Some(a) => a.attr("href").unwrap_or_default().to_string(),
-                        None => String::new(),
-                    };
+                        let url = match node.find(Name("a")).next() {
+                            Some(a) => a.attr("href").unwrap_or_default().to_string(),
+                            None => String::new(),
+                        };
 
-                    changelog.push(Change { text, url });
-                }
+                        changelog.push(Change { text, url });
+                    }
+                    changelog
+                };
 
                 for node in section_1.find(Name("a")) {
                     let archive_name = node
@@ -113,12 +126,21 @@ impl ReleaseType for Lts {
                         continue;
                     }
 
+                    let url = format!("{}{}{}", download_path, lts_ver_path, archive_name);
+
+                    let date = {
+                        match archived_packages.iter().find(|package| package.url == url) {
+                            Some(package) => package.date,
+                            None => date,
+                        }
+                    };
+
                     let package = Package {
                         version: version.clone(),
                         name: format!("{}-lts", get_file_stem(archive_name)),
                         build: Build::Lts,
                         date,
-                        url: format!("{}{}/{}", download_path, lts_ver_path, archive_name),
+                        url,
                         os,
                         changelog: changelog.clone(),
                         ..Default::default()
