@@ -8,8 +8,8 @@ homepage = "https://github.com/AlexChaplinBraz/Ablavema"
 repository = "https://github.com/AlexChaplinBraz/Ablavema"
 readme = "README.md"
 license = "MIT"
-keywords = ["blender", "launcher", "blend", "gui", "cli"]
-categories = ["accessibility", "command-line-utilities"]
+keywords = ["blender", "launcher", "blend", "gui"]
+categories = ["accessibility"]
 resolver = "2"
 
 [profile.dev.package."*"]
@@ -34,11 +34,9 @@ directories-next = "2"
 fs2 = "0.4"
 fs_extra = "1"
 iced_futures = "0.3"
-indicatif = "0.15"
 itertools = "0.10"
 lazy_static = "1"
 native-dialog = "0.5"
-prettytable-rs = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
 select = "0.5"

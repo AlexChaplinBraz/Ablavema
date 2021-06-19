@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Command-line interface. It was only there because I was testing main functionality before adding a GUI, but adding
+  new features or making changes sometimes leads to having to do twice as much work, so I decided to remove it since
+  it's probably not going to be used a lot anyway.
+
 ### Fixed
 
 - Default 00:00:00 time on newest stable and LTS packages if archived packages are out of sync.

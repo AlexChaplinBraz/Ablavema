@@ -15,12 +15,11 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDateTime, Utc};
-use indicatif::MultiProgress;
 use select::predicate::{And, Class, Name};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fs::{remove_file, File},
-    iter, mem, ops,
+    mem, ops,
     path::PathBuf,
     sync::atomic::Ordering,
     time::SystemTime,
@@ -303,55 +302,6 @@ impl Releases {
             lts: lts_count.return_option(),
         }
     }
-
-    /// Installs the latest packages for each build, as long as there's one older package
-    /// of that build already installed. Operates based on user settings, so it updates only the
-    /// enabled types and can delete old packages of the same build. Can also update the default
-    /// package to the latest of its build type if one was installed.
-    pub async fn cli_install_updates(&mut self) {
-        let updates_found = iter::empty()
-            .chain(self.daily.iter())
-            .chain(self.experimental.iter())
-            .chain(self.stable.iter())
-            .chain(self.lts.iter())
-            .chain(self.archived.iter())
-            .filter(|package| package.status == PackageStatus::Update)
-            .collect::<Vec<_>>();
-
-        if updates_found.is_empty() {
-            println!("No updates to install.");
-        } else {
-            let multi_progress = MultiProgress::new();
-            let mut install_completion = Vec::new();
-
-            for package in updates_found {
-                install_completion.push(
-                    package
-                        .cli_install(&multi_progress, &(true, true))
-                        .await
-                        .unwrap(),
-                );
-            }
-
-            multi_progress.join().unwrap();
-            for handle in install_completion {
-                handle.await.unwrap();
-            }
-
-            self.installed.fetch();
-            self.installed.update_default();
-            let (daily_removed, experimental_removed) = self.installed.remove_old_packages();
-            self.sync();
-
-            if get_setting().keep_only_latest_daily && daily_removed {
-                self.daily.remove_dead_packages().await;
-            }
-
-            if get_setting().keep_only_latest_experimental && experimental_removed {
-                self.experimental.remove_dead_packages().await;
-            }
-        }
-    }
 }
 
 pub struct UpdateCount {
@@ -362,6 +312,11 @@ pub struct UpdateCount {
     pub lts: Option<usize>,
 }
 
+// TODO: Add a "last fetched date-time" to each release type.
+// This would be useful for letting the user know how long ago was the last time a release type
+// was fetched. Would probably have to be through a bin file, instead of a field somewhere.
+// TODO: Don't initialise on first startup.
+// It takes time and the user may not even want all of the release types.
 #[async_trait]
 pub trait ReleaseType:
     Sized
