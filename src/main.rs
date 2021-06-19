@@ -6,6 +6,7 @@ mod gui;
 mod helpers;
 mod package;
 mod releases;
+mod self_updater;
 mod settings;
 use crate::{
     cli::run_cli,

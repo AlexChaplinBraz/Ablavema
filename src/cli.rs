@@ -1,7 +1,8 @@
 use crate::{
     gui::GuiFlags,
-    helpers::{check_self_updates, fetch_self_releases, is_time_to_update},
+    helpers::is_time_to_update,
     releases::Releases,
+    self_updater::SelfUpdater,
     settings::{get_setting, CAN_CONNECT, LAUNCH_GUI},
 };
 use clap::{crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg};
@@ -54,9 +55,9 @@ pub async fn run_cli() -> GuiFlags {
         && is_time_to_update()
         && CAN_CONNECT.load(Ordering::Relaxed)
     {
-        self_releases = fetch_self_releases();
+        self_releases = SelfUpdater::fetch();
 
-        if let Some(updates) = check_self_updates(&self_releases) {
+        if let Some(updates) = SelfUpdater::count_new(&self_releases) {
             println!(
                 "Found {} Ablavema update{}.",
                 updates,

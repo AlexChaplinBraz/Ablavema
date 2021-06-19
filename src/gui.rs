@@ -5,15 +5,13 @@ use self::{
     style::Theme,
 };
 use crate::{
-    helpers::{
-        change_self_version, check_connection, check_self_updates, fetch_self_releases,
-        open_blender,
-    },
+    helpers::{check_connection, open_blender},
     package::{Build, Package, PackageState, PackageStatus},
     releases::{
         archived::Archived, daily::Daily, experimental::Experimental, lts::Lts, stable::Stable,
         ReleaseType, Releases, UpdateCount,
     },
+    self_updater::SelfUpdater,
     settings::{
         get_setting, save_settings, set_setting, ModifierKey, CAN_CONNECT, CONFIG_FILE_ENV,
         PORTABLE, PROJECT_DIRS, TEXT_SIZE,
@@ -165,11 +163,11 @@ impl Gui {
     }
 
     async fn fetch_self_releases() -> Option<Vec<Release>> {
-        spawn_blocking(fetch_self_releases).await.unwrap()
+        spawn_blocking(SelfUpdater::fetch).await.unwrap()
     }
 
     async fn change_self_version(releases: Vec<Release>, version: String) {
-        spawn_blocking(|| change_self_version(releases, version))
+        spawn_blocking(|| SelfUpdater::change(releases, version))
             .await
             .unwrap();
     }
@@ -1084,7 +1082,7 @@ impl Application for Gui {
 
         let self_update_tab_label = format!(
             "Self-updater{}",
-            match check_self_updates(&self.self_releases) {
+            match SelfUpdater::count_new(&self.self_releases) {
                 Some(count) => {
                     format!(" [{}]", count)
                 }
