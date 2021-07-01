@@ -1,7 +1,7 @@
 use crate::{
     helpers::{get_document, get_file_stem},
     package::{Build, Os, Package},
-    releases::{archived::fetch_archive_version, ReleaseType},
+    releases::{stable_archive::fetch_stable_archive_version, ReleaseType},
     settings::get_setting,
 };
 use async_trait::async_trait;
@@ -13,10 +13,10 @@ use std::path::PathBuf;
 use versions::Versioning;
 
 #[derive(Clone, Debug, Default, Deref, DerefMut, Deserialize, PartialEq, Serialize)]
-pub struct Stable(Vec<Package>);
+pub struct StableLatest(Vec<Package>);
 
 #[async_trait]
-impl ReleaseType for Stable {
+impl ReleaseType for StableLatest {
     async fn fetch() -> Self {
         let (mut package, version_path) = {
             let url = "https://www.blender.org/download/";
@@ -67,8 +67,6 @@ impl ReleaseType for Stable {
                     .replace(".msi", ".zip")
             );
 
-            let name = format!("{}-stable", get_file_stem(&url).to_string());
-
             let date = {
                 let mut date = node
                     .find(Class("dl-header-info-platform"))
@@ -85,8 +83,8 @@ impl ReleaseType for Stable {
 
             let package = Package {
                 version,
-                name,
-                build: Build::Stable,
+                name: get_file_stem(&url).to_string(),
+                build: Build::StableLatest,
                 date,
                 url,
                 os,
@@ -96,8 +94,9 @@ impl ReleaseType for Stable {
             (package, version_path.to_string())
         };
 
-        let archived_packages = fetch_archive_version(format!("{}/", version_path)).await;
-        if let Some(a_package) = archived_packages
+        let stable_archive_packages =
+            fetch_stable_archive_version(format!("{}/", version_path)).await;
+        if let Some(a_package) = stable_archive_packages
             .iter()
             .find(|a_package| a_package.url == package.url)
         {
@@ -107,11 +106,7 @@ impl ReleaseType for Stable {
         Self(vec![package])
     }
 
-    fn get_name(&self) -> String {
-        String::from("stable")
-    }
-
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("stable.bin")
+        get_setting().databases_dir.join("stable_latest.bin")
     }
 }

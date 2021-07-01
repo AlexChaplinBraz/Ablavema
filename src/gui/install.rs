@@ -1,4 +1,4 @@
-use super::{Message, PackageMessage};
+use super::{package::PackageMessage, Message};
 use crate::{package::Package, settings::get_setting};
 use iced_futures::{
     futures::stream::{unfold, BoxStream},
@@ -51,15 +51,12 @@ macro_rules! unwrap_or_return {
     };
 }
 
-pub struct Install {
-    package: Package,
-    index: usize,
-}
+pub struct Install(Package);
 
 impl Install {
-    pub fn package(package: Package, index: usize) -> iced::Subscription<Message> {
-        iced::Subscription::from_recipe(Install { package, index }).map(|(index, progress)| {
-            Message::PackageMessage(index, PackageMessage::InstallationProgress(progress))
+    pub fn package(package: Package) -> iced::Subscription<Message> {
+        iced::Subscription::from_recipe(Install(package)).map(|(index, progress)| {
+            Message::PackageMessage((index, PackageMessage::InstallationProgress(progress)))
         })
     }
 }
@@ -72,19 +69,19 @@ where
 
     fn hash(&self, state: &mut H) {
         std::any::TypeId::of::<Self>().hash(state);
-        self.package.name.hash(state);
-        self.package.date.hash(state);
+        self.0.name.hash(state);
+        self.0.date.hash(state);
     }
 
     fn stream(self: Box<Self>, _input: BoxStream<'static, I>) -> BoxStream<'static, Self::Output> {
         Box::pin(unfold(
             State::ReadyToInstall {
-                package: self.package,
-                index: self.index,
+                index: self.0.index,
+                package: self.0,
             },
             |state| async move {
                 match state {
-                    State::ReadyToInstall { package, index } => {
+                    State::ReadyToInstall { index, package } => {
                         let response = reqwest::get(&package.url).await;
 
                         match response {
@@ -134,13 +131,13 @@ where
                                     Some((
                                         (index, Progress::Started),
                                         State::Downloading {
-                                            package,
                                             response,
                                             file,
                                             destination,
                                             total,
                                             downloaded: 0,
                                             index,
+                                            package,
                                         },
                                     ))
                                 } else {
@@ -162,13 +159,13 @@ where
                         }
                     }
                     State::Downloading {
-                        package,
                         mut response,
                         file,
                         mut destination,
                         total,
                         downloaded,
                         index,
+                        package,
                     } => match response.chunk().await {
                         // TODO: Handle case when temporarily banned for making too many requests.
                         // I had this happen when testing too frequently. Probably not an issue for
@@ -189,22 +186,22 @@ where
                             Some((
                                 (index, Progress::DownloadProgress(percentage)),
                                 State::Downloading {
-                                    package,
                                     response,
                                     file,
                                     destination,
                                     total,
                                     downloaded,
                                     index,
+                                    package,
                                 },
                             ))
                         }
                         Ok(None) => Some((
                             (index, Progress::FinishedDownloading),
                             State::FinishedDownloading {
-                                package,
                                 file,
                                 index,
+                                package,
                             },
                         )),
                         Err(e) => Some((
@@ -213,9 +210,9 @@ where
                         )),
                     },
                     State::FinishedDownloading {
-                        package,
                         file,
                         index,
+                        package,
                     } => {
                         // TODO: Figure out a way to show extraction progress on Linux.
                         // I can't pass it around due to the use of Cell and the like inside it.
@@ -280,18 +277,18 @@ where
                         Some((
                             (index, Progress::ExtractionProgress(0.0)),
                             State::Extracting {
-                                package,
                                 file,
                                 archive,
                                 index,
+                                package,
                             },
                         ))
                     }
                     State::Extracting {
-                        package,
                         file,
                         archive,
                         index,
+                        package,
                     } => match archive {
                         #[cfg(target_os = "linux")]
                         DownloadedArchive::TarXz { extraction_dir } => {
@@ -306,7 +303,7 @@ where
 
                             Some((
                                 (index, Progress::FinishedExtracting),
-                                State::FinishedExtracting { package, index },
+                                State::FinishedExtracting { index, package },
                             ))
                         }
                         #[cfg(target_os = "linux")]
@@ -322,7 +319,7 @@ where
 
                             Some((
                                 (index, Progress::FinishedExtracting),
-                                State::FinishedExtracting { package, index },
+                                State::FinishedExtracting { index, package },
                             ))
                         }
                         #[cfg(target_os = "linux")]
@@ -338,7 +335,7 @@ where
 
                             Some((
                                 (index, Progress::FinishedExtracting),
-                                State::FinishedExtracting { package, index },
+                                State::FinishedExtracting { index, package },
                             ))
                         }
                         #[cfg(target_os = "windows")]
@@ -385,22 +382,22 @@ where
                             if extracted == total {
                                 Some((
                                     (index, Progress::FinishedExtracting),
-                                    State::FinishedExtracting { package, index },
+                                    State::FinishedExtracting { index, package },
                                 ))
                             } else {
                                 Some((
                                     (index, Progress::ExtractionProgress(percentage)),
                                     State::Extracting {
-                                        package,
                                         file,
                                         archive,
                                         index,
+                                        package,
                                     },
                                 ))
                             }
                         }
                     },
-                    State::FinishedExtracting { package, index } => {
+                    State::FinishedExtracting { index, package } => {
                         #[cfg(target_os = "linux")]
                         let extracted_path = glob(&format!(
                             "{}/*",
@@ -423,6 +420,7 @@ where
 
                         // TODO: Fix moving directories across filesystems.
                         // Can probably use the `fs_extra` crate, which I'm already depending on.
+                        // Actually, I tried it but that crate fails to move links.
                         unwrap_or_return!(index, rename(extracted_path, &package_path));
 
                         package_path.push("package_info.bin");
@@ -458,32 +456,32 @@ pub enum Progress {
 
 enum State {
     ReadyToInstall {
-        package: Package,
         index: usize,
+        package: Package,
     },
     Downloading {
-        package: Package,
         response: reqwest::Response,
         file: PathBuf,
         destination: tokio::fs::File,
         total: u64,
         downloaded: u64,
         index: usize,
+        package: Package,
     },
     FinishedDownloading {
-        package: Package,
         file: PathBuf,
         index: usize,
+        package: Package,
     },
     Extracting {
-        package: Package,
         file: PathBuf,
         archive: DownloadedArchive,
         index: usize,
+        package: Package,
     },
     FinishedExtracting {
-        package: Package,
         index: usize,
+        package: Package,
     },
     FinishedInstalling,
 }

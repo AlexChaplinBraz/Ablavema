@@ -1,5 +1,5 @@
 use crate::{
-    gui::GuiFlags,
+    gui::extra::GuiFlags,
     helpers::is_time_to_update,
     releases::Releases,
     self_updater::SelfUpdater,
@@ -25,10 +25,10 @@ pub async fn run_cli() -> GuiFlags {
         )
         .get_matches();
 
-    let (mut releases, initialised) = Releases::init().await;
+    let mut releases = Releases::init().await;
     let mut self_releases = None;
 
-    if get_setting().check_updates_at_launch && !initialised {
+    if get_setting().check_updates_at_launch {
         if is_time_to_update() {
             if CAN_CONNECT.load(Ordering::Relaxed) {
                 let packages = Releases::check_updates(releases.take()).await;

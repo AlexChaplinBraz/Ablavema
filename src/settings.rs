@@ -1,7 +1,8 @@
 use crate::{
-    gui::{style::Theme, Filters, SortBy},
+    gui::{filters::Filters, sort_by::SortBy, style::Theme},
     package::Package,
 };
+use derive_deref::{Deref, DerefMut};
 use device_query::Keycode;
 use directories_next::ProjectDirs;
 use lazy_static::{initialize, lazy_static};
@@ -40,6 +41,8 @@ pub const CONFIG_FILE_ENV: &str = "ABLAVEMA_CONFIG_FILE";
 pub static PORTABLE: AtomicBool = AtomicBool::new(false);
 pub static CAN_CONNECT: AtomicBool = AtomicBool::new(true);
 pub static LAUNCH_GUI: AtomicBool = AtomicBool::new(false);
+pub static FETCHING: AtomicBool = AtomicBool::new(false);
+pub static INSTALLING: AtomicBool = AtomicBool::new(false);
 // TODO: Consider making the text size user-adjustable.
 // Would need for all elements and sizes to scale properly.
 // Another requirement is for the window to remember its size and position.
@@ -53,7 +56,6 @@ lazy_static! {
             PORTABLE.store(true, Ordering::Relaxed);
             PORTABLE_PATH.join(CONFIG_NAME)
         } else if let Ok(path) = var(CONFIG_FILE_ENV) {
-            // TODO: Probably need to validate config path set with env.
             let config_path = PathBuf::from(path);
             create_dir_all(config_path.parent().unwrap()).unwrap();
             config_path
@@ -69,20 +71,18 @@ lazy_static! {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Settings {
+    pub bookmarks: Bookmarks,
     pub default_package: Option<Package>,
     pub bypass_launcher: bool,
     pub modifier_key: ModifierKey,
     pub use_latest_as_default: bool,
     pub check_updates_at_launch: bool,
     pub minutes_between_updates: u64,
-    pub update_daily: bool,
-    pub update_experimental: bool,
-    pub update_stable: bool,
+    pub update_daily_latest: bool,
+    pub update_experimental_latest: bool,
+    pub update_patch_latest: bool,
+    pub update_stable_latest: bool,
     pub update_lts: bool,
-    pub keep_only_latest_daily: bool,
-    pub keep_only_latest_experimental: bool,
-    pub keep_only_latest_stable: bool,
-    pub keep_only_latest_lts: bool,
     pub databases_dir: PathBuf,
     pub packages_dir: PathBuf,
     pub cache_dir: PathBuf,
@@ -138,20 +138,18 @@ impl Default for Settings {
         let minutes_between_updates = 60;
 
         Self {
+            bookmarks: Bookmarks::default(),
             default_package: None,
             bypass_launcher: false,
             modifier_key: ModifierKey::Shift,
             use_latest_as_default: true,
             check_updates_at_launch: true,
             minutes_between_updates,
-            update_daily: true,
-            update_experimental: true,
-            update_stable: true,
+            update_daily_latest: true,
+            update_experimental_latest: true,
+            update_patch_latest: true,
+            update_stable_latest: true,
             update_lts: true,
-            keep_only_latest_daily: false,
-            keep_only_latest_experimental: false,
-            keep_only_latest_stable: false,
-            keep_only_latest_lts: false,
             databases_dir: PROJECT_DIRS.config_dir().to_path_buf(),
             packages_dir: PROJECT_DIRS.data_local_dir().to_path_buf(),
             cache_dir: PROJECT_DIRS.cache_dir().to_path_buf(),
@@ -194,5 +192,38 @@ impl std::fmt::Display for ModifierKey {
             ModifierKey::Alt => "alt",
         };
         write!(f, "{}", printable)
+    }
+}
+
+#[derive(Debug, Default, Deref, DerefMut, Deserialize, Serialize)]
+pub struct Bookmarks(Vec<String>);
+
+impl Bookmarks {
+    pub fn update(&mut self, package_name: String) {
+        match self.iter().position(|bookmark| bookmark == &package_name) {
+            Some(index) => {
+                self.remove(index);
+            }
+            None => self.push(package_name),
+        }
+    }
+
+    pub fn clean(&mut self, pakcages: &[Package]) {
+        let mut indeces = Vec::new();
+
+        for bookmark in self.iter() {
+            if !pakcages.iter().any(|package| &package.name == bookmark) {
+                if let Some(index) = self
+                    .iter()
+                    .position(|old_bookmark| old_bookmark == bookmark)
+                {
+                    indeces.push(index);
+                }
+            }
+        }
+
+        for (removed, index) in indeces.iter().enumerate() {
+            self.remove(index - removed);
+        }
     }
 }

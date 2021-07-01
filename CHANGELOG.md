@@ -7,16 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+IMPORTANT: If getting a `core dumped` error while launching Ablavema after updating, remove config file and all
+databases since their structure has changed and can't be loaded correctly.
+
+### Added
+
+Note: I didn't add the [`Library`](https://builder.blender.org/download/library/) categories because they're
+completely empty at the moment and nobody seems to know what these builds would be.
+
+- `Daily (archive)`.
+- `Experimental (archive)`.
+- `Patch (latest)`.
+- `Patch (archive)`.
+
 ### Removed
 
 - Command-line interface. It was only there because I was testing main functionality before adding a GUI, but adding
   new features or making changes sometimes leads to having to do twice as much work, so I decided to remove it since
   it's probably not going to be used a lot anyway.
+- Settings to uninstall older packages of the same build type upon installing its update.
+- "Filters" label on sidebar.
+
+### Changed
+
+- Renamed `Daily` to `Daily (latest)`.
+- Renamed `Experimental` to `Experimental (latest)`.
+- Renamed `Stable` to `Stable (latest)`.
+- Renamed `Archived` to `Stable (archive)`.
+- Identical packages that are in multiple categories like `Stable`, `LTS` and `Archived` now appear as one with the
+  "Build: ..." section displaying every category the package is part of based on what categories are fetched.
+- Bookmarks are now saved in the user settings instead of the package database.
+- Packages are no longer fetched during first launch.
+- Increased minimum window size slightly to fit the new release types on the side bar.
+- The `Updates`, `Bookmarks` and `Installed` filters can now be combined.
 
 ### Fixed
 
 - Default 00:00:00 time on newest stable and LTS packages if archived packages are out of sync.
-- Crash on double clicking "Uninstall".
+- Crash on double-clicking "Uninstall".
+- Crash on trying to fetch while installing.
+- Setting to use latest as default wasn't updating on LTS packages. Now it does so if patch number is higher.
+- Bad update count of LTS packages now that there's more than one LTS release.
+
+### Known issues
+
+- Due to how showing multiple identical packages as one works, some of the internal logic is inaccurate depending on
+  what categories are fetched at the time of installing a package. This is most noticeable with LTS packages when the
+  Stable categories are also fetched.
 
 ## [0.2.1] - 2021-06-17: Stomping on runaway bugs
 <!--BEGIN=0.2.1-->

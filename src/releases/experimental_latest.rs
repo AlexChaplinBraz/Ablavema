@@ -1,4 +1,4 @@
-use super::{BuilderBuildsType, ReleaseType};
+use super::{BuilderBuild, ReleaseType};
 use crate::{package::Package, settings::get_setting};
 use async_trait::async_trait;
 use derive_deref::{Deref, DerefMut};
@@ -6,19 +6,15 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Default, Deref, DerefMut, Deserialize, PartialEq, Serialize)]
-pub struct Daily(Vec<Package>);
+pub struct ExperimentalLatest(Vec<Package>);
 
 #[async_trait]
-impl ReleaseType for Daily {
+impl ReleaseType for ExperimentalLatest {
     async fn fetch() -> Self {
-        Self(BuilderBuildsType::Daily.fetch().await)
-    }
-
-    fn get_name(&self) -> String {
-        String::from("daily")
+        Self(BuilderBuild::ExperimentalLatest.fetch().await)
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("daily.bin")
+        get_setting().databases_dir.join("experimental_latest.bin")
     }
 }

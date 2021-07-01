@@ -39,6 +39,8 @@ async fn main() {
     check_connection().await;
 
     // TODO: Error reporting on unrecoverable failure.
+    // TODO: Implement error logging.
+    // Saving the file and line of the error for easier debugging.
     run().await;
 }
 
@@ -47,8 +49,8 @@ async fn run() {
 
     if LAUNCH_GUI.load(Ordering::Relaxed) || get_setting().default_package.is_none() {
         let mut window = iced::window::Settings::default();
-        window.size = (650, 570);
-        window.min_size = Some((650, 570));
+        window.size = (680, 585);
+        window.min_size = Some((680, 585));
         window.icon = Some(
             iced::window::Icon::from_rgba(
                 include_bytes!("../extra/temp/iced_icon_data").to_vec(),

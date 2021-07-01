@@ -37,90 +37,27 @@ impl Installed {
     pub fn update_default(&self) {
         if get_setting().use_latest_as_default && get_setting().default_package.is_some() {
             let default_package = get_setting().default_package.clone().unwrap();
-            let new_default = self
-                .iter()
-                .find(|package| package.build == default_package.build)
-                .unwrap();
+            // TODO: Fix build comparison.
+            // It's comparing Build, which may not be accurate because it may have been filtered
+            // and installed with another Build due to BuildType. I could save the BuildType as
+            // well and compare that, but it could get out of sync so I'm not sure what to do.
+            if let Some(new_default) = self.iter().find(|package| {
+                package.build == default_package.build
+                    && package.version.nth(0).unwrap() == default_package.version.nth(0).unwrap()
+                    && package.version.nth(1).unwrap() == default_package.version.nth(1).unwrap()
+                    && package.version.nth(2).unwrap() >= default_package.version.nth(2).unwrap()
+            }) {
+                if new_default.date > default_package.date {
+                    set_setting().default_package = Some(new_default.clone());
+                    save_settings();
 
-            if new_default.version == default_package.version
-                && new_default.date > default_package.date
-            {
-                set_setting().default_package = Some(new_default.clone());
-                save_settings();
-
-                println!(
-                    "Installed an update for the default package, switched from:\n{} | {}\nTo:\n{} | {}",
-                    default_package.name, default_package.date, new_default.name, new_default.date
-                );
-            }
-        }
-    }
-
-    pub fn remove_old_packages(&self) -> (bool, bool) {
-        let mut daily_removed = false;
-        let mut experimental_removed = false;
-
-        if get_setting().keep_only_latest_daily
-            || get_setting().keep_only_latest_experimental
-            || get_setting().keep_only_latest_stable
-            || get_setting().keep_only_latest_lts
-        {
-            let mut daily_count = Vec::new();
-            let mut experimental_count = Vec::new();
-            let mut stable_count = 0;
-            let mut lts_count = Vec::new();
-            for package in self.iter() {
-                match &package.build {
-                    Build::Daily(s) if get_setting().keep_only_latest_daily => {
-                        daily_count.push((package.version.clone(), s.clone()));
-                        if daily_count
-                            .iter()
-                            .filter(|(v, n)| v == &package.version && n == s)
-                            .count()
-                            > 1
-                        {
-                            package.remove();
-                            daily_removed = true;
-                        }
-                    }
-                    Build::Experimental(s) if get_setting().keep_only_latest_experimental => {
-                        experimental_count.push((package.version.clone(), s.clone()));
-                        if experimental_count
-                            .iter()
-                            .filter(|(v, n)| v == &package.version && n == s)
-                            .count()
-                            > 1
-                        {
-                            package.remove();
-                            experimental_removed = true;
-                        }
-                    }
-                    Build::Stable if get_setting().keep_only_latest_stable => {
-                        stable_count += 1;
-                        if stable_count > 1 {
-                            package.remove();
-                        }
-                    }
-                    Build::Lts if get_setting().keep_only_latest_lts => {
-                        lts_count.push(&package.version);
-                        if lts_count
-                            .iter()
-                            .filter(|v| {
-                                v.nth(0).unwrap() == package.version.nth(0).unwrap()
-                                    && v.nth(1).unwrap() == package.version.nth(1).unwrap()
-                            })
-                            .count()
-                            > 1
-                        {
-                            package.remove();
-                        }
-                    }
-                    _ => continue,
+                    println!(
+                            "Installed an update for the default package, switched from:\n{} | {}\nTo:\n{} | {}",
+                            default_package.name, default_package.date, new_default.name, new_default.date
+                        );
                 }
             }
         }
-
-        (daily_removed, experimental_removed)
     }
 
     pub fn remove_all(&mut self) {
@@ -129,25 +66,65 @@ impl Installed {
         }
     }
 
-    pub fn remove_daily(&mut self) {
+    pub fn remove_daily_latest(&mut self) {
         for package in self.iter() {
-            if matches!(package.build, Build::Daily { .. }) {
+            if matches!(package.build, Build::DailyLatest { .. }) {
                 package.remove();
             }
         }
     }
 
-    pub fn remove_experimental(&mut self) {
+    pub fn remove_daily_archive(&mut self) {
         for package in self.iter() {
-            if matches!(package.build, Build::Experimental { .. }) {
+            if matches!(package.build, Build::DailyArchive { .. }) {
                 package.remove();
             }
         }
     }
 
-    pub fn remove_stable(&mut self) {
+    pub fn remove_experimental_latest(&mut self) {
         for package in self.iter() {
-            if package.build == Build::Stable {
+            if matches!(package.build, Build::ExperimentalLatest { .. }) {
+                package.remove();
+            }
+        }
+    }
+
+    pub fn remove_experimental_archive(&mut self) {
+        for package in self.iter() {
+            if matches!(package.build, Build::ExperimentalArchive { .. }) {
+                package.remove();
+            }
+        }
+    }
+
+    pub fn remove_patch_latest(&mut self) {
+        for package in self.iter() {
+            if matches!(package.build, Build::PatchLatest { .. }) {
+                package.remove();
+            }
+        }
+    }
+
+    pub fn remove_patch_archive(&mut self) {
+        for package in self.iter() {
+            if matches!(package.build, Build::PatchArchive { .. }) {
+                package.remove();
+            }
+        }
+    }
+
+    pub fn remove_stable_latest(&mut self) {
+        for package in self.iter() {
+            if package.build == Build::StableLatest {
+                package.remove();
+            }
+        }
+    }
+
+    pub fn remove_stable_archive(&mut self) {
+        for package in self.iter() {
+            if package.build == Build::StableArchive {
                 package.remove();
             }
         }
@@ -156,14 +133,6 @@ impl Installed {
     pub fn remove_lts(&mut self) {
         for package in self.iter() {
             if package.build == Build::Lts {
-                package.remove();
-            }
-        }
-    }
-
-    pub fn remove_archived(&mut self) {
-        for package in self.iter() {
-            if package.build == Build::Archived {
                 package.remove();
             }
         }

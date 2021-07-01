@@ -14,12 +14,12 @@ use tokio::spawn;
 use versions::Versioning;
 
 #[derive(Clone, Debug, Default, Deref, DerefMut, Deserialize, PartialEq, Serialize)]
-pub struct Archived(Vec<Package>);
+pub struct StableArchive(Vec<Package>);
 
 #[async_trait]
-impl ReleaseType for Archived {
+impl ReleaseType for StableArchive {
     async fn fetch() -> Self {
-        let mut archived = Archived::default();
+        let mut stable_archive = Self::default();
 
         let versions = {
             let mut versions = Vec::new();
@@ -38,27 +38,25 @@ impl ReleaseType for Archived {
 
         let mut handles = Vec::new();
         for version in versions {
-            handles.push(spawn(async move { fetch_archive_version(version).await }));
+            handles.push(spawn(
+                async move { fetch_stable_archive_version(version).await },
+            ));
         }
 
         for handle in handles {
-            archived.append(&mut handle.await.unwrap());
+            stable_archive.append(&mut handle.await.unwrap());
         }
 
-        archived.sort();
-        archived
-    }
-
-    fn get_name(&self) -> String {
-        String::from("archived")
+        stable_archive.sort();
+        stable_archive
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("archived.bin")
+        get_setting().databases_dir.join("stable_archive.bin")
     }
 }
 
-pub async fn fetch_archive_version(version: String) -> Vec<Package> {
+pub async fn fetch_stable_archive_version(version: String) -> Vec<Package> {
     let mut packages = Vec::new();
 
     let url = format!(
@@ -191,8 +189,8 @@ pub async fn fetch_archive_version(version: String) -> Vec<Package> {
 
         let package = Package {
             version,
-            name: format!("{}-archived", get_file_stem(build)),
-            build: Build::Archived,
+            name: get_file_stem(build).to_string(),
+            build: Build::StableArchive,
             date: NaiveDateTime::parse_from_str(&date, "%d-%b-%Y %T").unwrap(),
             url: format!("{}{}", url, build),
             os,

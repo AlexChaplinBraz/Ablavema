@@ -1,12 +1,18 @@
-pub mod archived;
-pub mod daily;
-pub mod experimental;
+pub mod daily_archive;
+pub mod daily_latest;
+pub mod experimental_archive;
+pub mod experimental_latest;
 pub mod installed;
 pub mod lts;
-pub mod stable;
+pub mod patch_archive;
+pub mod patch_latest;
+pub mod stable_archive;
+pub mod stable_latest;
 use self::{
-    archived::Archived, daily::Daily, experimental::Experimental, installed::Installed, lts::Lts,
-    stable::Stable,
+    daily_archive::DailyArchive, daily_latest::DailyLatest,
+    experimental_archive::ExperimentalArchive, experimental_latest::ExperimentalLatest,
+    installed::Installed, lts::Lts, patch_archive::PatchArchive, patch_latest::PatchLatest,
+    stable_archive::StableArchive, stable_latest::StableLatest,
 };
 use crate::{
     helpers::{get_document, get_file_stem, ReturnOption},
@@ -19,7 +25,7 @@ use select::predicate::{And, Class, Name};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fs::{remove_file, File},
-    mem, ops,
+    iter, mem, ops,
     path::PathBuf,
     sync::atomic::Ordering,
     time::SystemTime,
@@ -28,262 +34,214 @@ use versions::Versioning;
 
 #[derive(Debug, Default)]
 pub struct Releases {
-    pub daily: Daily,
-    pub experimental: Experimental,
-    pub stable: Stable,
+    pub daily_latest: DailyLatest,
+    pub daily_archive: DailyArchive,
+    pub experimental_latest: ExperimentalLatest,
+    pub experimental_archive: ExperimentalArchive,
+    pub patch_latest: PatchLatest,
+    pub patch_archive: PatchArchive,
+    pub stable_latest: StableLatest,
+    pub stable_archive: StableArchive,
     pub lts: Lts,
-    pub archived: Archived,
     pub installed: Installed,
 }
 
 impl Releases {
-    /// Load databases and sync them with installed packages,
-    /// returning Releases and true if initialised.
-    pub async fn init() -> (Releases, bool) {
+    /// Load databases and sync them with the installed packages.
+    pub async fn init() -> Releases {
         init_settings();
         let mut releases = Releases::default();
-        let initialised = releases.load_all().await;
+        releases.load_all().await;
         releases.sync();
-        (releases, initialised)
+        releases
     }
 
     /// Load all databases, or initialise them if non-existent.
-    /// Also reinitialises databases if the Package struct changed.
-    /// Returns true if initialised.
-    async fn load_all(&mut self) -> bool {
-        let mut initialised = false;
-
-        if self.daily.get_db_path().exists() {
-            if self.daily.load() {
-                initialised = self.daily.init().await;
-            }
-        } else {
-            initialised = self.daily.init().await;
-        }
-
-        if self.experimental.get_db_path().exists() {
-            if self.experimental.load() {
-                initialised = self.experimental.init().await;
-            }
-        } else {
-            initialised = self.experimental.init().await;
-        }
-
-        if self.stable.get_db_path().exists() {
-            if self.stable.load() {
-                initialised = self.stable.init().await;
-            }
-        } else {
-            initialised = self.stable.init().await;
-        }
-
-        if self.lts.get_db_path().exists() {
-            if self.lts.load() {
-                initialised = self.lts.init().await;
-            }
-        } else {
-            initialised = self.lts.init().await;
-        }
-
-        if self.archived.get_db_path().exists() {
-            if self.archived.load() {
-                initialised = self.archived.init().await;
-            }
-        } else {
-            initialised = self.archived.init().await;
-        }
-
-        initialised
+    /// Also removes the databases if the Package struct changed.
+    async fn load_all(&mut self) {
+        self.daily_latest.load();
+        self.daily_archive.load();
+        self.experimental_latest.load();
+        self.experimental_archive.load();
+        self.patch_latest.load();
+        self.patch_archive.load();
+        self.stable_latest.load();
+        self.stable_archive.load();
+        self.lts.load();
     }
 
     /// Refreshes the state and status of all packages.
     pub fn sync(&mut self) {
+        // TODO: Consider changing how latest packages that became archived are handled.
+        // I should probably check if a latest package appeared in the archive and remove it from
+        // the latest list. If this is implemented I should change how BuildType works, since they
+        // wouldn't be able to be loaded at the same time anyway.
         self.installed.fetch();
 
-        self.daily.refresh_state(&self.installed);
-        self.daily.refresh_status(get_setting().update_daily);
+        self.daily_latest.refresh_state(&self.installed);
+        self.daily_latest
+            .refresh_status(get_setting().update_daily_latest);
 
-        self.experimental.refresh_state(&self.installed);
-        self.experimental
-            .refresh_status(get_setting().update_experimental);
+        self.daily_archive.refresh_state(&self.installed);
 
-        self.stable.refresh_state(&self.installed);
-        self.stable.refresh_status(get_setting().update_stable);
+        self.experimental_latest.refresh_state(&self.installed);
+        self.experimental_latest
+            .refresh_status(get_setting().update_experimental_latest);
+
+        self.experimental_archive.refresh_state(&self.installed);
+
+        self.patch_latest.refresh_state(&self.installed);
+        self.patch_latest
+            .refresh_status(get_setting().update_patch_latest);
+
+        self.patch_archive.refresh_state(&self.installed);
+
+        self.stable_latest.refresh_state(&self.installed);
+        self.stable_latest
+            .refresh_status(get_setting().update_stable_latest);
+
+        self.stable_archive.refresh_state(&self.installed);
 
         self.lts.refresh_state(&self.installed);
         self.lts.refresh_status(get_setting().update_lts);
-
-        self.archived.refresh_state(&self.installed);
     }
 
     /// Check for new packages. This returns a tuple where the first item is a boolean
     /// that indicates whether there were any new packages found.
     pub async fn check_updates(
-        packages: (Daily, Experimental, Stable, Lts),
-    ) -> (bool, Daily, Experimental, Stable, Lts) {
+        packages: (
+            DailyLatest,
+            ExperimentalLatest,
+            PatchLatest,
+            StableLatest,
+            Lts,
+        ),
+    ) -> (
+        bool,
+        DailyLatest,
+        ExperimentalLatest,
+        PatchLatest,
+        StableLatest,
+        Lts,
+    ) {
         set_setting().last_update_time = SystemTime::now();
         save_settings();
 
-        let (mut daily, mut experimental, mut stable, mut lts) = packages;
+        let (
+            mut daily_latest,
+            mut experimental_latest,
+            mut patch_latest,
+            mut stable_latest,
+            mut lts,
+        ) = packages;
 
-        let mut updated_daily = false;
-        if get_setting().update_daily {
-            let (updated, fetched_daily) = Releases::check_daily_updates(daily).await;
-            updated_daily = updated;
-            daily = fetched_daily;
+        let mut updated_daily_latest = false;
+        if get_setting().update_daily_latest && daily_latest.get_db_path().exists() {
+            let (updated, fetched_daily_latest) = DailyLatest::check_updates(daily_latest).await;
+            updated_daily_latest = updated;
+            daily_latest = fetched_daily_latest;
         }
 
-        let mut updated_experimental = false;
-        if get_setting().update_experimental {
-            let (updated, fetched_experimental) =
-                Releases::check_experimental_updates(experimental).await;
-            updated_experimental = updated;
-            experimental = fetched_experimental;
+        let mut updated_experimental_latest = false;
+        if get_setting().update_experimental_latest && experimental_latest.get_db_path().exists() {
+            let (updated, fetched_experimental_latest) =
+                ExperimentalLatest::check_updates(experimental_latest).await;
+            updated_experimental_latest = updated;
+            experimental_latest = fetched_experimental_latest;
         }
 
-        let mut updated_stable = false;
-        if get_setting().update_stable {
-            let (updated, fetched_stable) = Releases::check_stable_updates(stable).await;
-            updated_stable = updated;
-            stable = fetched_stable;
+        let mut updated_patch_latest = false;
+        if get_setting().update_patch_latest && patch_latest.get_db_path().exists() {
+            let (updated, fetched_patch_latest) = PatchLatest::check_updates(patch_latest).await;
+            updated_patch_latest = updated;
+            patch_latest = fetched_patch_latest;
+        }
+
+        let mut updated_stable_latest = false;
+        if get_setting().update_stable_latest && stable_latest.get_db_path().exists() {
+            let (updated, fetched_stable_latest) = StableLatest::check_updates(stable_latest).await;
+            updated_stable_latest = updated;
+            stable_latest = fetched_stable_latest;
         }
 
         let mut updated_lts = false;
-        if get_setting().update_lts {
-            let (updated, fetched_lts) = Releases::check_lts_updates(lts).await;
+        if get_setting().update_lts && lts.get_db_path().exists() {
+            let (updated, fetched_lts) = Lts::check_updates(lts).await;
             updated_lts = updated;
             lts = fetched_lts;
         }
 
         (
-            updated_daily || updated_experimental || updated_stable || updated_lts,
-            daily,
-            experimental,
-            stable,
+            updated_daily_latest
+                || updated_experimental_latest
+                || updated_patch_latest
+                || updated_stable_latest
+                || updated_lts,
+            daily_latest,
+            experimental_latest,
+            patch_latest,
+            stable_latest,
             lts,
         )
     }
 
     /// Used for getting the packages for `Releases::check_updates()`.
-    pub fn take(&mut self) -> (Daily, Experimental, Stable, Lts) {
+    pub fn take(
+        &mut self,
+    ) -> (
+        DailyLatest,
+        ExperimentalLatest,
+        PatchLatest,
+        StableLatest,
+        Lts,
+    ) {
         (
-            self.daily.take(),
-            self.experimental.take(),
-            self.stable.take(),
+            self.daily_latest.take(),
+            self.experimental_latest.take(),
+            self.patch_latest.take(),
+            self.stable_latest.take(),
             self.lts.take(),
         )
     }
 
-    /// Used for adding the results of `Releases::check_updates()`
-    /// back into the variable and syncing.
-    pub fn add_new_packages(&mut self, packages: (bool, Daily, Experimental, Stable, Lts)) {
-        self.daily = packages.1;
-        self.experimental = packages.2;
-        self.stable = packages.3;
-        self.lts = packages.4;
-        self.sync();
-    }
-
-    pub async fn check_daily_updates(mut daily: Daily) -> (bool, Daily) {
-        print!("Checking for daily updates... ");
-        match daily.get_new_packages().await {
-            Some(new_packages) => {
-                println!("Found:");
-                daily.add_new_packages(new_packages);
-                daily.remove_dead_packages().await;
-                daily.save();
-                (true, daily)
-            }
-            None => {
-                println!("None found.");
-                (false, daily)
-            }
-        }
-    }
-
-    pub async fn check_experimental_updates(
-        mut experimental: Experimental,
-    ) -> (bool, Experimental) {
-        print!("Checking for experimental updates... ");
-        match experimental.get_new_packages().await {
-            Some(new_packages) => {
-                println!("Found:");
-                experimental.add_new_packages(new_packages);
-                experimental.remove_dead_packages().await;
-                experimental.save();
-                (true, experimental)
-            }
-            None => {
-                println!("None found.");
-                (false, experimental)
-            }
-        }
-    }
-
-    pub async fn check_stable_updates(mut stable: Stable) -> (bool, Stable) {
-        print!("Checking for stable updates... ");
-        match stable.get_new_packages().await {
-            Some(new_packages) => {
-                println!("Found:");
-                stable.add_new_packages(new_packages);
-                stable.save();
-                (true, stable)
-            }
-            None => {
-                println!("None found.");
-                (false, stable)
-            }
-        }
-    }
-
-    pub async fn check_lts_updates(mut lts: Lts) -> (bool, Lts) {
-        print!("Checking for LTS updates... ");
-        match lts.get_new_packages().await {
-            Some(new_packages) => {
-                println!("Found:");
-                lts.add_new_packages(new_packages);
-                lts.save();
-                (true, lts)
-            }
-            None => {
-                println!("None found.");
-                (false, lts)
-            }
-        }
-    }
-
-    pub async fn check_archived_updates(mut archived: Archived) -> (bool, Archived) {
-        print!("Checking for archived updates... ");
-        match archived.get_new_packages().await {
-            Some(new_packages) => {
-                println!("Found:");
-                archived.add_new_packages(new_packages);
-                archived.save();
-                (true, archived)
-            }
-            None => {
-                println!("None found.");
-                (false, archived)
-            }
-        }
+    /// Used for adding the results of `Releases::check_updates()` back into itself.
+    pub fn add_new_packages(
+        &mut self,
+        packages: (
+            bool,
+            DailyLatest,
+            ExperimentalLatest,
+            PatchLatest,
+            StableLatest,
+            Lts,
+        ),
+    ) {
+        self.daily_latest = packages.1;
+        self.experimental_latest = packages.2;
+        self.patch_latest = packages.3;
+        self.stable_latest = packages.4;
+        self.lts = packages.5;
     }
 
     /// Returns the amount of updates for each build type if there are any.
-    /// The returned tuple of options is:
-    /// (all_count, daily_count, experimental_count, stable_count, lts_count)
     pub fn count_updates(&self) -> UpdateCount {
         let daily_count = self
-            .daily
+            .daily_latest
             .iter()
             .filter(|package| package.status == PackageStatus::Update)
             .count();
         let experimental_count = self
-            .experimental
+            .experimental_latest
+            .iter()
+            .filter(|package| package.status == PackageStatus::Update)
+            .count();
+        let patch_count = self
+            .patch_latest
             .iter()
             .filter(|package| package.status == PackageStatus::Update)
             .count();
         let stable_count = self
-            .stable
+            .stable_latest
             .iter()
             .filter(|package| package.status == PackageStatus::Update)
             .count();
@@ -292,15 +250,51 @@ impl Releases {
             .iter()
             .filter(|package| package.status == PackageStatus::Update)
             .count();
-        let all_count = daily_count + experimental_count + stable_count + lts_count;
+        let all_count = daily_count + experimental_count + patch_count + stable_count + lts_count;
 
         UpdateCount {
             all: all_count.return_option(),
             daily: daily_count.return_option(),
             experimental: experimental_count.return_option(),
+            patch: patch_count.return_option(),
             stable: stable_count.return_option(),
             lts: lts_count.return_option(),
         }
+    }
+
+    pub fn build_vec(&self) -> Vec<Package> {
+        let mut index = 0;
+        let mut packages: Vec<Package> = Vec::new();
+
+        for package in iter::empty()
+            .chain(self.daily_latest.iter())
+            .chain(self.daily_archive.iter())
+            .chain(self.experimental_latest.iter())
+            .chain(self.experimental_archive.iter())
+            .chain(self.patch_latest.iter())
+            .chain(self.patch_archive.iter())
+            .chain(self.stable_latest.iter())
+            .chain(self.stable_archive.iter())
+            .chain(self.lts.iter())
+        {
+            match packages
+                .iter_mut()
+                .find(|a_package| a_package.name == package.name)
+            {
+                Some(found_package) => {
+                    found_package.build_type.update(&package.build);
+                }
+                None => {
+                    let mut new_package = package.clone();
+                    new_package.index = index;
+                    new_package.build_type.update(&package.build);
+                    packages.push(new_package);
+                    index += 1;
+                }
+            }
+        }
+
+        packages
     }
 }
 
@@ -308,18 +302,15 @@ pub struct UpdateCount {
     pub all: Option<usize>,
     pub daily: Option<usize>,
     pub experimental: Option<usize>,
+    pub patch: Option<usize>,
     pub stable: Option<usize>,
     pub lts: Option<usize>,
 }
 
-// TODO: Add a "last fetched date-time" to each release type.
-// This would be useful for letting the user know how long ago was the last time a release type
-// was fetched. Would probably have to be through a bin file, instead of a field somewhere.
-// TODO: Don't initialise on first startup.
-// It takes time and the user may not even want all of the release types.
 #[async_trait]
 pub trait ReleaseType:
     Sized
+    + Sync
     + Default
     + Serialize
     + DeserializeOwned
@@ -327,6 +318,17 @@ pub trait ReleaseType:
     + ops::DerefMut<Target = Vec<Package>>
 {
     async fn fetch() -> Self;
+
+    async fn check_updates(mut packages: Self) -> (bool, Self) {
+        match packages.get_new_packages().await {
+            Some(new_packages) => {
+                packages.add_new_packages(new_packages);
+                packages.save();
+                (true, packages)
+            }
+            None => (false, packages),
+        }
+    }
 
     async fn get_new_packages(&self) -> Option<Self> {
         let mut fetched_packages = Self::fetch().await;
@@ -348,7 +350,6 @@ pub trait ReleaseType:
     fn add_new_packages(&mut self, mut new_packages: Self) {
         for mut package in new_packages.iter_mut() {
             package.status = PackageStatus::New;
-            println!("    {} | {}", package.name, package.date);
             self.push(package.take());
         }
         self.sort();
@@ -376,79 +377,92 @@ pub trait ReleaseType:
     fn refresh_status(&mut self, refresh: bool) {
         self.unset_status();
 
-        if refresh {
-            let mut installed_packages: Vec<Package> = Vec::new();
-            for package in self.iter() {
-                if matches!(package.state, PackageState::Installed { .. }) {
-                    match package.build {
-                        Build::Daily(_) | Build::Experimental(_) => {
-                            match installed_packages.iter().find(|installed_package| {
-                                installed_package.version == package.version
-                                    && installed_package.build == package.build
-                            }) {
-                                Some(_) => continue,
-                                None => installed_packages.push(package.clone()),
-                            }
+        if !refresh {
+            return;
+        }
+
+        let mut installed_packages: Vec<Package> = Vec::new();
+
+        for package in self.iter() {
+            if matches!(package.state, PackageState::Installed { .. }) {
+                match package.build {
+                    Build::DailyLatest(_)
+                    | Build::ExperimentalLatest(_)
+                    | Build::PatchLatest(_) => {
+                        match installed_packages.iter().find(|installed_package| {
+                            installed_package.version == package.version
+                                && installed_package.build == package.build
+                        }) {
+                            Some(_) => continue,
+                            None => installed_packages.push(package.clone()),
                         }
-                        Build::Stable => {
-                            installed_packages.push(package.clone());
-                            break;
-                        }
-                        Build::Lts => {
-                            match installed_packages.iter().find(|installed_package| {
+                    }
+                    Build::StableLatest => {
+                        installed_packages.push(package.clone());
+                        break;
+                    }
+                    Build::Lts => {
+                        if installed_packages
+                            .iter()
+                            .find(|installed_package| {
                                 installed_package.version.nth(0).unwrap()
                                     == package.version.nth(0).unwrap()
                                     && installed_package.version.nth(1).unwrap()
                                         == package.version.nth(1).unwrap()
-                            }) {
-                                Some(_) => break,
-                                None => installed_packages.push(package.clone()),
-                            }
+                            })
+                            .is_none()
+                        {
+                            installed_packages.push(package.clone());
                         }
-                        Build::Archived => {
-                            break;
-                        }
+                    }
+                    Build::DailyArchive(_)
+                    | Build::ExperimentalArchive(_)
+                    | Build::PatchArchive(_)
+                    | Build::StableArchive => {
+                        break;
                     }
                 }
             }
+        }
 
-            for installed_package in installed_packages {
-                match installed_package.build {
-                    Build::Daily(_) | Build::Experimental(_) => {
-                        if let Some(package) = self.iter_mut().find(|package| {
-                            installed_package.version == package.version
-                                && installed_package.build == package.build
-                        }) {
-                            if package.date > installed_package.date {
-                                package.status = PackageStatus::Update;
-                            }
+        for installed_package in installed_packages {
+            match installed_package.build {
+                Build::DailyLatest(_) | Build::ExperimentalLatest(_) | Build::PatchLatest(_) => {
+                    if let Some(package) = self.iter_mut().find(|package| {
+                        installed_package.version == package.version
+                            && installed_package.build == package.build
+                    }) {
+                        if package.date > installed_package.date {
+                            package.status = PackageStatus::Update;
                         }
                     }
-                    Build::Stable => {
-                        if let Some(package) = self
-                            .iter_mut()
-                            .find(|package| installed_package.build == package.build)
-                        {
-                            if package.date > installed_package.date {
-                                package.status = PackageStatus::Update;
-                            }
+                }
+                Build::StableLatest => {
+                    if let Some(package) = self
+                        .iter_mut()
+                        .find(|package| installed_package.build == package.build)
+                    {
+                        if package.date > installed_package.date {
+                            package.status = PackageStatus::Update;
                         }
                     }
-                    Build::Lts => {
-                        if let Some(package) = self.iter_mut().find(|package| {
-                            installed_package.version.nth(0).unwrap()
-                                == package.version.nth(0).unwrap()
-                                && installed_package.version.nth(1).unwrap()
-                                    == package.version.nth(1).unwrap()
-                        }) {
-                            if package.date > installed_package.date {
-                                package.status = PackageStatus::Update;
-                            }
+                }
+                Build::Lts => {
+                    if let Some(package) = self.iter_mut().find(|package| {
+                        installed_package.version.nth(0).unwrap() == package.version.nth(0).unwrap()
+                            && installed_package.version.nth(1).unwrap()
+                                == package.version.nth(1).unwrap()
+                    }) {
+                        if package.date > installed_package.date {
+                            package.status = PackageStatus::Update;
                         }
                     }
-                    Build::Archived => {
-                        continue;
-                    }
+                }
+                Build::DailyArchive(_)
+                | Build::ExperimentalArchive(_)
+                | Build::PatchArchive(_)
+                | Build::StableArchive => {
+                    break;
                 }
             }
         }
@@ -458,6 +472,9 @@ pub trait ReleaseType:
     /// over a short period of time, so it shouldn't be used in places like .sync().
     /// It's better to check the availability of a package on Un/Installing.
     async fn remove_dead_packages(&mut self) {
+        // TODO: Figure out what to do with dead packages.
+        // Now that there are more categories fetching from the experimental builds, it's much
+        // easier to get temp banned.
         if CAN_CONNECT.load(Ordering::Relaxed) {
             let mut checkables = Vec::new();
             for (index, package) in self.iter().enumerate() {
@@ -478,11 +495,11 @@ pub trait ReleaseType:
                 handles.push(handle);
             }
 
-            let mut deviation = 0;
+            let mut removed = 0;
             for handle in handles {
                 if let Some(index) = handle.await.unwrap() {
-                    self.remove(index - deviation);
-                    deviation += 1;
+                    self.remove(index - removed);
+                    removed += 1;
                 }
             }
         }
@@ -492,20 +509,6 @@ pub trait ReleaseType:
         mem::take(self)
     }
 
-    fn get_name(&self) -> String;
-
-    /// Fetches packages and saves them. Always returns true.
-    async fn init(&mut self) -> bool {
-        print!(
-            "No database for {} packages found. Fetching... ",
-            self.get_name()
-        );
-        *self = Self::fetch().await;
-        self.save();
-        println!("Done");
-        true
-    }
-
     fn get_db_path(&self) -> PathBuf;
 
     fn save(&self) {
@@ -513,47 +516,55 @@ pub trait ReleaseType:
         bincode::serialize_into(file, self).unwrap();
     }
 
-    /// Returns true if Self changed in any way so it can be reinitialised.
-    fn load(&mut self) -> bool {
-        let file = File::open(self.get_db_path()).unwrap();
-        match bincode::deserialize_from(file) {
-            Ok(bin) => {
-                *self = bin;
-                false
+    fn load(&mut self) {
+        if let Ok(file) = File::open(self.get_db_path()) {
+            match bincode::deserialize_from(file) {
+                Ok(bin) => {
+                    *self = bin;
+                }
+                Err(e) => {
+                    // TODO: Consider moving to a diferent serialiser.
+                    // Since even after Package was modified bincode may just error with:
+                    // memory allocation of 7809lotsofbytes6536 bytes failed
+                    // abort (core dumped)
+                    eprintln!("Failed to load database with: {}.", e);
+                    self.remove_db();
+                }
             }
-            Err(_) => true,
         }
     }
 
     fn remove_db(&mut self) {
         let database = self.get_db_path();
-        let mut name = self.get_name();
-        if let Some(c) = name.get_mut(0..1) {
-            c.make_ascii_uppercase();
-        }
         if database.exists() {
             remove_file(database).unwrap();
-            println!("{} database removed.", name);
             *self = Self::default();
         }
     }
 }
 
-pub enum BuilderBuildsType {
-    // TODO: Add support for all the other new types.
-    // Would require more than a few changes to the GUI and the logic behind some parts.
-    Daily,
-    Experimental,
+pub enum BuilderBuild {
+    DailyLatest,
+    DailyArchive,
+    ExperimentalLatest,
+    ExperimentalArchive,
+    PatchLatest,
+    PatchArchive,
 }
 
-impl BuilderBuildsType {
-    const DAILY_URL: &'static str = "https://builder.blender.org/download/daily/";
-    const EXPERIMENTAL_URL: &'static str = "https://builder.blender.org/download/experimental/";
-
+impl BuilderBuild {
     pub async fn fetch(&self) -> Vec<Package> {
         let url = match self {
-            BuilderBuildsType::Daily => Self::DAILY_URL,
-            BuilderBuildsType::Experimental => Self::EXPERIMENTAL_URL,
+            BuilderBuild::DailyLatest => "https://builder.blender.org/download/daily/",
+            BuilderBuild::DailyArchive => "https://builder.blender.org/download/daily/archive/",
+            BuilderBuild::ExperimentalLatest => {
+                "https://builder.blender.org/download/experimental/"
+            }
+            BuilderBuild::ExperimentalArchive => {
+                "https://builder.blender.org/download/experimental/archive/"
+            }
+            BuilderBuild::PatchLatest => "https://builder.blender.org/download/patch/",
+            BuilderBuild::PatchArchive => "https://builder.blender.org/download/patch/archive/",
         };
         let document = get_document(url).await;
         let mut packages = Vec::new();
@@ -592,8 +603,12 @@ impl BuilderBuildsType {
 
             let build_name = build_node.find(Class("build-var")).next().unwrap().text();
             let build = match self {
-                BuilderBuildsType::Daily => Build::Daily(build_name),
-                BuilderBuildsType::Experimental => Build::Experimental(build_name),
+                BuilderBuild::DailyLatest => Build::DailyLatest(build_name),
+                BuilderBuild::DailyArchive => Build::DailyArchive(build_name),
+                BuilderBuild::ExperimentalLatest => Build::ExperimentalLatest(build_name),
+                BuilderBuild::ExperimentalArchive => Build::ExperimentalArchive(build_name),
+                BuilderBuild::PatchLatest => Build::PatchLatest(build_name),
+                BuilderBuild::PatchArchive => Build::PatchArchive(build_name),
             };
 
             let version = Versioning::new(

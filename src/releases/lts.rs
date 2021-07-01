@@ -1,7 +1,7 @@
 use crate::{
     helpers::{get_document, get_file_stem},
     package::{Build, Change, Os, Package},
-    releases::{archived::fetch_archive_version, ReleaseType},
+    releases::{stable_archive::fetch_stable_archive_version, ReleaseType},
     settings::get_setting,
 };
 use async_trait::async_trait;
@@ -18,7 +18,7 @@ pub struct Lts(Vec<Package>);
 #[async_trait]
 impl ReleaseType for Lts {
     async fn fetch() -> Self {
-        let mut lts = Lts::default();
+        let mut lts = Self::default();
 
         let download_path = "https://ftp.nluug.nl/pub/graphics/blender/release/";
 
@@ -47,10 +47,10 @@ impl ReleaseType for Lts {
             }
         };
 
-        let archived_packages = {
+        let stable_archive_packages = {
             let mut packages = Vec::new();
             for (_, _, version) in lts_info {
-                packages.append(&mut fetch_archive_version(version.to_string()).await);
+                packages.append(&mut fetch_stable_archive_version(version.to_string()).await);
             }
             packages
         };
@@ -129,7 +129,10 @@ impl ReleaseType for Lts {
                     let url = format!("{}{}{}", download_path, lts_ver_path, archive_name);
 
                     let date = {
-                        match archived_packages.iter().find(|package| package.url == url) {
+                        match stable_archive_packages
+                            .iter()
+                            .find(|package| package.url == url)
+                        {
                             Some(package) => package.date,
                             None => date,
                         }
@@ -137,7 +140,7 @@ impl ReleaseType for Lts {
 
                     let package = Package {
                         version: version.clone(),
-                        name: format!("{}-lts", get_file_stem(archive_name)),
+                        name: get_file_stem(archive_name).to_string(),
                         build: Build::Lts,
                         date,
                         url,
@@ -153,10 +156,6 @@ impl ReleaseType for Lts {
 
         lts.sort();
         lts
-    }
-
-    fn get_name(&self) -> String {
-        String::from("LTS")
     }
 
     fn get_db_path(&self) -> PathBuf {
