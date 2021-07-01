@@ -589,7 +589,7 @@ Keep in mind that any installed package that's no longer available will not reap
                                 &mut self.settings_state.remove_stable_archive_db_button,
                             ))
                             .push(remove_db_button(
-                                "LTS",
+                                "Long-term Support",
                                 BuildTypeSettings::Lts,
                                 lts_db_exists,
                                 &mut self.settings_state.remove_lts_db_button,
@@ -688,7 +688,7 @@ Useful for getting rid of a large quantity of packages at the same time.",
                                 &mut self.settings_state.remove_stable_archive_packages_button,
                             ))
                             .push(remove_packages_button(
-                                "LTS",
+                                "Long-term Support",
                                 BuildTypeSettings::Lts,
                                 lts_packages_exist,
                                 &mut self.settings_state.remove_lts_packages_button,
