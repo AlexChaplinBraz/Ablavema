@@ -247,7 +247,7 @@ impl BuildType {
             } => match build {
                 Build::DailyLatest(_) => *latest = true,
                 Build::DailyArchive(_) => *archive = true,
-                _ => unreachable!("mismatched build types"),
+                _ => (),
             },
             BuildType::Experimental {
                 latest,
@@ -256,7 +256,7 @@ impl BuildType {
             } => match build {
                 Build::ExperimentalLatest(_) => *latest = true,
                 Build::ExperimentalArchive(_) => *archive = true,
-                _ => unreachable!("mismatched build types"),
+                _ => (),
             },
             BuildType::Patch {
                 latest,
@@ -265,7 +265,7 @@ impl BuildType {
             } => match build {
                 Build::PatchLatest(_) => *latest = true,
                 Build::PatchArchive(_) => *archive = true,
-                _ => unreachable!("mismatched build types"),
+                _ => (),
             },
             BuildType::Stable {
                 latest,
@@ -275,7 +275,7 @@ impl BuildType {
                 Build::StableLatest => *latest = true,
                 Build::StableArchive => *archive = true,
                 Build::Lts => *lts = true,
-                _ => unreachable!("mismatched build types"),
+                _ => (),
             },
             BuildType::None => match build {
                 Build::DailyLatest(name) => {
