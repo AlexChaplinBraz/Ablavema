@@ -17,7 +17,7 @@ use crate::{
 use helpers::check_connection;
 use iced::Application;
 use settings::TEXT_SIZE;
-use std::sync::atomic::Ordering;
+use std::{env, sync::atomic::Ordering};
 
 // TODO: Fix window cascading on Windows. This will involve creating our own window which we'll
 // give to Iced.
@@ -53,7 +53,7 @@ async fn run() {
         window.min_size = Some((680, 585));
         window.icon = Some(
             iced::window::Icon::from_rgba(
-                include_bytes!("../extra/temp/iced_icon_data").to_vec(),
+                include_bytes!(env!("ICED_ICON_DATA_PATH")).to_vec(),
                 env!("ICED_ICON_WIDTH").parse().unwrap(),
                 env!("ICED_ICON_HEIGHT").parse().unwrap(),
             )
