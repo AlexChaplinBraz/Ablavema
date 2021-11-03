@@ -1,4 +1,4 @@
-use super::Tabs;
+use super::TabState;
 use crate::{
     gui::message::Message,
     settings::{get_setting, TEXT_SIZE},
@@ -14,7 +14,7 @@ pub struct AboutState {
     pub donation_link_button: button::State,
 }
 
-impl Tabs {
+impl TabState {
     pub fn about_body(&mut self) -> Element<'_, Message> {
         let link = |label, url, state| {
             Row::new()
@@ -52,22 +52,22 @@ impl Tabs {
                         .push(link(
                             "Repository:",
                             String::from("https://github.com/AlexChaplinBraz/Ablavema"),
-                            &mut self.about_state.repository_link_button,
+                            &mut self.about.repository_link_button,
                         ))
                         .push(link(
                             "Discord:",
                             String::from("https://discord.gg/D6gmhMUrrH"),
-                            &mut self.about_state.discord_link_button,
+                            &mut self.about.discord_link_button,
                         ))
                         .push(link(
                             "Contact me:",
                             String::from("https://alexchaplinbraz.com/contact"),
-                            &mut self.about_state.contact_link_button,
+                            &mut self.about.contact_link_button,
                         ))
                         .push(link(
                             "Donate:",
                             String::from("https://donate.alexchaplinbraz.com"),
-                            &mut self.about_state.donation_link_button,
+                            &mut self.about.donation_link_button,
                         )),
                 ),
         )

@@ -1,5 +1,5 @@
 use crate::{
-    gui::{filters::Filters, sort_by::SortBy, style::Theme},
+    gui::{filters::Filters, sort_by::SortBy, style::Theme, tabs::Tab},
     package::Package,
 };
 use derive_deref::{Deref, DerefMut};
@@ -72,6 +72,7 @@ lazy_static! {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Settings {
     pub bookmarks: Bookmarks,
+    pub tab: Tab,
     pub default_package: Option<Package>,
     pub bypass_launcher: bool,
     pub modifier_key: ModifierKey,
@@ -139,6 +140,7 @@ impl Default for Settings {
 
         Self {
             bookmarks: Bookmarks::default(),
+            tab: Tab::default(),
             default_package: None,
             bypass_launcher: false,
             modifier_key: ModifierKey::Shift,

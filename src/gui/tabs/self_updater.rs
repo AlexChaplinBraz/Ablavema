@@ -1,4 +1,4 @@
-use super::Tabs;
+use super::TabState;
 use crate::{
     gui::message::Message,
     settings::{get_setting, CAN_CONNECT, TEXT_SIZE},
@@ -33,12 +33,12 @@ impl SelfUpdaterState {
     }
 }
 
-impl Tabs {
+impl TabState {
     pub fn self_updater_body(
         &mut self,
         self_releases: &mut Option<Vec<Release>>,
     ) -> Element<'_, Message> {
-        let self_updater_pick_list_selected = self.self_updater_state.pick_list_selected.clone();
+        let self_updater_pick_list_selected = self.self_updater.pick_list_selected.clone();
 
         let release_index = match &self_releases {
             Some(releases) => {
@@ -66,27 +66,27 @@ impl Tabs {
                         .push(Text::new("Select version:"))
                         .push(
                             PickList::new(
-                                &mut self.self_updater_state.pick_list,
-                                &self.self_updater_state.release_versions,
+                                &mut self.self_updater.pick_list,
+                                &self.self_updater.release_versions,
                                 Some(self_updater_pick_list_selected),
                                 Message::PickListVersionSelected,
                             )
                             .width(Length::Units(60))
                             .style(get_setting().theme),
                         )
-                        .push(if self.self_updater_state.installed {
+                        .push(if self.self_updater.installed {
                             Container::new(Text::new("Restart Ablavema."))
-                        } else if self.self_updater_state.installing {
+                        } else if self.self_updater.installing {
                             Container::new(Text::new("Installing..."))
                         } else if self_releases.is_none() {
                             Container::new({
                                 let button = Button::new(
-                                    &mut self.self_updater_state.fetch_button,
+                                    &mut self.self_updater.fetch_button,
                                     Text::new("Fetch releases"),
                                 )
                                 .style(get_setting().theme);
                                 if CAN_CONNECT.load(Ordering::Relaxed)
-                                    && !self.self_updater_state.fetching
+                                    && !self.self_updater.fetching
                                 {
                                     // TODO: Check connectivity on press.
                                     button.on_press(Message::FetchSelfReleases)
@@ -97,11 +97,11 @@ impl Tabs {
                         } else {
                             Container::new({
                                 let button = Button::new(
-                                    &mut self.self_updater_state.install_button,
+                                    &mut self.self_updater.install_button,
                                     Text::new("Install this version"),
                                 )
                                 .style(get_setting().theme);
-                                if self.self_updater_state.pick_list_selected == crate_version!()
+                                if self.self_updater.pick_list_selected == crate_version!()
                                     || !CAN_CONNECT.load(Ordering::Relaxed)
                                 {
                                     button
@@ -114,7 +114,7 @@ impl Tabs {
                 )
                 .push(match &self_releases {
                     Some(releases) => Container::new(
-                        Scrollable::new(&mut self.self_updater_state.scroll).push(
+                        Scrollable::new(&mut self.self_updater.scroll).push(
                             Row::new()
                                 .push(Space::with_width(Length::Fill))
                                 .push(

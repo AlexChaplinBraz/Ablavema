@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Logo from 32x32 to 256x256.
+- Logo from 32x32 to 256x256 pixels.
+- Current tab to be persistent between program launches.
 
 ## [0.3.0] - 2021-07-01: New experiments
 <!--BEGIN=0.3.0-->

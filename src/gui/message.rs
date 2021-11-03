@@ -598,7 +598,8 @@ impl Gui {
                 Command::none()
             }
             Message::TabChanged(tab) => {
-                self.tabs.tab = tab;
+                set_setting().tab = tab;
+                save_settings();
                 Command::none()
             }
             Message::BypassLauncher(choice) => {
@@ -842,37 +843,37 @@ impl Gui {
                 Command::none()
             }
             Message::FetchSelfReleases => {
-                self.tabs.self_updater_state.fetching = true;
+                self.tab_state.self_updater.fetching = true;
                 Command::perform(Gui::fetch_self_releases(), Message::PopulateSelfReleases)
             }
             Message::PopulateSelfReleases(self_releases) => {
                 self.self_releases = self_releases;
                 if let Some(s_releases) = &self.self_releases {
-                    self.tabs.self_updater_state.release_versions = s_releases
+                    self.tab_state.self_updater.release_versions = s_releases
                         .iter()
                         .map(|release| release.version.clone())
                         .collect();
                 }
-                self.tabs.self_updater_state.fetching = false;
+                self.tab_state.self_updater.fetching = false;
                 Command::none()
             }
             Message::PickListVersionSelected(version) => {
-                self.tabs.self_updater_state.pick_list_selected = version;
+                self.tab_state.self_updater.pick_list_selected = version;
                 Command::none()
             }
             Message::ChangeVersion => {
-                self.tabs.self_updater_state.installing = true;
+                self.tab_state.self_updater.installing = true;
                 Command::perform(
                     Gui::change_self_version(
                         self.self_releases.clone().unwrap(),
-                        self.tabs.self_updater_state.pick_list_selected.clone(),
+                        self.tab_state.self_updater.pick_list_selected.clone(),
                     ),
                     Message::VersionChanged,
                 )
             }
             Message::VersionChanged(()) => {
-                self.tabs.self_updater_state.installing = false;
-                self.tabs.self_updater_state.installed = true;
+                self.tab_state.self_updater.installing = false;
+                self.tab_state.self_updater.installed = true;
                 Command::none()
             }
             Message::CheckConnection => {

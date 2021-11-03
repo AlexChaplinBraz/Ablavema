@@ -6,7 +6,7 @@ mod message;
 mod package;
 pub mod sort_by;
 pub mod style;
-mod tabs;
+pub mod tabs;
 use self::{
     controls::Controls,
     extra::{GlobalTokio, GuiFlags, GuiState},
@@ -14,7 +14,7 @@ use self::{
     message::Message,
 };
 use crate::{
-    gui::tabs::{Tab, Tabs},
+    gui::tabs::{Tab, TabState},
     helpers::check_connection,
     package::Package,
     releases::{
@@ -56,7 +56,7 @@ pub struct Gui {
     file_path: Option<String>,
     state: GuiState,
     controls: Controls,
-    tabs: Tabs,
+    tab_state: TabState,
     self_releases: Option<Vec<Release>>,
 }
 
@@ -236,12 +236,12 @@ impl Application for Gui {
             }
         }
 
-        let mut tabs = Tabs::default();
+        let mut tab_state = TabState::default();
 
         let self_releases = flags.self_releases;
 
         if let Some(s_releases) = &self_releases {
-            tabs.self_updater_state.release_versions = s_releases
+            tab_state.self_updater.release_versions = s_releases
                 .iter()
                 .map(|release| release.version.clone())
                 .collect();
@@ -255,7 +255,7 @@ impl Application for Gui {
                 installing: Vec::default(),
                 state: GuiState::default(),
                 controls: Controls::default(),
-                tabs,
+                tab_state,
                 self_releases,
             },
             Command::none(),
@@ -287,7 +287,7 @@ impl Application for Gui {
 
     fn view(&mut self) -> Element<'_, Message> {
         let file_exists = self.file_path.is_some();
-        let self_tab = self.tabs.tab;
+        let current_tab = get_setting().tab;
         let update_count = self.releases.count_updates();
 
         let tab_button = |label, tab, state| {
@@ -298,7 +298,7 @@ impl Application for Gui {
             .width(Length::Units(100))
             .style(get_setting().theme.tab_button());
 
-            if tab == self_tab {
+            if tab == current_tab {
                 Container::new(button).padding(2)
             } else {
                 Container::new(button.on_press(Message::TabChanged(tab))).padding(2)
@@ -348,17 +348,17 @@ impl Application for Gui {
         .center_x()
         .style(get_setting().theme.tab_container());
 
-        let body = match self.tabs.tab {
-            Tab::Packages => self.tabs.packages_body(
+        let body = match current_tab {
+            Tab::Packages => self.tab_state.packages_body(
                 &mut self.packages,
                 self.file_path.clone(),
                 update_count,
                 file_exists,
                 &mut self.controls,
             ),
-            Tab::Settings => self.tabs.settings_body(&self.releases),
-            Tab::SelfUpdater => self.tabs.self_updater_body(&mut self.self_releases),
-            Tab::About => self.tabs.about_body(),
+            Tab::Settings => self.tab_state.settings_body(&self.releases),
+            Tab::SelfUpdater => self.tab_state.self_updater_body(&mut self.self_releases),
+            Tab::About => self.tab_state.about_body(),
         };
 
         Column::new().push(tabs).push(body).into()

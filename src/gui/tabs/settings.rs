@@ -1,4 +1,4 @@
-use super::Tabs;
+use super::TabState;
 use crate::{
     gui::{
         extra::{BuildTypeSettings, Choice, Location},
@@ -55,7 +55,7 @@ pub struct SettingsState {
     pub scroll: scrollable::State,
 }
 
-impl Tabs {
+impl TabState {
     pub fn settings_body(&mut self, releases: &Releases) -> Element<'_, Message> {
         let settings_block_intro = |title, description| {
             Column::new()
@@ -302,35 +302,19 @@ Maximum is a day (1440 minutes).",
                         .spacing(3)
                         .push(
                             Row::new()
-                                .push(min_button("+1", 1, &mut self.settings_state.plus_1_button))
-                                .push(min_button(
-                                    "+10",
-                                    10,
-                                    &mut self.settings_state.plus_10_button,
-                                ))
-                                .push(min_button(
-                                    "+100",
-                                    100,
-                                    &mut self.settings_state.plus_100_button,
-                                )),
+                                .push(min_button("+1", 1, &mut self.settings.plus_1_button))
+                                .push(min_button("+10", 10, &mut self.settings.plus_10_button))
+                                .push(min_button("+100", 100, &mut self.settings.plus_100_button)),
                         )
                         .push(Text::new(get_setting().minutes_between_updates.to_string()))
                         .push(
                             Row::new()
-                                .push(min_button(
-                                    "-1",
-                                    -1,
-                                    &mut self.settings_state.minus_1_button,
-                                ))
-                                .push(min_button(
-                                    "-10",
-                                    -10,
-                                    &mut self.settings_state.minus_10_button,
-                                ))
+                                .push(min_button("-1", -1, &mut self.settings.minus_1_button))
+                                .push(min_button("-10", -10, &mut self.settings.minus_10_button))
                                 .push(min_button(
                                     "-100",
                                     -100,
-                                    &mut self.settings_state.minus_100_button,
+                                    &mut self.settings.minus_100_button,
                                 )),
                         ),
                 )
@@ -472,42 +456,36 @@ whatever its name is.",
                                         .push(change_location_button(
                                             "Databases",
                                             Location::Databases,
-                                            &mut self
-                                                .settings_state
-                                                .change_databases_location_button,
+                                            &mut self.settings.change_databases_location_button,
                                         ))
                                         .push(reset_location_button(
                                             Location::Databases,
                                             get_setting().databases_dir
                                                 == PROJECT_DIRS.config_dir(),
-                                            &mut self
-                                                .settings_state
-                                                .reset_databases_location_button,
+                                            &mut self.settings.reset_databases_location_button,
                                         ))
                                         .push(Space::with_width(Length::Units(15)))
                                         .push(change_location_button(
                                             "Packages",
                                             Location::Packages,
-                                            &mut self
-                                                .settings_state
-                                                .change_packages_location_button,
+                                            &mut self.settings.change_packages_location_button,
                                         ))
                                         .push(reset_location_button(
                                             Location::Packages,
                                             get_setting().packages_dir
                                                 == PROJECT_DIRS.data_local_dir(),
-                                            &mut self.settings_state.reset_packages_location_button,
+                                            &mut self.settings.reset_packages_location_button,
                                         ))
                                         .push(Space::with_width(Length::Units(15)))
                                         .push(change_location_button(
                                             "Cache",
                                             Location::Cache,
-                                            &mut self.settings_state.change_cache_location_button,
+                                            &mut self.settings.change_cache_location_button,
                                         ))
                                         .push(reset_location_button(
                                             Location::Cache,
                                             get_setting().cache_dir == PROJECT_DIRS.cache_dir(),
-                                            &mut self.settings_state.reset_cache_location_button,
+                                            &mut self.settings.reset_cache_location_button,
                                         )),
                                 ),
                         )
@@ -538,61 +516,61 @@ Keep in mind that any installed package that's no longer available will not reap
                                 "All",
                                 BuildTypeSettings::All,
                                 any_dbs_exist,
-                                &mut self.settings_state.remove_all_dbs_button,
+                                &mut self.settings.remove_all_dbs_button,
                             ))
                             .push(remove_db_button(
                                 "Daily (latest)",
                                 BuildTypeSettings::DailyLatest,
                                 daily_latest_db_exists,
-                                &mut self.settings_state.remove_daily_latest_db_button,
+                                &mut self.settings.remove_daily_latest_db_button,
                             ))
                             .push(remove_db_button(
                                 "Daily (archive)",
                                 BuildTypeSettings::DailyArchive,
                                 daily_archive_db_exists,
-                                &mut self.settings_state.remove_daily_archive_db_button,
+                                &mut self.settings.remove_daily_archive_db_button,
                             ))
                             .push(remove_db_button(
                                 "Experimental (latest)",
                                 BuildTypeSettings::ExperimentalLatest,
                                 experimental_latest_db_exists,
-                                &mut self.settings_state.remove_experimental_latest_db_button,
+                                &mut self.settings.remove_experimental_latest_db_button,
                             ))
                             .push(remove_db_button(
                                 "Experimental (archive)",
                                 BuildTypeSettings::ExperimentalArchive,
                                 experimental_archive_db_exists,
-                                &mut self.settings_state.remove_experimental_archive_db_button,
+                                &mut self.settings.remove_experimental_archive_db_button,
                             ))
                             .push(remove_db_button(
                                 "Patch (latest)",
                                 BuildTypeSettings::PatchLatest,
                                 patch_latest_db_exists,
-                                &mut self.settings_state.remove_patch_latest_db_button,
+                                &mut self.settings.remove_patch_latest_db_button,
                             ))
                             .push(remove_db_button(
                                 "Patch (archive)",
                                 BuildTypeSettings::PatchArchive,
                                 patch_archive_db_exists,
-                                &mut self.settings_state.remove_patch_archive_db_button,
+                                &mut self.settings.remove_patch_archive_db_button,
                             ))
                             .push(remove_db_button(
                                 "Stable (latest)",
                                 BuildTypeSettings::StableLatest,
                                 stable_latest_db_exists,
-                                &mut self.settings_state.remove_stable_latest_db_button,
+                                &mut self.settings.remove_stable_latest_db_button,
                             ))
                             .push(remove_db_button(
                                 "Stable (archive)",
                                 BuildTypeSettings::StableArchive,
                                 stable_archive_db_exists,
-                                &mut self.settings_state.remove_stable_archive_db_button,
+                                &mut self.settings.remove_stable_archive_db_button,
                             ))
                             .push(remove_db_button(
                                 "Long-term Support",
                                 BuildTypeSettings::Lts,
                                 lts_db_exists,
-                                &mut self.settings_state.remove_lts_db_button,
+                                &mut self.settings.remove_lts_db_button,
                             )),
                     ),
             )
@@ -633,65 +611,61 @@ Useful for getting rid of a large quantity of packages at the same time.",
                                 "All",
                                 BuildTypeSettings::All,
                                 any_packages_exist,
-                                &mut self.settings_state.remove_all_packages_button,
+                                &mut self.settings.remove_all_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Daily (latest)",
                                 BuildTypeSettings::DailyLatest,
                                 daily_latest_packages_exist,
-                                &mut self.settings_state.remove_daily_latest_packages_button,
+                                &mut self.settings.remove_daily_latest_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Daily (archive)",
                                 BuildTypeSettings::DailyArchive,
                                 daily_archive_packages_exist,
-                                &mut self.settings_state.remove_daily_archive_packages_button,
+                                &mut self.settings.remove_daily_archive_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Experimental (latest)",
                                 BuildTypeSettings::ExperimentalLatest,
                                 experimental_latest_packages_exist,
-                                &mut self
-                                    .settings_state
-                                    .remove_experimental_latest_packages_button,
+                                &mut self.settings.remove_experimental_latest_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Experimental (archive)",
                                 BuildTypeSettings::ExperimentalArchive,
                                 experimental_archive_packages_exist,
-                                &mut self
-                                    .settings_state
-                                    .remove_experimental_archive_packages_button,
+                                &mut self.settings.remove_experimental_archive_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Patch (latest)",
                                 BuildTypeSettings::PatchLatest,
                                 patch_latest_packages_exist,
-                                &mut self.settings_state.remove_patch_latest_packages_button,
+                                &mut self.settings.remove_patch_latest_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Patch (archive)",
                                 BuildTypeSettings::PatchArchive,
                                 patch_archive_packages_exist,
-                                &mut self.settings_state.remove_patch_archive_packages_button,
+                                &mut self.settings.remove_patch_archive_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Stable (latest)",
                                 BuildTypeSettings::StableLatest,
                                 stable_latest_packages_exist,
-                                &mut self.settings_state.remove_stable_latest_packages_button,
+                                &mut self.settings.remove_stable_latest_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Stable (archive)",
                                 BuildTypeSettings::StableArchive,
                                 stable_archive_packages_exist,
-                                &mut self.settings_state.remove_stable_archive_packages_button,
+                                &mut self.settings.remove_stable_archive_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Long-term Support",
                                 BuildTypeSettings::Lts,
                                 lts_packages_exist,
-                                &mut self.settings_state.remove_lts_packages_button,
+                                &mut self.settings.remove_lts_packages_button,
                             )),
                     ),
             )
@@ -731,7 +705,7 @@ cache isn't being automatically removed.",
                             // TODO: Disable button while installing.
                             // Also disable the buttons for the databases and stuff.
                             Button::new(
-                                &mut self.settings_state.remove_cache_button,
+                                &mut self.settings.remove_cache_button,
                                 Text::new("Remove all cache")
                                     .horizontal_alignment(HorizontalAlignment::Center),
                             )
@@ -789,7 +763,7 @@ to see if a bug was there before or whatnot.",
             }
         }
 
-        Container::new(Scrollable::new(&mut self.settings_state.scroll).push(
+        Container::new(Scrollable::new(&mut self.settings.scroll).push(
             if get_setting().self_updater {
                 settings.push(separator()).push(choice_setting!(
                     "Check for Ablavema updates at launch",

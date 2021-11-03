@@ -1,6 +1,4 @@
-use std::sync::atomic::Ordering;
-
-use super::Tabs;
+use super::TabState;
 use crate::{
     gui::{controls::Controls, message::Message},
     package::Package,
@@ -11,6 +9,7 @@ use iced::{
     button, scrollable, Align, Button, Column, Container, Element, Length, Row, Scrollable, Text,
 };
 use itertools::Itertools;
+use std::sync::atomic::Ordering;
 
 #[derive(Debug, Default)]
 pub struct PackagesState {
@@ -19,7 +18,7 @@ pub struct PackagesState {
     pub open_default_with_file_button: button::State,
 }
 
-impl<'a> Tabs {
+impl<'a> TabState {
     pub fn packages_body(
         &'a mut self,
         packages: &'a mut Vec<Package>,
@@ -53,7 +52,7 @@ impl<'a> Tabs {
                                 .default_package
                                 .clone()
                                 .map(Message::OpenBlender),
-                            &mut self.packages_state.open_default_button,
+                            &mut self.packages.open_default_button,
                         ))
                         .push(Text::new("Default package:"))
                         .push(
@@ -77,7 +76,7 @@ impl<'a> Tabs {
                             } else {
                                 None
                             },
-                            &mut self.packages_state.open_default_with_file_button,
+                            &mut self.packages.open_default_with_file_button,
                         ))
                         .push(Text::new("File:"))
                         .push(
@@ -112,7 +111,7 @@ impl<'a> Tabs {
             );
 
             let scrollable =
-                Scrollable::new(&mut self.packages_state.packages_scroll).push(filtered_packages);
+                Scrollable::new(&mut self.packages.packages_scroll).push(filtered_packages);
 
             if package_count == 0 {
                 Container::new(

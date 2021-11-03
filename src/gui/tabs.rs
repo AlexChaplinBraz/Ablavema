@@ -2,38 +2,41 @@ use self::{
     about::AboutState, packages::PackagesState, self_updater::SelfUpdaterState,
     settings::SettingsState,
 };
+use serde::{Deserialize, Serialize};
 pub mod about;
 pub mod packages;
 pub mod self_updater;
 pub mod settings;
 
-#[derive(Debug)]
-pub struct Tabs {
-    // TODO: Save tab in user settings.
-    // Will be useful when the recent files tab is introduced.
-    pub tab: Tab,
-    pub packages_state: PackagesState,
-    pub settings_state: SettingsState,
-    pub self_updater_state: SelfUpdaterState,
-    pub about_state: AboutState,
-}
-
-impl Default for Tabs {
-    fn default() -> Self {
-        Self {
-            tab: Tab::Packages,
-            packages_state: Default::default(),
-            settings_state: Default::default(),
-            self_updater_state: SelfUpdaterState::new(),
-            about_state: Default::default(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum Tab {
     Packages,
     Settings,
     SelfUpdater,
     About,
+}
+
+impl Default for Tab {
+    fn default() -> Self {
+        Tab::Packages
+    }
+}
+
+#[derive(Debug)]
+pub struct TabState {
+    pub packages: PackagesState,
+    pub settings: SettingsState,
+    pub self_updater: SelfUpdaterState,
+    pub about: AboutState,
+}
+
+impl Default for TabState {
+    fn default() -> Self {
+        Self {
+            packages: Default::default(),
+            settings: Default::default(),
+            self_updater: SelfUpdaterState::new(),
+            about: Default::default(),
+        }
+    }
 }
