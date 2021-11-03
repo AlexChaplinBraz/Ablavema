@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Crash due to archived daily build being duplicated in the experimental archive where it doesn't belong.
 
+### Changed
+
+- Logo from 32x32 to 256x256.
+
 ## [0.3.0] - 2021-07-01: New experiments
 <!--BEGIN=0.3.0-->
 IMPORTANT: If getting a `core dumped` error while launching Ablavema after updating, remove config file and all

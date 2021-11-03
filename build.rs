@@ -2,7 +2,7 @@ fn main() {
     use png::Decoder;
     use std::{env, fs::File, io::Write};
 
-    let ablavema32_file = File::open("extra/logo/ablavema32.png").unwrap();
+    let ablavema32_file = File::open("extra/logo/ablavema256.png").unwrap();
     let decoder = Decoder::new(ablavema32_file);
     let mut reader = decoder.read_info().unwrap();
     let buffer_size = reader.output_buffer_size();
