@@ -10,6 +10,7 @@ pub struct GuiFlags {
 }
 #[derive(Debug, Default)]
 pub struct GuiState {
+    pub recent_files_button: button::State,
     pub packages_button: button::State,
     pub settings_button: button::State,
     pub self_updater_button: button::State,

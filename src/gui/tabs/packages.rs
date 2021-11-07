@@ -50,10 +50,13 @@ impl<'a> TabState {
                         .align_items(Align::Center)
                         .push(button(
                             "[=]",
-                            get_setting()
-                                .default_package
-                                .clone()
-                                .map(Message::OpenBlender),
+                            if get_setting().default_package.is_some() {
+                                Some(Message::OpenBlender(
+                                    get_setting().default_package.clone().unwrap().name,
+                                ))
+                            } else {
+                                None
+                            },
                             &mut self.packages.open_default_button,
                         ))
                         .push(Text::new("Default package:"))
@@ -73,7 +76,7 @@ impl<'a> TabState {
                             "[+]",
                             if file_path.is_some() && get_setting().default_package.is_some() {
                                 Some(Message::OpenBlenderWithFile(
-                                    get_setting().default_package.clone().unwrap(),
+                                    get_setting().default_package.clone().unwrap().name,
                                 ))
                             } else {
                                 None

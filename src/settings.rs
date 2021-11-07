@@ -1,5 +1,10 @@
 use crate::{
-    gui::{filters::Filters, sort_by::SortBy, style::Theme, tabs::Tab},
+    gui::{
+        filters::Filters,
+        sort_by::SortBy,
+        style::Theme,
+        tabs::{recent_files::RecentFiles, Tab},
+    },
     package::Package,
 };
 use derive_deref::{Deref, DerefMut};
@@ -71,6 +76,7 @@ lazy_static! {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Settings {
+    pub recent_files: RecentFiles,
     pub bookmarks: Bookmarks,
     pub tab: Tab,
     pub default_package: Option<Package>,
@@ -139,6 +145,7 @@ impl Default for Settings {
         let minutes_between_updates = 60;
 
         Self {
+            recent_files: RecentFiles::default(),
             bookmarks: Bookmarks::default(),
             tab: Tab::default(),
             default_package: None,

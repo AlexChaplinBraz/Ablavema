@@ -12,6 +12,7 @@ use self::{
     extra::{GlobalTokio, GuiFlags, GuiState},
     install::Install,
     message::Message,
+    tabs::recent_files::RecentFile,
 };
 use crate::{
     gui::tabs::{Tab, TabState},
@@ -54,6 +55,7 @@ pub struct Gui {
     packages: Vec<Package>,
     installing: Vec<Package>,
     file_path: Option<String>,
+    recent_files: Vec<RecentFile>,
     state: GuiState,
     controls: Controls,
     tab_state: TabState,
@@ -89,6 +91,10 @@ impl Gui {
 
     async fn pass_package(package: Package) -> Package {
         package
+    }
+
+    async fn pass_string(string: String) -> String {
+        string
     }
 
     async fn check_for_updates(
@@ -252,6 +258,7 @@ impl Application for Gui {
                 releases,
                 packages,
                 file_path: flags.file_path,
+                recent_files: get_setting().recent_files.to_vec(),
                 installing: Vec::default(),
                 state: GuiState::default(),
                 controls: Controls::default(),
@@ -320,6 +327,11 @@ impl Application for Gui {
         let tabs = Container::new(
             Row::new()
                 .push(tab_button(
+                    "Recent files",
+                    Tab::RecentFiles,
+                    &mut self.state.recent_files_button,
+                ))
+                .push(tab_button(
                     "Packages",
                     Tab::Packages,
                     &mut self.state.packages_button,
@@ -349,6 +361,9 @@ impl Application for Gui {
         .style(get_setting().theme.tab_container());
 
         let body = match current_tab {
+            Tab::RecentFiles => self
+                .tab_state
+                .recent_files_body(self.file_path.clone(), &mut self.recent_files),
             Tab::Packages => self.tab_state.packages_body(
                 &mut self.packages,
                 self.file_path.clone(),

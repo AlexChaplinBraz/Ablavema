@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Recent files tab (without thumbnails for now).
 - File selection dialog.
 
 ### Changed
@@ -19,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Crash due to archived daily build being duplicated in the experimental archive where it doesn't belong.
+
+### Known issues
+
+- All settings, bookmarks and recent files reset on updating the launcher. This is working as intended to avoid
+  crashing when I change the structure of the settings, but could be improved so they are recovered if the changes
+  aren't too drastic.
 
 ## [0.3.0] - 2021-07-01: New experiments
 <!--BEGIN=0.3.0-->

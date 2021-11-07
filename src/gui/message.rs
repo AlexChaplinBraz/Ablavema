@@ -3,6 +3,7 @@ use super::{
     package::PackageMessage,
     sort_by::SortBy,
     style::Theme,
+    tabs::recent_files::{RecentFile, RecentFileMessage},
     Gui, Tab,
 };
 use crate::{
@@ -23,6 +24,7 @@ use native_dialog::{FileDialog, MessageDialog, MessageType};
 use self_update::update::Release;
 use std::{
     fs::{create_dir_all, remove_dir_all},
+    path::PathBuf,
     process::exit,
     sync::atomic::Ordering,
 };
@@ -30,14 +32,15 @@ use std::{
 #[derive(Clone, Debug)]
 pub enum Message {
     PackageMessage((usize, PackageMessage)),
+    RecentFileMessage((String, RecentFileMessage)),
     Bookmark(Package),
     CheckAvailability(Option<(bool, bool, Package)>),
     InstallPackage(Package),
     CancelInstall(Package),
     PackageInstalled(Package),
     PackageRemoved(Package),
-    OpenBlender(Package),
-    OpenBlenderWithFile(Package),
+    OpenBlender(String),
+    OpenBlenderWithFile(String),
     SelectFile,
     OpenBrowser(String),
     CheckForUpdates,
@@ -140,6 +143,29 @@ impl Gui {
                     None => unreachable!("index out of bounds"),
                 }
             }
+            Message::RecentFileMessage((file, recent_file_message)) => match recent_file_message {
+                RecentFileMessage::OpenWithLastBlender(blender) => {
+                    self.file_path = Some(file);
+                    Command::perform(Gui::pass_string(blender), Message::OpenBlenderWithFile)
+                }
+                RecentFileMessage::OpenWithDefaultBlender => {
+                    self.file_path = Some(file);
+                    Command::perform(
+                        Gui::pass_string(get_setting().default_package.clone().unwrap().name),
+                        Message::OpenBlenderWithFile,
+                    )
+                }
+                RecentFileMessage::Select => {
+                    self.file_path = Some(file);
+                    Command::none()
+                }
+                RecentFileMessage::Remove => {
+                    set_setting().recent_files.remove(&PathBuf::from(file));
+                    save_settings();
+                    self.recent_files = get_setting().recent_files.to_vec();
+                    Command::none()
+                }
+            },
             Message::Bookmark(package) => {
                 set_setting().bookmarks.update(package.name);
                 set_setting().bookmarks.clean(&self.packages);
@@ -326,11 +352,16 @@ impl Gui {
                 )
             }
             Message::OpenBlender(package) => {
-                open_blender(package.name, None);
+                open_blender(package, None);
                 exit(0);
             }
             Message::OpenBlenderWithFile(package) => {
-                open_blender(package.name, Some(self.file_path.clone().unwrap()));
+                let file_path = self.file_path.clone().unwrap();
+                let path = PathBuf::from(&file_path);
+                let recent_file = RecentFile::new(path.clone(), package.clone());
+                set_setting().recent_files.insert(path.clone(), recent_file);
+                save_settings();
+                open_blender(package, Some(file_path));
                 exit(0);
             }
             Message::SelectFile => {

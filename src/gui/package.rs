@@ -89,11 +89,11 @@ impl Package {
                 Command::perform(Gui::pass_package(self.clone()), Message::PackageRemoved)
             }
             PackageMessage::OpenBlender => {
-                Command::perform(Gui::pass_package(self.clone()), Message::OpenBlender)
+                Command::perform(Gui::pass_string(self.name.clone()), Message::OpenBlender)
             }
 
             PackageMessage::OpenBlenderWithFile => Command::perform(
-                Gui::pass_package(self.clone()),
+                Gui::pass_string(self.name.clone()),
                 Message::OpenBlenderWithFile,
             ),
             PackageMessage::SetDefault => {
