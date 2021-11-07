@@ -38,6 +38,7 @@ pub enum Message {
     PackageRemoved(Package),
     OpenBlender(Package),
     OpenBlenderWithFile(Package),
+    SelectFile,
     OpenBrowser(String),
     CheckForUpdates,
     UpdatesChecked(
@@ -331,6 +332,17 @@ impl Gui {
             Message::OpenBlenderWithFile(package) => {
                 open_blender(package.name, Some(self.file_path.clone().unwrap()));
                 exit(0);
+            }
+            Message::SelectFile => {
+                if let Some(new_file_path) = FileDialog::new()
+                    .add_filter("BLEND archive", &["blend*"])
+                    .add_filter("All files", &["*"])
+                    .show_open_single_file()
+                    .unwrap()
+                {
+                    self.file_path = Some(new_file_path.to_str().unwrap().to_string());
+                }
+                Command::none()
             }
             Message::OpenBrowser(url) => {
                 let _ = webbrowser::open(&url);

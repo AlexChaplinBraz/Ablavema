@@ -6,16 +6,18 @@ use crate::{
     settings::{get_setting, FETCHING, TEXT_SIZE},
 };
 use iced::{
-    button, scrollable, Align, Button, Column, Container, Element, Length, Row, Scrollable, Text,
+    button, scrollable, Align, Button, Column, Container, Element, Length, Row, Scrollable, Space,
+    Text,
 };
 use itertools::Itertools;
 use std::sync::atomic::Ordering;
 
 #[derive(Debug, Default)]
 pub struct PackagesState {
-    pub packages_scroll: scrollable::State,
     pub open_default_button: button::State,
     pub open_default_with_file_button: button::State,
+    pub select_file_button: button::State,
+    pub scroll: scrollable::State,
 }
 
 impl<'a> TabState {
@@ -29,11 +31,11 @@ impl<'a> TabState {
     ) -> Element<'a, Message> {
         // TODO: Use real icons for the buttons.
         // TODO: Add tooltips.
-        let button = |label, package_message: Option<Message>, state| {
+        let button = |label, message: Option<Message>, state| {
             let button = Button::new(state, Text::new(label)).style(get_setting().theme);
 
-            match package_message {
-                Some(package_message) => button.on_press(package_message),
+            match message {
+                Some(message) => button.on_press(message),
                 None => button,
             }
         };
@@ -85,6 +87,15 @@ impl<'a> TabState {
                                 None => "none",
                             })
                             .color(get_setting().theme.highlight_text()),
+                        )
+                        .push(Space::with_width(Length::Fill))
+                        .push(
+                            Button::new(
+                                &mut self.packages.select_file_button,
+                                Text::new("Select file"),
+                            )
+                            .on_press(Message::SelectFile)
+                            .style(get_setting().theme),
                         ),
                 ),
         )
@@ -110,8 +121,7 @@ impl<'a> TabState {
                     .width(Length::Fill),
             );
 
-            let scrollable =
-                Scrollable::new(&mut self.packages.packages_scroll).push(filtered_packages);
+            let scrollable = Scrollable::new(&mut self.packages.scroll).push(filtered_packages);
 
             if package_count == 0 {
                 Container::new(

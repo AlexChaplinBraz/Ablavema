@@ -7,14 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- Crash due to archived daily build being duplicated in the experimental archive where it doesn't belong.
+- File selection dialog.
 
 ### Changed
 
 - Logo from 32x32 to 256x256 pixels.
 - Current tab to be persistent between program launches.
+
+### Fixed
+
+- Crash due to archived daily build being duplicated in the experimental archive where it doesn't belong.
 
 ## [0.3.0] - 2021-07-01: New experiments
 <!--BEGIN=0.3.0-->
