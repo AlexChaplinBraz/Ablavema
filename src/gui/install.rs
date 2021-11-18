@@ -218,6 +218,7 @@ where
                         // I can't pass it around due to the use of Cell and the like inside it.
 
                         let extraction_dir = get_setting().cache_dir.join(&package.name);
+                        create_dir_all(&extraction_dir).unwrap();
 
                         let archive = if file.extension().unwrap() == "xz" {
                             #[cfg(not(target_os = "linux"))]
