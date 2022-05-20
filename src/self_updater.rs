@@ -15,7 +15,7 @@ impl SelfUpdater {
         let releases = ReleaseList::configure()
             .repo_owner("AlexChaplinBraz")
             .repo_name("Ablavema")
-            .with_target(&self_update::get_target())
+            .with_target(self_update::get_target())
             .build()
             .unwrap()
             .fetch()
@@ -48,7 +48,7 @@ impl SelfUpdater {
             .iter()
             .find(|release| release.version == version)
             .unwrap()
-            .asset_for(&self_update::get_target())
+            .asset_for(self_update::get_target())
             .unwrap();
 
         let archive_path = get_setting().cache_dir.join(asset.name);

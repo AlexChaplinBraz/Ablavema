@@ -30,7 +30,7 @@ use std::{
 };
 
 #[derive(Clone, Debug)]
-pub enum Message {
+pub enum GuiMessage {
     PackageMessage((usize, PackageMessage)),
     RecentFileMessage((String, RecentFileMessage)),
     Bookmark(Package),
@@ -133,26 +133,27 @@ pub enum Message {
 impl Gui {
     pub fn update_message(
         &mut self,
-        message: Message,
+        message: GuiMessage,
         _clipboard: &mut Clipboard,
-    ) -> Command<Message> {
+    ) -> Command<GuiMessage> {
         match message {
-            Message::PackageMessage((index, package_message)) => {
+            GuiMessage::PackageMessage((index, package_message)) => {
                 match self.packages.get_mut(index) {
                     Some(package) => package.update(package_message),
                     None => unreachable!("index out of bounds"),
                 }
             }
-            Message::RecentFileMessage((file, recent_file_message)) => match recent_file_message {
+            GuiMessage::RecentFileMessage((file, recent_file_message)) => match recent_file_message
+            {
                 RecentFileMessage::OpenWithLastBlender(blender) => {
                     self.file_path = Some(file);
-                    Command::perform(Gui::pass_string(blender), Message::OpenBlenderWithFile)
+                    Command::perform(Gui::pass_string(blender), GuiMessage::OpenBlenderWithFile)
                 }
                 RecentFileMessage::OpenWithDefaultBlender => {
                     self.file_path = Some(file);
                     Command::perform(
                         Gui::pass_string(get_setting().default_package.clone().unwrap().name),
-                        Message::OpenBlenderWithFile,
+                        GuiMessage::OpenBlenderWithFile,
                     )
                 }
                 RecentFileMessage::Select => {
@@ -166,16 +167,16 @@ impl Gui {
                     Command::none()
                 }
             },
-            Message::Bookmark(package) => {
+            GuiMessage::Bookmark(package) => {
                 set_setting().bookmarks.update(package.name);
                 set_setting().bookmarks.clean(&self.packages);
                 save_settings();
                 Command::none()
             }
-            Message::CheckAvailability(option) => match option {
+            GuiMessage::CheckAvailability(option) => match option {
                 Some((available, for_install, package)) => {
                     if available && for_install {
-                        Command::perform(Gui::pass_package(package), Message::InstallPackage)
+                        Command::perform(Gui::pass_package(package), GuiMessage::InstallPackage)
                     } else if !for_install {
                         self.sync();
                         Command::none()
@@ -300,14 +301,14 @@ impl Gui {
                     Command::none()
                 }
             },
-            Message::InstallPackage(package) => {
+            GuiMessage::InstallPackage(package) => {
                 if self.installing.is_empty() {
                     INSTALLING.store(true, Ordering::Relaxed);
                 }
                 self.installing.push(package);
                 Command::none()
             }
-            Message::CancelInstall(package) => {
+            GuiMessage::CancelInstall(package) => {
                 let index = self
                     .installing
                     .iter()
@@ -321,7 +322,7 @@ impl Gui {
                 }
                 Command::none()
             }
-            Message::PackageInstalled(package) => {
+            GuiMessage::PackageInstalled(package) => {
                 let index = self
                     .installing
                     .iter()
@@ -338,7 +339,7 @@ impl Gui {
                 }
                 Command::none()
             }
-            Message::PackageRemoved(package) => {
+            GuiMessage::PackageRemoved(package) => {
                 let default_package_option = get_setting().default_package.clone();
                 if let Some(default_package) = default_package_option {
                     if default_package == package {
@@ -348,23 +349,23 @@ impl Gui {
                 }
                 Command::perform(
                     Gui::check_availability(false, package),
-                    Message::CheckAvailability,
+                    GuiMessage::CheckAvailability,
                 )
             }
-            Message::OpenBlender(package) => {
+            GuiMessage::OpenBlender(package) => {
                 open_blender(package, None);
                 exit(0);
             }
-            Message::OpenBlenderWithFile(package) => {
+            GuiMessage::OpenBlenderWithFile(package) => {
                 let file_path = self.file_path.clone().unwrap();
                 let path = PathBuf::from(&file_path);
                 let recent_file = RecentFile::new(path.clone(), package.clone());
-                set_setting().recent_files.insert(path.clone(), recent_file);
+                set_setting().recent_files.insert(path, recent_file);
                 save_settings();
                 open_blender(package, Some(file_path));
                 exit(0);
             }
-            Message::SelectFile => {
+            GuiMessage::SelectFile => {
                 if let Some(new_file_path) = FileDialog::new()
                     .add_filter("BLEND archive", &["blend*"])
                     .add_filter("All files", &["*"])
@@ -375,24 +376,24 @@ impl Gui {
                 }
                 Command::none()
             }
-            Message::OpenBrowser(url) => {
+            GuiMessage::OpenBrowser(url) => {
                 let _ = webbrowser::open(&url);
                 Command::none()
             }
-            Message::CheckForUpdates => {
+            GuiMessage::CheckForUpdates => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_for_updates(self.releases.take()),
-                    Message::UpdatesChecked,
+                    GuiMessage::UpdatesChecked,
                 )
             }
-            Message::UpdatesChecked(tuple) => {
+            GuiMessage::UpdatesChecked(tuple) => {
                 self.releases.add_new_packages(tuple);
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchAll => {
+            GuiMessage::FetchAll => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_all(
@@ -406,10 +407,10 @@ impl Gui {
                         self.releases.stable_archive.take(),
                         self.releases.lts.take(),
                     ),
-                    Message::AllFetched,
+                    GuiMessage::AllFetched,
                 )
             }
-            Message::AllFetched((
+            GuiMessage::AllFetched((
                 _,
                 daily_latest,
                 daily_archive,
@@ -434,140 +435,140 @@ impl Gui {
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchDailyLatest => {
+            GuiMessage::FetchDailyLatest => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_daily_latest(self.releases.daily_latest.take()),
-                    Message::DailyLatestFetched,
+                    GuiMessage::DailyLatestFetched,
                 )
             }
-            Message::DailyLatestFetched((_, daily_latest)) => {
+            GuiMessage::DailyLatestFetched((_, daily_latest)) => {
                 self.releases.daily_latest = daily_latest;
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchDailyArchive => {
+            GuiMessage::FetchDailyArchive => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_daily_archive(self.releases.daily_archive.take()),
-                    Message::DailyArchiveFetched,
+                    GuiMessage::DailyArchiveFetched,
                 )
             }
-            Message::DailyArchiveFetched((_, daily_archive)) => {
+            GuiMessage::DailyArchiveFetched((_, daily_archive)) => {
                 self.releases.daily_archive = daily_archive;
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchExperimentalLatest => {
+            GuiMessage::FetchExperimentalLatest => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_experimental_latest(self.releases.experimental_latest.take()),
-                    Message::ExperimentalLatestFetched,
+                    GuiMessage::ExperimentalLatestFetched,
                 )
             }
-            Message::ExperimentalLatestFetched((_, experimental_latest)) => {
+            GuiMessage::ExperimentalLatestFetched((_, experimental_latest)) => {
                 self.releases.experimental_latest = experimental_latest;
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchExperimentalArchive => {
+            GuiMessage::FetchExperimentalArchive => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_experimental_archive(self.releases.experimental_archive.take()),
-                    Message::ExperimentalArchiveFetched,
+                    GuiMessage::ExperimentalArchiveFetched,
                 )
             }
-            Message::ExperimentalArchiveFetched((_, experimental_archive)) => {
+            GuiMessage::ExperimentalArchiveFetched((_, experimental_archive)) => {
                 self.releases.experimental_archive = experimental_archive;
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchPatchLatest => {
+            GuiMessage::FetchPatchLatest => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_patch_latest(self.releases.patch_latest.take()),
-                    Message::PatchLatestFetched,
+                    GuiMessage::PatchLatestFetched,
                 )
             }
-            Message::PatchLatestFetched((_, patch_latest)) => {
+            GuiMessage::PatchLatestFetched((_, patch_latest)) => {
                 self.releases.patch_latest = patch_latest;
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchPatchArchive => {
+            GuiMessage::FetchPatchArchive => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_patch_archive(self.releases.patch_archive.take()),
-                    Message::PatchArchiveFetched,
+                    GuiMessage::PatchArchiveFetched,
                 )
             }
-            Message::PatchArchiveFetched((_, patch_archive)) => {
+            GuiMessage::PatchArchiveFetched((_, patch_archive)) => {
                 self.releases.patch_archive = patch_archive;
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchStableLatest => {
+            GuiMessage::FetchStableLatest => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_stable_latest(self.releases.stable_latest.take()),
-                    Message::StableLatestFetched,
+                    GuiMessage::StableLatestFetched,
                 )
             }
-            Message::StableLatestFetched((_, stable_latest)) => {
+            GuiMessage::StableLatestFetched((_, stable_latest)) => {
                 self.releases.stable_latest = stable_latest;
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchStableArchive => {
+            GuiMessage::FetchStableArchive => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_stable_archive(self.releases.stable_archive.take()),
-                    Message::StableArchiveFetched,
+                    GuiMessage::StableArchiveFetched,
                 )
             }
-            Message::StableArchiveFetched((_, stable_archive)) => {
+            GuiMessage::StableArchiveFetched((_, stable_archive)) => {
                 self.releases.stable_archive = stable_archive;
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FetchLts => {
+            GuiMessage::FetchLts => {
                 FETCHING.store(true, Ordering::Relaxed);
                 Command::perform(
                     Gui::check_lts(self.releases.lts.take()),
-                    Message::LtsFetched,
+                    GuiMessage::LtsFetched,
                 )
             }
-            Message::LtsFetched((_, lts)) => {
+            GuiMessage::LtsFetched((_, lts)) => {
                 self.releases.lts = lts;
                 self.sync();
                 FETCHING.store(false, Ordering::Relaxed);
                 Command::none()
             }
-            Message::FilterUpdatesChanged(change) => {
+            GuiMessage::FilterUpdatesChanged(change) => {
                 set_setting().filters.updates = change;
                 save_settings();
                 Command::none()
             }
 
-            Message::FilterBookmarksChanged(change) => {
+            GuiMessage::FilterBookmarksChanged(change) => {
                 set_setting().filters.bookmarks = change;
                 save_settings();
                 Command::none()
             }
-            Message::FilterInstalledChanged(change) => {
+            GuiMessage::FilterInstalledChanged(change) => {
                 set_setting().filters.installed = change;
                 save_settings();
                 Command::none()
             }
-            Message::FilterAllChanged(change) => {
+            GuiMessage::FilterAllChanged(change) => {
                 set_setting().filters.all = change;
                 set_setting().filters.daily_latest = change;
                 set_setting().filters.daily_archive = change;
@@ -581,71 +582,71 @@ impl Gui {
                 save_settings();
                 Command::none()
             }
-            Message::FilterDailyLatestChanged(change) => {
+            GuiMessage::FilterDailyLatestChanged(change) => {
                 set_setting().filters.daily_latest = change;
                 set_setting().filters.refresh_all();
                 save_settings();
                 Command::none()
             }
-            Message::FilterDailyArchiveChanged(change) => {
+            GuiMessage::FilterDailyArchiveChanged(change) => {
                 set_setting().filters.daily_archive = change;
                 set_setting().filters.refresh_all();
                 save_settings();
                 Command::none()
             }
-            Message::FilterExperimentalLatestChanged(change) => {
+            GuiMessage::FilterExperimentalLatestChanged(change) => {
                 set_setting().filters.experimental_latest = change;
                 set_setting().filters.refresh_all();
                 save_settings();
                 Command::none()
             }
-            Message::FilterExperimentalArchiveChanged(change) => {
+            GuiMessage::FilterExperimentalArchiveChanged(change) => {
                 set_setting().filters.experimental_archive = change;
                 set_setting().filters.refresh_all();
                 save_settings();
                 Command::none()
             }
-            Message::FilterPatchLatestChanged(change) => {
+            GuiMessage::FilterPatchLatestChanged(change) => {
                 set_setting().filters.patch_latest = change;
                 set_setting().filters.refresh_all();
                 save_settings();
                 Command::none()
             }
-            Message::FilterPatchArchiveChanged(change) => {
+            GuiMessage::FilterPatchArchiveChanged(change) => {
                 set_setting().filters.patch_archive = change;
                 set_setting().filters.refresh_all();
                 save_settings();
                 Command::none()
             }
-            Message::FilterStableLatestChanged(change) => {
+            GuiMessage::FilterStableLatestChanged(change) => {
                 set_setting().filters.stable_latest = change;
                 set_setting().filters.refresh_all();
                 save_settings();
                 Command::none()
             }
-            Message::FilterStableArchiveChanged(change) => {
+            GuiMessage::FilterStableArchiveChanged(change) => {
                 set_setting().filters.stable_archive = change;
                 set_setting().filters.refresh_all();
                 save_settings();
                 Command::none()
             }
-            Message::FilterLtsChanged(change) => {
+            GuiMessage::FilterLtsChanged(change) => {
                 set_setting().filters.lts = change;
                 set_setting().filters.refresh_all();
                 save_settings();
                 Command::none()
             }
-            Message::SortingChanged(sort_by) => {
+            GuiMessage::SortingChanged(sort_by) => {
                 set_setting().sort_by = sort_by;
                 save_settings();
                 Command::none()
             }
-            Message::TabChanged(tab) => {
+            GuiMessage::TabChanged(tab) => {
                 set_setting().tab = tab;
                 save_settings();
                 Command::none()
             }
-            Message::BypassLauncher(choice) => {
+            GuiMessage::BypassLauncher(choice) => {
                 match choice {
                     Choice::Enable => set_setting().bypass_launcher = true,
                     Choice::Disable => set_setting().bypass_launcher = false,
@@ -653,12 +654,12 @@ impl Gui {
                 save_settings();
                 Command::none()
             }
-            Message::ModifierKey(modifier_key) => {
+            GuiMessage::ModifierKey(modifier_key) => {
                 set_setting().modifier_key = modifier_key;
                 save_settings();
                 Command::none()
             }
-            Message::UseLatestAsDefault(choice) => {
+            GuiMessage::UseLatestAsDefault(choice) => {
                 match choice {
                     Choice::Enable => set_setting().use_latest_as_default = true,
                     Choice::Disable => set_setting().use_latest_as_default = false,
@@ -666,7 +667,7 @@ impl Gui {
                 save_settings();
                 Command::none()
             }
-            Message::CheckUpdatesAtLaunch(choice) => {
+            GuiMessage::CheckUpdatesAtLaunch(choice) => {
                 match choice {
                     Choice::Enable => set_setting().check_updates_at_launch = true,
                     Choice::Disable => set_setting().check_updates_at_launch = false,
@@ -674,7 +675,7 @@ impl Gui {
                 save_settings();
                 Command::none()
             }
-            Message::MinutesBetweenUpdatesChanged(change) => {
+            GuiMessage::MinutesBetweenUpdatesChanged(change) => {
                 if change.is_positive() {
                     let mut current = get_setting().minutes_between_updates;
                     current += change as u64;
@@ -691,7 +692,7 @@ impl Gui {
                 save_settings();
                 Command::none()
             }
-            Message::UpdateDailyLatest(choice) => {
+            GuiMessage::UpdateDailyLatest(choice) => {
                 match choice {
                     Choice::Enable => set_setting().update_daily_latest = true,
                     Choice::Disable => set_setting().update_daily_latest = false,
@@ -700,7 +701,7 @@ impl Gui {
                 self.sync();
                 Command::none()
             }
-            Message::UpdateExperimentalLatest(choice) => {
+            GuiMessage::UpdateExperimentalLatest(choice) => {
                 match choice {
                     Choice::Enable => set_setting().update_experimental_latest = true,
                     Choice::Disable => set_setting().update_experimental_latest = false,
@@ -709,7 +710,7 @@ impl Gui {
                 self.sync();
                 Command::none()
             }
-            Message::UpdatePatchLatest(choice) => {
+            GuiMessage::UpdatePatchLatest(choice) => {
                 match choice {
                     Choice::Enable => set_setting().update_patch_latest = true,
                     Choice::Disable => set_setting().update_patch_latest = false,
@@ -718,7 +719,7 @@ impl Gui {
                 self.sync();
                 Command::none()
             }
-            Message::UpdateStableLatest(choice) => {
+            GuiMessage::UpdateStableLatest(choice) => {
                 match choice {
                     Choice::Enable => set_setting().update_stable_latest = true,
                     Choice::Disable => set_setting().update_stable_latest = false,
@@ -727,7 +728,7 @@ impl Gui {
                 self.sync();
                 Command::none()
             }
-            Message::UpdateLts(choice) => {
+            GuiMessage::UpdateLts(choice) => {
                 match choice {
                     Choice::Enable => set_setting().update_lts = true,
                     Choice::Disable => set_setting().update_lts = false,
@@ -736,12 +737,12 @@ impl Gui {
                 self.sync();
                 Command::none()
             }
-            Message::ThemeChanged(theme) => {
+            GuiMessage::ThemeChanged(theme) => {
                 set_setting().theme = theme;
                 save_settings();
                 Command::none()
             }
-            Message::ChangeLocation(location) => {
+            GuiMessage::ChangeLocation(location) => {
                 match location {
                     Location::Databases => {
                         if let Some(directory) = FileDialog::new().show_open_single_dir().unwrap() {
@@ -765,7 +766,7 @@ impl Gui {
                 }
                 Command::none()
             }
-            Message::ResetLocation(location) => {
+            GuiMessage::ResetLocation(location) => {
                 match location {
                     Location::Databases => {
                         set_setting().databases_dir = PROJECT_DIRS.config_dir().to_path_buf();
@@ -783,7 +784,7 @@ impl Gui {
                 }
                 Command::none()
             }
-            Message::RemoveDatabases(build_type) => {
+            GuiMessage::RemoveDatabases(build_type) => {
                 match build_type {
                     BuildTypeSettings::All => {
                         self.releases.daily_latest.remove_db();
@@ -827,7 +828,7 @@ impl Gui {
                 self.sync();
                 Command::none()
             }
-            Message::RemovePackages(build_type) => {
+            GuiMessage::RemovePackages(build_type) => {
                 match build_type {
                     BuildTypeSettings::All => {
                         self.releases.installed.remove_all();
@@ -863,13 +864,13 @@ impl Gui {
                 self.sync();
                 Command::none()
             }
-            Message::RemoveCache => {
+            GuiMessage::RemoveCache => {
                 remove_dir_all(get_setting().cache_dir.clone()).unwrap();
                 println!("All cache removed.");
                 create_dir_all(get_setting().cache_dir.clone()).unwrap();
                 Command::none()
             }
-            Message::SelfUpdater(choice) => {
+            GuiMessage::SelfUpdater(choice) => {
                 match choice {
                     Choice::Enable => set_setting().self_updater = true,
                     Choice::Disable => set_setting().self_updater = false,
@@ -877,7 +878,7 @@ impl Gui {
                 save_settings();
                 Command::none()
             }
-            Message::CheckSelfUpdatesAtLaunch(choice) => {
+            GuiMessage::CheckSelfUpdatesAtLaunch(choice) => {
                 match choice {
                     Choice::Enable => set_setting().check_self_updates_at_launch = true,
                     Choice::Disable => set_setting().check_self_updates_at_launch = false,
@@ -885,11 +886,11 @@ impl Gui {
                 save_settings();
                 Command::none()
             }
-            Message::FetchSelfReleases => {
+            GuiMessage::FetchSelfReleases => {
                 self.tab_state.self_updater.fetching = true;
-                Command::perform(Gui::fetch_self_releases(), Message::PopulateSelfReleases)
+                Command::perform(Gui::fetch_self_releases(), GuiMessage::PopulateSelfReleases)
             }
-            Message::PopulateSelfReleases(self_releases) => {
+            GuiMessage::PopulateSelfReleases(self_releases) => {
                 self.self_releases = self_releases;
                 if let Some(s_releases) = &self.self_releases {
                     self.tab_state.self_updater.release_versions = s_releases
@@ -900,30 +901,30 @@ impl Gui {
                 self.tab_state.self_updater.fetching = false;
                 Command::none()
             }
-            Message::PickListVersionSelected(version) => {
+            GuiMessage::PickListVersionSelected(version) => {
                 self.tab_state.self_updater.pick_list_selected = version;
                 Command::none()
             }
-            Message::ChangeVersion => {
+            GuiMessage::ChangeVersion => {
                 self.tab_state.self_updater.installing = true;
                 Command::perform(
                     Gui::change_self_version(
                         self.self_releases.clone().unwrap(),
                         self.tab_state.self_updater.pick_list_selected.clone(),
                     ),
-                    Message::VersionChanged,
+                    GuiMessage::VersionChanged,
                 )
             }
-            Message::VersionChanged(()) => {
+            GuiMessage::VersionChanged(()) => {
                 self.tab_state.self_updater.installing = false;
                 self.tab_state.self_updater.installed = true;
                 Command::none()
             }
-            Message::CheckConnection => {
+            GuiMessage::CheckConnection => {
                 self.controls.checking_connection = true;
-                Command::perform(Gui::check_connection(), Message::ConnectionChecked)
+                Command::perform(Gui::check_connection(), GuiMessage::ConnectionChecked)
             }
-            Message::ConnectionChecked(()) => {
+            GuiMessage::ConnectionChecked(()) => {
                 self.controls.checking_connection = false;
                 Command::none()
             }

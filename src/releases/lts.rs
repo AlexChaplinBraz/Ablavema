@@ -85,7 +85,7 @@ impl ReleaseType for Lts {
                         Some(a) => a,
                         None => continue,
                     }
-                    .strip_suffix(".")
+                    .strip_suffix('.')
                     .unwrap()
                     .to_string();
                     date.push_str("-00:00:00");

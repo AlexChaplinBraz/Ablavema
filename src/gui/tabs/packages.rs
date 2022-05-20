@@ -1,6 +1,6 @@
 use super::TabState;
 use crate::{
-    gui::{controls::Controls, message::Message},
+    gui::{controls::Controls, message::GuiMessage},
     package::Package,
     releases::UpdateCount,
     settings::{get_setting, FETCHING, TEXT_SIZE},
@@ -23,15 +23,15 @@ pub struct PackagesState {
 impl<'a> TabState {
     pub fn packages_body(
         &'a mut self,
-        packages: &'a mut Vec<Package>,
+        packages: &'a mut [Package],
         file_path: Option<String>,
         update_count: UpdateCount,
         file_exists: bool,
         controls: &'a mut Controls,
-    ) -> Element<'a, Message> {
+    ) -> Element<'a, GuiMessage> {
         // TODO: Use real icons for the buttons.
         // TODO: Add tooltips.
-        let button = |label, message: Option<Message>, state| {
+        let button = |label, message: Option<GuiMessage>, state| {
             let button = Button::new(state, Text::new(label)).style(get_setting().theme);
 
             match message {
@@ -40,7 +40,7 @@ impl<'a> TabState {
             }
         };
 
-        let info: Element<'_, Message> = Container::new(
+        let info: Element<'_, GuiMessage> = Container::new(
             Column::new()
                 .padding(10)
                 .spacing(5)
@@ -51,7 +51,7 @@ impl<'a> TabState {
                         .push(button(
                             "[=]",
                             if get_setting().default_package.is_some() {
-                                Some(Message::OpenBlender(
+                                Some(GuiMessage::OpenBlender(
                                     get_setting().default_package.clone().unwrap().name,
                                 ))
                             } else {
@@ -75,7 +75,7 @@ impl<'a> TabState {
                         .push(button(
                             "[+]",
                             if file_path.is_some() && get_setting().default_package.is_some() {
-                                Some(Message::OpenBlenderWithFile(
+                                Some(GuiMessage::OpenBlenderWithFile(
                                     get_setting().default_package.clone().unwrap().name,
                                 ))
                             } else {
@@ -97,7 +97,7 @@ impl<'a> TabState {
                                 &mut self.packages.select_file_button,
                                 Text::new("Select file"),
                             )
-                            .on_press(Message::SelectFile)
+                            .on_press(GuiMessage::SelectFile)
                             .style(get_setting().theme),
                         ),
                 ),
@@ -106,7 +106,7 @@ impl<'a> TabState {
         .style(get_setting().theme.info_container())
         .into();
 
-        let packages: Element<'_, Message> = {
+        let packages: Element<'_, GuiMessage> = {
             let mut package_count: u16 = 0;
             let filtered_packages = Container::new(
                 packages
@@ -118,7 +118,8 @@ impl<'a> TabState {
                         let index = package.index;
                         let element = package.view(file_exists, package_count & 1 != 0);
                         column.push(
-                            element.map(move |message| Message::PackageMessage((index, message))),
+                            element
+                                .map(move |message| GuiMessage::PackageMessage((index, message))),
                         )
                     })
                     .width(Length::Fill),

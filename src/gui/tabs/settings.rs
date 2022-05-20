@@ -2,7 +2,7 @@ use super::TabState;
 use crate::{
     gui::{
         extra::{BuildTypeSettings, Choice, Location},
-        message::Message,
+        message::GuiMessage,
         style::Theme,
     },
     package::Build,
@@ -56,7 +56,7 @@ pub struct SettingsState {
 }
 
 impl TabState {
-    pub fn settings_body(&mut self, releases: &Releases) -> Element<'_, Message> {
+    pub fn settings_body(&mut self, releases: &Releases) -> Element<'_, GuiMessage> {
         let settings_block_intro = |title, description| {
             Column::new()
                 .spacing(10)
@@ -119,7 +119,7 @@ impl TabState {
                 state,
                 Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
             )
-            .on_press(Message::MinutesBetweenUpdatesChanged(amount))
+            .on_press(GuiMessage::MinutesBetweenUpdatesChanged(amount))
             .width(Length::Fill)
             .style(get_setting().theme.tab_button())
         };
@@ -131,7 +131,7 @@ impl TabState {
             )
             .width(Length::Fill)
             .style(get_setting().theme.tab_button())
-            .on_press(Message::ChangeLocation(location))
+            .on_press(GuiMessage::ChangeLocation(location))
         };
 
         let reset_location_button = |location, default, state| {
@@ -141,7 +141,7 @@ impl TabState {
             if default {
                 button
             } else {
-                button.on_press(Message::ResetLocation(location))
+                button.on_press(GuiMessage::ResetLocation(location))
             }
         };
 
@@ -154,7 +154,7 @@ impl TabState {
             .style(get_setting().theme.tab_button());
 
             if exists {
-                Row::new().push(button.on_press(Message::RemoveDatabases(build_type)))
+                Row::new().push(button.on_press(GuiMessage::RemoveDatabases(build_type)))
             } else {
                 Row::new().push(button)
             }
@@ -188,7 +188,7 @@ impl TabState {
             .style(get_setting().theme.tab_button());
 
             if exists {
-                Row::new().push(button.on_press(Message::RemovePackages(build_type)))
+                Row::new().push(button.on_press(GuiMessage::RemovePackages(build_type)))
             } else {
                 Row::new().push(button)
             }
@@ -273,7 +273,7 @@ that aren't installed to reduce launch time.",
             "Increases Ablavema's launch time for about a second or two.",
             &Choice::ALL,
             Some(choice(get_setting().check_updates_at_launch).unwrap()),
-            Message::CheckUpdatesAtLaunch,
+            GuiMessage::CheckUpdatesAtLaunch,
         );
 
         let minutes_between_updates = {
@@ -328,7 +328,7 @@ Look for new latest daily packages. Each build, like Alpha and Beta, is consider
 build and will look for updates for itself.",
             &Choice::ALL,
             Some(choice(get_setting().update_daily_latest).unwrap()),
-            Message::UpdateDailyLatest,
+            GuiMessage::UpdateDailyLatest,
         );
 
         let check_experimental_latest = choice_setting!(
@@ -338,7 +338,7 @@ Look for new latest experimental packages. Each branch is considered a separate 
 look for updates for itself.",
             &Choice::ALL,
             Some(choice(get_setting().update_experimental_latest).unwrap()),
-            Message::UpdateExperimentalLatest,
+            GuiMessage::UpdateExperimentalLatest,
         );
 
         let check_patch_latest = choice_setting!(
@@ -346,7 +346,7 @@ look for updates for itself.",
             "Look for new latest patched packages.",
             &Choice::ALL,
             Some(choice(get_setting().update_patch_latest).unwrap()),
-            Message::UpdatePatchLatest,
+            GuiMessage::UpdatePatchLatest,
         );
 
         let check_stable_latest = choice_setting!(
@@ -354,7 +354,7 @@ look for updates for itself.",
             "Look for new latest stable packages.",
             &Choice::ALL,
             Some(choice(get_setting().update_stable_latest).unwrap()),
-            Message::UpdateStableLatest,
+            GuiMessage::UpdateStableLatest,
         );
 
         let check_lts = choice_setting!(
@@ -362,7 +362,7 @@ look for updates for itself.",
             "Look for new Long-term Support packages.",
             &Choice::ALL,
             Some(choice(get_setting().update_lts).unwrap()),
-            Message::UpdateLts,
+            GuiMessage::UpdateLts,
         );
 
         let others_block =
@@ -376,7 +376,7 @@ only open launcher when the selected modifier key is held down. This way the lau
 itself known if there's an update or if you want to launch a different package.",
             &Choice::ALL,
             Some(choice(get_setting().bypass_launcher).unwrap()),
-            Message::BypassLauncher,
+            GuiMessage::BypassLauncher,
         );
 
         let modifier_key = choice_setting!(
@@ -386,7 +386,7 @@ You can start holding the modifier key even before double clicking on a .blend f
 shortcut, but you are able to change it if there's any interference.",
             &ModifierKey::ALL,
             Some(get_setting().modifier_key),
-            Message::ModifierKey,
+            GuiMessage::ModifierKey,
         );
 
         let use_latest_as_default = choice_setting!(
@@ -396,7 +396,7 @@ Change to the latest package of the same build type and version (except the patc
 can be higher) when installing an update.",
             &Choice::ALL,
             Some(choice(get_setting().use_latest_as_default).unwrap()),
-            Message::UseLatestAsDefault,
+            GuiMessage::UseLatestAsDefault,
         );
 
         let choose_theme = choice_setting!(
@@ -404,7 +404,7 @@ can be higher) when installing an update.",
             "Both try to mimic Blender's colour schemes as much as possible.",
             &Theme::ALL,
             Some(get_setting().theme),
-            Message::ThemeChanged,
+            GuiMessage::ThemeChanged,
         );
 
         let change_location = Row::new()
@@ -709,7 +709,7 @@ cache isn't being automatically removed.",
                                 Text::new("Remove all cache")
                                     .horizontal_alignment(HorizontalAlignment::Center),
                             )
-                            .on_press(Message::RemoveCache)
+                            .on_press(GuiMessage::RemoveCache)
                             .width(Length::Fill)
                             .style(get_setting().theme.tab_button()),
                         ),
@@ -730,7 +730,7 @@ self-updater. In this way, making use of this feature is helpful when trying out
 to see if a bug was there before or whatnot.",
             &Choice::ALL,
             Some(choice(get_setting().self_updater).unwrap()),
-            Message::SelfUpdater,
+            GuiMessage::SelfUpdater,
         );
 
         let items = [
@@ -756,7 +756,7 @@ to see if a bug was there before or whatnot.",
 
         let num_items = items.len();
         let mut settings = Column::new().padding(10).spacing(10);
-        for (i, setting) in std::array::IntoIter::new(items).enumerate() {
+        for (i, setting) in IntoIterator::into_iter(items).enumerate() {
             settings = settings.push(setting);
             if i + 1 < num_items {
                 settings = settings.push(separator());
@@ -772,7 +772,7 @@ This uses the same delay as the normal updates. Keep in mind that, at the moment
 downgrade you will be prompted to update Ablavema every time updates are checked.",
                     &Choice::ALL,
                     Some(choice(get_setting().check_self_updates_at_launch).unwrap()),
-                    Message::CheckSelfUpdatesAtLaunch,
+                    GuiMessage::CheckSelfUpdatesAtLaunch,
                 ))
             } else {
                 settings

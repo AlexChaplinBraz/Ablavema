@@ -402,16 +402,12 @@ pub trait ReleaseType:
                         break;
                     }
                     Build::Lts => {
-                        if installed_packages
-                            .iter()
-                            .find(|installed_package| {
-                                installed_package.version.nth(0).unwrap()
-                                    == package.version.nth(0).unwrap()
-                                    && installed_package.version.nth(1).unwrap()
-                                        == package.version.nth(1).unwrap()
-                            })
-                            .is_none()
-                        {
+                        if !installed_packages.iter().any(|installed_package| {
+                            installed_package.version.nth(0).unwrap()
+                                == package.version.nth(0).unwrap()
+                                && installed_package.version.nth(1).unwrap()
+                                    == package.version.nth(1).unwrap()
+                        }) {
                             installed_packages.push(package.clone());
                         }
                     }

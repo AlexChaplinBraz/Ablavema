@@ -1,4 +1,4 @@
-use super::{install::Progress, Gui, Message};
+use super::{install::Progress, Gui, GuiMessage};
 use crate::{
     package::{Package, PackageState, PackageStatus},
     settings::{get_setting, save_settings, set_setting, CAN_CONNECT, FETCHING, TEXT_SIZE},
@@ -23,11 +23,11 @@ pub enum PackageMessage {
 }
 
 impl Package {
-    pub fn update(&mut self, message: PackageMessage) -> Command<Message> {
+    pub fn update(&mut self, message: PackageMessage) -> Command<GuiMessage> {
         match message {
             PackageMessage::Install => Command::perform(
                 Gui::check_availability(true, self.clone()),
-                Message::CheckAvailability,
+                GuiMessage::CheckAvailability,
             ),
             PackageMessage::InstallationProgress(progress) => match progress {
                 Progress::Started => {
@@ -70,31 +70,34 @@ impl Package {
                         set_default_button: Default::default(),
                         remove_button: Default::default(),
                     };
-                    Command::perform(Gui::pass_package(self.clone()), Message::PackageInstalled)
+                    Command::perform(
+                        Gui::pass_package(self.clone()),
+                        GuiMessage::PackageInstalled,
+                    )
                 }
                 Progress::Errored(error_message) => {
                     self.state = PackageState::Errored {
                         error_message,
                         retry_button: Default::default(),
                     };
-                    Command::perform(Gui::pass_package(self.clone()), Message::CancelInstall)
+                    Command::perform(Gui::pass_package(self.clone()), GuiMessage::CancelInstall)
                 }
             },
             PackageMessage::Cancel => {
                 self.state = PackageState::default();
-                Command::perform(Gui::pass_package(self.clone()), Message::CancelInstall)
+                Command::perform(Gui::pass_package(self.clone()), GuiMessage::CancelInstall)
             }
             PackageMessage::Remove => {
                 self.remove();
-                Command::perform(Gui::pass_package(self.clone()), Message::PackageRemoved)
+                Command::perform(Gui::pass_package(self.clone()), GuiMessage::PackageRemoved)
             }
             PackageMessage::OpenBlender => {
-                Command::perform(Gui::pass_string(self.name.clone()), Message::OpenBlender)
+                Command::perform(Gui::pass_string(self.name.clone()), GuiMessage::OpenBlender)
             }
 
             PackageMessage::OpenBlenderWithFile => Command::perform(
                 Gui::pass_string(self.name.clone()),
-                Message::OpenBlenderWithFile,
+                GuiMessage::OpenBlenderWithFile,
             ),
             PackageMessage::SetDefault => {
                 set_setting().default_package = Some(self.clone());
@@ -107,7 +110,7 @@ impl Package {
                 Command::none()
             }
             PackageMessage::Bookmark => {
-                Command::perform(Gui::pass_package(self.clone()), Message::Bookmark)
+                Command::perform(Gui::pass_package(self.clone()), GuiMessage::Bookmark)
             }
         }
     }

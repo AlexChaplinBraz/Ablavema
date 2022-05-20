@@ -1,4 +1,4 @@
-use super::{package::PackageMessage, Message};
+use super::{package::PackageMessage, GuiMessage};
 use crate::{package::Package, settings::get_setting};
 use iced_futures::{
     futures::stream::{unfold, BoxStream},
@@ -54,9 +54,9 @@ macro_rules! unwrap_or_return {
 pub struct Install(Package);
 
 impl Install {
-    pub fn package(package: Package) -> iced::Subscription<Message> {
+    pub fn package(package: Package) -> iced::Subscription<GuiMessage> {
         iced::Subscription::from_recipe(Install(package)).map(|(index, progress)| {
-            Message::PackageMessage((index, PackageMessage::InstallationProgress(progress)))
+            GuiMessage::PackageMessage((index, PackageMessage::InstallationProgress(progress)))
         })
     }
 }

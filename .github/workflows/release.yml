@@ -102,10 +102,6 @@ jobs:
         shell: bash
         run: cargo build --verbose --release --target ${{ matrix.target }}
 
-      - name: Strip Linux binary
-        if: matrix.os == 'ubuntu-20.04'
-        run: strip "target/${{ matrix.target }}/release/ablavema"
-
       - name: Load clean changelog
         uses: actions/download-artifact@v2
         with:

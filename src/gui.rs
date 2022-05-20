@@ -11,7 +11,7 @@ use self::{
     controls::Controls,
     extra::{GlobalTokio, GuiFlags, GuiState},
     install::Install,
-    message::Message,
+    message::GuiMessage,
     tabs::recent_files::RecentFile,
 };
 use crate::{
@@ -124,6 +124,7 @@ impl Gui {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn check_all(
         daily_latest: DailyLatest,
         daily_archive: DailyArchive,
@@ -226,10 +227,10 @@ impl Gui {
 
 impl Application for Gui {
     type Executor = GlobalTokio;
-    type Message = Message;
+    type Message = GuiMessage;
     type Flags = GuiFlags;
 
-    fn new(flags: Self::Flags) -> (Self, Command<Message>) {
+    fn new(flags: Self::Flags) -> (Self, Command<GuiMessage>) {
         let releases = flags.releases;
 
         let packages = releases.build_vec();
@@ -280,11 +281,11 @@ impl Application for Gui {
         }
     }
 
-    fn update(&mut self, message: Message, _clipboard: &mut Clipboard) -> Command<Message> {
+    fn update(&mut self, message: GuiMessage, _clipboard: &mut Clipboard) -> Command<GuiMessage> {
         self.update_message(message, _clipboard)
     }
 
-    fn subscription(&self) -> Subscription<Message> {
+    fn subscription(&self) -> Subscription<GuiMessage> {
         Subscription::batch(
             self.installing
                 .iter()
@@ -292,7 +293,7 @@ impl Application for Gui {
         )
     }
 
-    fn view(&mut self) -> Element<'_, Message> {
+    fn view(&mut self) -> Element<'_, GuiMessage> {
         let file_exists = self.file_path.is_some();
         let current_tab = get_setting().tab;
         let update_count = self.releases.count_updates();
@@ -308,7 +309,7 @@ impl Application for Gui {
             if tab == current_tab {
                 Container::new(button).padding(2)
             } else {
-                Container::new(button.on_press(Message::TabChanged(tab))).padding(2)
+                Container::new(button.on_press(GuiMessage::TabChanged(tab))).padding(2)
             }
         };
 

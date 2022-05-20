@@ -1,6 +1,6 @@
 use super::TabState;
 use crate::{
-    gui::message::Message,
+    gui::message::GuiMessage,
     settings::{get_setting, TEXT_SIZE},
 };
 use chrono::{DateTime, Local};
@@ -190,9 +190,9 @@ impl<'a> TabState {
     pub fn recent_files_body(
         &'a mut self,
         file_path: Option<String>,
-        recent_files: &'a mut Vec<RecentFile>,
-    ) -> Element<'_, Message> {
-        let button = |label, message: Option<Message>, state| {
+        recent_files: &'a mut [RecentFile],
+    ) -> Element<'_, GuiMessage> {
+        let button = |label, message: Option<GuiMessage>, state| {
             let button = Button::new(state, Text::new(label)).style(get_setting().theme);
 
             match message {
@@ -201,7 +201,7 @@ impl<'a> TabState {
             }
         };
 
-        let info: Element<'_, Message> = Container::new(
+        let info: Element<'_, GuiMessage> = Container::new(
             Column::new()
                 .padding(10)
                 .spacing(5)
@@ -212,7 +212,7 @@ impl<'a> TabState {
                         .push(button(
                             "[=]",
                             if get_setting().default_package.is_some() {
-                                Some(Message::OpenBlender(
+                                Some(GuiMessage::OpenBlender(
                                     get_setting().default_package.clone().unwrap().name,
                                 ))
                             } else {
@@ -236,7 +236,7 @@ impl<'a> TabState {
                         .push(button(
                             "[+]",
                             if file_path.is_some() && get_setting().default_package.is_some() {
-                                Some(Message::OpenBlenderWithFile(
+                                Some(GuiMessage::OpenBlenderWithFile(
                                     get_setting().default_package.clone().unwrap().name,
                                 ))
                             } else {
@@ -258,7 +258,7 @@ impl<'a> TabState {
                                 &mut self.recent_files.select_file_button,
                                 Text::new("Select file"),
                             )
-                            .on_press(Message::SelectFile)
+                            .on_press(GuiMessage::SelectFile)
                             .style(get_setting().theme),
                         ),
                 ),
@@ -267,7 +267,7 @@ impl<'a> TabState {
         .style(get_setting().theme.info_container())
         .into();
 
-        let recent_files_view: Element<'_, Message> = {
+        let recent_files_view: Element<'_, GuiMessage> = {
             let mut file_count: u16 = 0;
             let files = Container::new(
                 recent_files
@@ -277,7 +277,7 @@ impl<'a> TabState {
                         let path = recent_file.path.to_str().unwrap().to_string();
                         let element = recent_file.view(file_count & 1 != 0);
                         column.push(element.map(move |message| {
-                            Message::RecentFileMessage((path.clone(), message))
+                            GuiMessage::RecentFileMessage((path.clone(), message))
                         }))
                     })
                     .width(Length::Fill),

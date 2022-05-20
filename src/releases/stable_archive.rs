@@ -66,7 +66,7 @@ pub async fn fetch_stable_archive_version(version: String) -> Vec<Package> {
 
     let document = get_document(url.as_str()).await;
 
-    let version = version.strip_prefix("Blender").unwrap().replace("/", "");
+    let version = version.strip_prefix("Blender").unwrap().replace('/', "");
 
     let (os, targ_os) = {
         if cfg!(target_os = "linux") {

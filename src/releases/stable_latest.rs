@@ -62,7 +62,7 @@ impl ReleaseType for StableLatest {
                     .unwrap()
                     .strip_prefix(&url)
                     .unwrap()
-                    .strip_suffix("/")
+                    .strip_suffix('/')
                     .unwrap()
                     .replace(".msi", ".zip")
             );

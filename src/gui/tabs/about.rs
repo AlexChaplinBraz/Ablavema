@@ -1,6 +1,6 @@
 use super::TabState;
 use crate::{
-    gui::message::Message,
+    gui::message::GuiMessage,
     settings::{get_setting, TEXT_SIZE},
 };
 use clap::crate_version;
@@ -15,7 +15,7 @@ pub struct AboutState {
 }
 
 impl TabState {
-    pub fn about_body(&mut self) -> Element<'_, Message> {
+    pub fn about_body(&mut self) -> Element<'_, GuiMessage> {
         let link = |label, url, state| {
             Row::new()
                 .spacing(10)
@@ -27,7 +27,7 @@ impl TabState {
                 )
                 .push(
                     Button::new(state, Text::new(&url))
-                        .on_press(Message::OpenBrowser(url))
+                        .on_press(GuiMessage::OpenBrowser(url))
                         .style(get_setting().theme),
                 )
         };

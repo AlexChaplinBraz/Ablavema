@@ -1,4 +1,4 @@
-use super::{sort_by::SortBy, Message};
+use super::{sort_by::SortBy, GuiMessage};
 use crate::{
     releases::UpdateCount,
     settings::{get_setting, CAN_CONNECT, FETCHING, INSTALLING},
@@ -29,7 +29,7 @@ pub struct Controls {
 }
 
 impl Controls {
-    pub fn view(&mut self, update_count: UpdateCount) -> Container<'_, Message> {
+    pub fn view(&mut self, update_count: UpdateCount) -> Container<'_, GuiMessage> {
         let update_button = {
             let button = Button::new(
                 &mut self.check_for_updates_button,
@@ -41,7 +41,7 @@ impl Controls {
                 && !INSTALLING.load(Ordering::Relaxed)
                 && !FETCHING.load(Ordering::Relaxed)
             {
-                button.on_press(Message::CheckForUpdates)
+                button.on_press(GuiMessage::CheckForUpdates)
             } else {
                 button
             }
@@ -49,9 +49,9 @@ impl Controls {
 
         let filter_row = |filter,
                           label,
-                          checkbox_message: fn(bool) -> Message,
+                          checkbox_message: fn(bool) -> GuiMessage,
                           state,
-                          button_message: Option<Message>| {
+                          button_message: Option<GuiMessage>| {
             let row = Row::new()
                 .height(Length::Units(25))
                 .align_items(Align::Center)
@@ -92,21 +92,21 @@ impl Controls {
                     }
                     None => String::from("Updates"),
                 },
-                Message::FilterUpdatesChanged,
+                GuiMessage::FilterUpdatesChanged,
                 None,
                 None,
             ))
             .push(filter_row(
                 get_setting().filters.bookmarks,
                 String::from("Bookmarks"),
-                Message::FilterBookmarksChanged,
+                GuiMessage::FilterBookmarksChanged,
                 None,
                 None,
             ))
             .push(filter_row(
                 get_setting().filters.installed,
                 String::from("Installed"),
-                Message::FilterInstalledChanged,
+                GuiMessage::FilterInstalledChanged,
                 None,
                 None,
             ))
@@ -114,9 +114,9 @@ impl Controls {
             .push(filter_row(
                 get_setting().filters.all,
                 String::from("All"),
-                Message::FilterAllChanged,
+                GuiMessage::FilterAllChanged,
                 Some(&mut self.fetch_all_button),
-                Some(Message::FetchAll),
+                Some(GuiMessage::FetchAll),
             ))
             .push(filter_row(
                 get_setting().filters.daily_latest,
@@ -126,16 +126,16 @@ impl Controls {
                     }
                     None => String::from("Daily (latest)"),
                 },
-                Message::FilterDailyLatestChanged,
+                GuiMessage::FilterDailyLatestChanged,
                 Some(&mut self.fetch_daily_latest_button),
-                Some(Message::FetchDailyLatest),
+                Some(GuiMessage::FetchDailyLatest),
             ))
             .push(filter_row(
                 get_setting().filters.daily_archive,
                 String::from("Daily (archive)"),
-                Message::FilterDailyArchiveChanged,
+                GuiMessage::FilterDailyArchiveChanged,
                 Some(&mut self.fetch_daily_archive_button),
-                Some(Message::FetchDailyArchive),
+                Some(GuiMessage::FetchDailyArchive),
             ))
             .push(filter_row(
                 get_setting().filters.experimental_latest,
@@ -145,16 +145,16 @@ impl Controls {
                     }
                     None => String::from("Experimental (latest)"),
                 },
-                Message::FilterExperimentalLatestChanged,
+                GuiMessage::FilterExperimentalLatestChanged,
                 Some(&mut self.fetch_experimental_latest_button),
-                Some(Message::FetchExperimentalLatest),
+                Some(GuiMessage::FetchExperimentalLatest),
             ))
             .push(filter_row(
                 get_setting().filters.experimental_archive,
                 String::from("Experimental (archive)"),
-                Message::FilterExperimentalArchiveChanged,
+                GuiMessage::FilterExperimentalArchiveChanged,
                 Some(&mut self.fetch_experimental_archive_button),
-                Some(Message::FetchExperimentalArchive),
+                Some(GuiMessage::FetchExperimentalArchive),
             ))
             .push(filter_row(
                 get_setting().filters.patch_latest,
@@ -164,16 +164,16 @@ impl Controls {
                     }
                     None => String::from("Patch (latest)"),
                 },
-                Message::FilterPatchLatestChanged,
+                GuiMessage::FilterPatchLatestChanged,
                 Some(&mut self.fetch_patch_latest_button),
-                Some(Message::FetchPatchLatest),
+                Some(GuiMessage::FetchPatchLatest),
             ))
             .push(filter_row(
                 get_setting().filters.patch_archive,
                 String::from("Patch (archive)"),
-                Message::FilterPatchArchiveChanged,
+                GuiMessage::FilterPatchArchiveChanged,
                 Some(&mut self.fetch_patch_archive_button),
-                Some(Message::FetchPatchArchive),
+                Some(GuiMessage::FetchPatchArchive),
             ))
             .push(filter_row(
                 get_setting().filters.stable_latest,
@@ -183,16 +183,16 @@ impl Controls {
                     }
                     None => String::from("Stable (latest)"),
                 },
-                Message::FilterStableLatestChanged,
+                GuiMessage::FilterStableLatestChanged,
                 Some(&mut self.fetch_stable_latest_button),
-                Some(Message::FetchStableLatest),
+                Some(GuiMessage::FetchStableLatest),
             ))
             .push(filter_row(
                 get_setting().filters.stable_archive,
                 String::from("Stable (archive)"),
-                Message::FilterStableArchiveChanged,
+                GuiMessage::FilterStableArchiveChanged,
                 Some(&mut self.fetch_stable_archive_button),
-                Some(Message::FetchStableArchive),
+                Some(GuiMessage::FetchStableArchive),
             ))
             .push(filter_row(
                 get_setting().filters.lts,
@@ -202,9 +202,9 @@ impl Controls {
                     }
                     None => String::from("Long-term Support"),
                 },
-                Message::FilterLtsChanged,
+                GuiMessage::FilterLtsChanged,
                 Some(&mut self.fetch_lts_button),
-                Some(Message::FetchLts),
+                Some(GuiMessage::FetchLts),
             ));
 
         let sorting = Row::new()
@@ -216,7 +216,7 @@ impl Controls {
                     &mut self.sorting_pick_list,
                     &SortBy::ALL[..],
                     Some(get_setting().sort_by),
-                    Message::SortingChanged,
+                    GuiMessage::SortingChanged,
                 )
                 .width(Length::Fill)
                 .style(get_setting().theme),
@@ -258,7 +258,7 @@ impl Controls {
                                 if self.checking_connection {
                                     button
                                 } else {
-                                    button.on_press(Message::CheckConnection)
+                                    button.on_press(GuiMessage::CheckConnection)
                                 }
                             })
                             .push(Space::with_width(Length::Units(9))),

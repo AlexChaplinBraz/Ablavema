@@ -5,21 +5,14 @@ use crate::{
     self_updater::SelfUpdater,
     settings::{get_setting, CAN_CONNECT, LAUNCH_GUI},
 };
-use clap::{crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg};
+use clap::{command, Arg};
 use device_query::{DeviceQuery, DeviceState};
 use std::sync::atomic::Ordering;
 
 pub async fn run_cli() -> GuiFlags {
-    let args = App::new(crate_name!())
-        .version(crate_version!())
-        .author(crate_authors!())
-        .about(crate_description!())
-        .global_setting(AppSettings::ColoredHelp)
-        .help_message("Print help and exit")
-        .version_message("Print version and exit")
-        .version_short("v")
+    let args = command!()
         .arg(
-            Arg::with_name("path")
+            Arg::new("path")
                 .value_name("PATH")
                 .help("Path to .blend file"),
         )

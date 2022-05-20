@@ -1,6 +1,6 @@
 use super::TabState;
 use crate::{
-    gui::message::Message,
+    gui::message::GuiMessage,
     settings::{get_setting, CAN_CONNECT, TEXT_SIZE},
 };
 use clap::crate_version;
@@ -37,7 +37,7 @@ impl TabState {
     pub fn self_updater_body(
         &mut self,
         self_releases: &mut Option<Vec<Release>>,
-    ) -> Element<'_, Message> {
+    ) -> Element<'_, GuiMessage> {
         let self_updater_pick_list_selected = self.self_updater.pick_list_selected.clone();
 
         let release_index = match &self_releases {
@@ -69,7 +69,7 @@ impl TabState {
                                 &mut self.self_updater.pick_list,
                                 &self.self_updater.release_versions,
                                 Some(self_updater_pick_list_selected),
-                                Message::PickListVersionSelected,
+                                GuiMessage::PickListVersionSelected,
                             )
                             .width(Length::Units(60))
                             .style(get_setting().theme),
@@ -89,7 +89,7 @@ impl TabState {
                                     && !self.self_updater.fetching
                                 {
                                     // TODO: Check connectivity on press.
-                                    button.on_press(Message::FetchSelfReleases)
+                                    button.on_press(GuiMessage::FetchSelfReleases)
                                 } else {
                                     button
                                 }
@@ -107,7 +107,7 @@ impl TabState {
                                     button
                                 } else {
                                     // TODO: Check connectivity on press.
-                                    button.on_press(Message::ChangeVersion)
+                                    button.on_press(GuiMessage::ChangeVersion)
                                 }
                             })
                         }),
