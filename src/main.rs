@@ -63,6 +63,7 @@ async fn run() {
         let mut settings = iced::Settings::with_flags(gui_args);
         settings.id = Some(String::from("Ablavema"));
         settings.window = window;
+        settings.default_font = Some(include_bytes!("../extra/fonts/Lambda.ttf"));
         settings.default_text_size = TEXT_SIZE;
 
         Gui::run(settings).unwrap();

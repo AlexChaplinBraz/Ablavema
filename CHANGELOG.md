@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - To `wgpu` renderer on Linux since it seems to be working now.
+- Default font so everything fits correctly on all platforms.
 
 ### Fixed
 
