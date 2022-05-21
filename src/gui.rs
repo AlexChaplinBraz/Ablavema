@@ -15,7 +15,7 @@ use self::{
     tabs::recent_files::RecentFile,
 };
 use crate::{
-    gui::tabs::{Tab, TabState},
+    gui::tabs::Tab,
     helpers::check_connection,
     package::Package,
     releases::{
@@ -28,8 +28,12 @@ use crate::{
     settings::{get_setting, save_settings, set_setting, CAN_CONNECT},
 };
 use iced::{
-    Application, Button, Clipboard, Column, Command, Container, Element, HorizontalAlignment,
-    Length, Row, Space, Subscription, Text,
+    alignment::Horizontal,
+    pure::{
+        widget::{Button, Column, Container, Row, Text},
+        Application, Element,
+    },
+    Command, Length, Space, Subscription,
 };
 use self_update::update::Release;
 use std::sync::atomic::Ordering;
@@ -58,7 +62,6 @@ pub struct Gui {
     recent_files: Vec<RecentFile>,
     state: GuiState,
     controls: Controls,
-    tab_state: TabState,
     self_releases: Option<Vec<Release>>,
 }
 
@@ -243,12 +246,12 @@ impl Application for Gui {
             }
         }
 
-        let mut tab_state = TabState::default();
+        let mut state = GuiState::new();
 
         let self_releases = flags.self_releases;
 
         if let Some(s_releases) = &self_releases {
-            tab_state.self_updater.release_versions = s_releases
+            state.release_versions = s_releases
                 .iter()
                 .map(|release| release.version.clone())
                 .collect();
@@ -261,9 +264,8 @@ impl Application for Gui {
                 file_path: flags.file_path,
                 recent_files: get_setting().recent_files.to_vec(),
                 installing: Vec::default(),
-                state: GuiState::default(),
+                state,
                 controls: Controls::default(),
-                tab_state,
                 self_releases,
             },
             Command::none(),
@@ -281,8 +283,8 @@ impl Application for Gui {
         }
     }
 
-    fn update(&mut self, message: GuiMessage, _clipboard: &mut Clipboard) -> Command<GuiMessage> {
-        self.update_message(message, _clipboard)
+    fn update(&mut self, message: GuiMessage) -> Command<GuiMessage> {
+        self.update_message(message)
     }
 
     fn subscription(&self) -> Subscription<GuiMessage> {
@@ -293,18 +295,15 @@ impl Application for Gui {
         )
     }
 
-    fn view(&mut self) -> Element<'_, GuiMessage> {
+    fn view(&self) -> Element<'_, GuiMessage> {
         let file_exists = self.file_path.is_some();
         let current_tab = get_setting().tab;
         let update_count = self.releases.count_updates();
 
-        let tab_button = |label, tab, state| {
-            let button = Button::new(
-                state,
-                Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
-            )
-            .width(Length::Units(100))
-            .style(get_setting().theme.tab_button());
+        let tab_button = |label, tab| {
+            let button = Button::new(Text::new(label).horizontal_alignment(Horizontal::Center))
+                .width(Length::Units(100))
+                .style(get_setting().theme.tab_button());
 
             if tab == current_tab {
                 Container::new(button).padding(2)
@@ -327,54 +326,32 @@ impl Application for Gui {
 
         let tabs = Container::new(
             Row::new()
-                .push(tab_button(
-                    "Recent files",
-                    Tab::RecentFiles,
-                    &mut self.state.recent_files_button,
-                ))
-                .push(tab_button(
-                    "Packages",
-                    Tab::Packages,
-                    &mut self.state.packages_button,
-                ))
-                .push(tab_button(
-                    "Settings",
-                    Tab::Settings,
-                    &mut self.state.settings_button,
-                ))
+                .push(tab_button("Recent files", Tab::RecentFiles))
+                .push(tab_button("Packages", Tab::Packages))
+                .push(tab_button("Settings", Tab::Settings))
                 .push(if get_setting().self_updater {
-                    tab_button(
-                        &self_update_tab_label,
-                        Tab::SelfUpdater,
-                        &mut self.state.self_updater_button,
-                    )
+                    tab_button(&self_update_tab_label, Tab::SelfUpdater)
                 } else {
                     Container::new(Space::with_width(Length::Units(0)))
                 })
-                .push(tab_button(
-                    "About",
-                    Tab::About,
-                    &mut self.state.about_button,
-                )),
+                .push(tab_button("About", Tab::About)),
         )
         .width(Length::Fill)
         .center_x()
         .style(get_setting().theme.tab_container());
 
         let body = match current_tab {
-            Tab::RecentFiles => self
-                .tab_state
-                .recent_files_body(self.file_path.clone(), &mut self.recent_files),
-            Tab::Packages => self.tab_state.packages_body(
-                &mut self.packages,
+            Tab::RecentFiles => Tab::recent_files_body(self.file_path.clone(), &self.recent_files),
+            Tab::Packages => Tab::packages_body(
+                &self.packages,
                 self.file_path.clone(),
                 update_count,
                 file_exists,
-                &mut self.controls,
+                &self.controls,
             ),
-            Tab::Settings => self.tab_state.settings_body(&self.releases),
-            Tab::SelfUpdater => self.tab_state.self_updater_body(&mut self.self_releases),
-            Tab::About => self.tab_state.about_body(),
+            Tab::Settings => Tab::settings_body(&self.releases),
+            Tab::SelfUpdater => Tab::self_updater_body(&self.state, &self.self_releases),
+            Tab::About => Tab::about_body(),
         };
 
         Column::new().push(tabs).push(body).into()

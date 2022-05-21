@@ -15,7 +15,7 @@ use crate::{
     settings::{get_setting, LAUNCH_GUI},
 };
 use helpers::check_connection;
-use iced::Application;
+use iced::pure::Application;
 use settings::TEXT_SIZE;
 use std::{env, sync::atomic::Ordering};
 
@@ -49,8 +49,8 @@ async fn run() {
 
     if LAUNCH_GUI.load(Ordering::Relaxed) || get_setting().default_package.is_none() {
         let mut window = iced::window::Settings::default();
-        window.size = (680, 585);
-        window.min_size = Some((680, 585));
+        window.size = (680, 620);
+        window.min_size = Some((680, 620));
         window.icon = Some(
             iced::window::Icon::from_rgba(
                 include_bytes!(env!("ICED_ICON_DATA_PATH")).to_vec(),
@@ -60,16 +60,10 @@ async fn run() {
             .unwrap(),
         );
 
-        let default_settings = iced::Settings::<()>::default();
-
-        let settings = iced::Settings {
-            flags: gui_args,
-            window,
-            default_font: default_settings.default_font,
-            default_text_size: TEXT_SIZE,
-            exit_on_close_request: default_settings.exit_on_close_request,
-            antialiasing: default_settings.antialiasing,
-        };
+        let mut settings = iced::Settings::with_flags(gui_args);
+        settings.id = Some(String::from("Ablavema"));
+        settings.window = window;
+        settings.default_text_size = TEXT_SIZE;
 
         Gui::run(settings).unwrap();
     } else {

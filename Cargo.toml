@@ -31,7 +31,8 @@ device_query = "1"
 directories-next = "2"
 fs2 = "0.4"
 fs_extra = "1"
-iced_futures = "0.3"
+iced = { version = "0.4", features = ["pure"] }
+iced_futures = "0.4"
 itertools = "0.10"
 lazy_static = "1"
 native-dialog = "0.6"
@@ -48,13 +49,11 @@ webbrowser = "0.7"
 bzip2 = "0.4"
 flate2 = "1"
 glob = "0.3"
-iced = { version = "0.3", default-features = false, features = ["glow", "glow_default_system_font"] }
 self_update = { version = "0.30", default-features = false, features = ["archive-tar", "compression-flate2", "rustls"] }
 tar = "0.4"
 xz2 = "0.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-iced = "0.3"
 self_update = { version = "0.30", default-features = false, features = ["archive-zip", "rustls"] }
 winapi = { version = "0.3", features = ["wincon"] }
 zip = "0.6"

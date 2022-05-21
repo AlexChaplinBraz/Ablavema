@@ -1,5 +1,6 @@
 use crate::releases::Releases;
-use iced::{button, Executor};
+use clap::crate_version;
+use iced::Executor;
 use self_update::update::Release;
 
 #[derive(Debug)]
@@ -10,11 +11,20 @@ pub struct GuiFlags {
 }
 #[derive(Debug, Default)]
 pub struct GuiState {
-    pub recent_files_button: button::State,
-    pub packages_button: button::State,
-    pub settings_button: button::State,
-    pub self_updater_button: button::State,
-    pub about_button: button::State,
+    pub release_versions: Vec<String>,
+    pub fetching_releases: bool,
+    pub pick_list_selected_releases: String,
+    pub installing_release: bool,
+    pub installed_release: bool,
+}
+
+impl GuiState {
+    pub fn new() -> Self {
+        Self {
+            pick_list_selected_releases: crate_version!().to_string(),
+            ..Default::default()
+        }
+    }
 }
 
 pub struct GlobalTokio;

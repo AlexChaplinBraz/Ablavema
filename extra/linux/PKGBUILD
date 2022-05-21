@@ -8,7 +8,7 @@ pkgdesc='A Blender launcher and version manager'
 arch=('x86_64')
 url='https://github.com/AlexChaplinBraz/Ablavema'
 license=('MIT')
-depends=('fontconfig' 'freetype2' 'glibc' 'xz' 'bzip2' 'libx11' 'gcc-libs')
+depends=('xz' 'bzip2' 'libx11' 'gcc-libs' 'glibc')
 optdepends=(
     'zenity: graphical dialog'
     'kdialog: graphical dialog'

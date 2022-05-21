@@ -1,4 +1,4 @@
-use super::TabState;
+use super::Tab;
 use crate::{
     gui::{controls::Controls, message::GuiMessage},
     package::Package,
@@ -6,33 +6,27 @@ use crate::{
     settings::{get_setting, FETCHING, TEXT_SIZE},
 };
 use iced::{
-    button, scrollable, Align, Button, Column, Container, Element, Length, Row, Scrollable, Space,
-    Text,
+    pure::{
+        widget::{Button, Column, Container, Row, Scrollable, Text},
+        Element,
+    },
+    Alignment, Length, Space,
 };
 use itertools::Itertools;
 use std::sync::atomic::Ordering;
 
-#[derive(Debug, Default)]
-pub struct PackagesState {
-    pub open_default_button: button::State,
-    pub open_default_with_file_button: button::State,
-    pub select_file_button: button::State,
-    pub scroll: scrollable::State,
-}
-
-impl<'a> TabState {
+impl<'a> Tab {
     pub fn packages_body(
-        &'a mut self,
-        packages: &'a mut [Package],
+        packages: &'a [Package],
         file_path: Option<String>,
         update_count: UpdateCount,
         file_exists: bool,
-        controls: &'a mut Controls,
+        controls: &'a Controls,
     ) -> Element<'a, GuiMessage> {
         // TODO: Use real icons for the buttons.
         // TODO: Add tooltips.
-        let button = |label, message: Option<GuiMessage>, state| {
-            let button = Button::new(state, Text::new(label)).style(get_setting().theme);
+        let button = |label, message: Option<GuiMessage>| {
+            let button = Button::new(Text::new(label)).style(get_setting().theme);
 
             match message {
                 Some(message) => button.on_press(message),
@@ -47,7 +41,7 @@ impl<'a> TabState {
                 .push(
                     Row::new()
                         .spacing(10)
-                        .align_items(Align::Center)
+                        .align_items(Alignment::Center)
                         .push(button(
                             "[=]",
                             if get_setting().default_package.is_some() {
@@ -57,7 +51,6 @@ impl<'a> TabState {
                             } else {
                                 None
                             },
-                            &mut self.packages.open_default_button,
                         ))
                         .push(Text::new("Default package:"))
                         .push(
@@ -71,7 +64,7 @@ impl<'a> TabState {
                 .push(
                     Row::new()
                         .spacing(10)
-                        .align_items(Align::Center)
+                        .align_items(Alignment::Center)
                         .push(button(
                             "[+]",
                             if file_path.is_some() && get_setting().default_package.is_some() {
@@ -81,7 +74,6 @@ impl<'a> TabState {
                             } else {
                                 None
                             },
-                            &mut self.packages.open_default_with_file_button,
                         ))
                         .push(Text::new("File:"))
                         .push(
@@ -93,12 +85,9 @@ impl<'a> TabState {
                         )
                         .push(Space::with_width(Length::Fill))
                         .push(
-                            Button::new(
-                                &mut self.packages.select_file_button,
-                                Text::new("Select file"),
-                            )
-                            .on_press(GuiMessage::SelectFile)
-                            .style(get_setting().theme),
+                            Button::new(Text::new("Select file"))
+                                .on_press(GuiMessage::SelectFile)
+                                .style(get_setting().theme),
                         ),
                 ),
         )
@@ -110,7 +99,7 @@ impl<'a> TabState {
             let mut package_count: u16 = 0;
             let filtered_packages = Container::new(
                 packages
-                    .iter_mut()
+                    .iter()
                     .filter(|package| get_setting().filters.matches(package))
                     .sorted_by(|a, b| get_setting().sort_by.get_ordering(a, b))
                     .fold(Column::new(), |column, package| {
@@ -124,8 +113,6 @@ impl<'a> TabState {
                     })
                     .width(Length::Fill),
             );
-
-            let scrollable = Scrollable::new(&mut self.packages.scroll).push(filtered_packages);
 
             if package_count == 0 {
                 Container::new(
@@ -145,10 +132,10 @@ impl<'a> TabState {
                 .style(get_setting().theme)
                 .into()
             } else {
-                Container::new(scrollable)
+                Container::new(Scrollable::new(filtered_packages))
                     .height(Length::Fill)
                     .width(Length::Fill)
-                    .style(get_setting().theme)
+                    .style(get_setting().theme.normal_container())
                     .into()
             }
         };
@@ -160,7 +147,7 @@ impl<'a> TabState {
         )
         .height(Length::Fill)
         .width(Length::Fill)
-        .style(get_setting().theme)
+        .style(get_setting().theme.normal_container())
         .into()
     }
 }

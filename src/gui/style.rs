@@ -1,4 +1,7 @@
-use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, Color};
+use iced::{
+    pure::widget::{button, checkbox, container, pick_list, progress_bar, radio, rule},
+    Color,
+};
 use serde::{Deserialize, Serialize};
 
 /// Creates a const Color. Takes values from 0 to 255.
@@ -35,6 +38,28 @@ impl Theme {
         match self {
             Theme::Light => light::ButtonTab.into(),
             Theme::Dark => dark::ButtonTab.into(),
+        }
+    }
+
+    /// Workaround for:
+    /// error[E0495]: cannot infer an appropriate lifetime for autoref due to conflicting requirements
+    /// This is what I was getting whenever I used `.style(get_setting().theme)`:
+    /// expected `<std::boxed::Box<dyn iced::container::StyleSheet> as From<Theme>>`
+    ///    found `<std::boxed::Box<(dyn iced::container::StyleSheet + 'static)> as From<Theme>>`
+    /// No clue why calling it manually like this instead of the From impl fixes it.
+    /// TODO: Investigate why this is the case.
+    pub fn normal_container(&self) -> Box<dyn container::StyleSheet> {
+        match self {
+            Theme::Light => light::Container.into(),
+            Theme::Dark => dark::Container.into(),
+        }
+    }
+
+    /// Same workaround as `normal_container()`.
+    pub fn normal_pick_list(&self) -> Box<dyn pick_list::StyleSheet> {
+        match self {
+            Theme::Light => light::PickList.into(),
+            Theme::Dark => dark::PickList.into(),
         }
     }
 
@@ -158,7 +183,10 @@ impl From<Theme> for Box<dyn rule::StyleSheet> {
 }
 
 mod light {
-    use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, Color, Vector};
+    use iced::{
+        pure::widget::{button, checkbox, container, pick_list, progress_bar, radio, rule},
+        Color, Vector,
+    };
 
     const_color!(ACTIVE_TAB, 190, 190, 190);
     const_color!(HOVERED_TAB, 142, 142, 142);
@@ -249,6 +277,7 @@ mod light {
                 border_radius: 5.0,
                 border_width: 0.0,
                 border_color: Color::TRANSPARENT,
+                text_color: None,
             }
         }
 
@@ -350,6 +379,7 @@ mod light {
         fn active(&self) -> pick_list::Style {
             pick_list::Style {
                 text_color: ACTIVE_TEXT,
+                placeholder_color: ACTIVE_TEXT,
                 background: PICK_LIST_BACKGROUND.into(),
                 border_radius: 5.0,
                 border_width: 0.0,
@@ -385,6 +415,7 @@ mod light {
                 dot_color: ACTIVE,
                 border_width: 0.0,
                 border_color: Color::TRANSPARENT,
+                text_color: None,
             }
         }
 
@@ -410,7 +441,10 @@ mod light {
 }
 
 mod dark {
-    use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, Color, Vector};
+    use iced::{
+        pure::widget::{button, checkbox, container, pick_list, progress_bar, radio, rule},
+        Color, Vector,
+    };
 
     const_color!(ACTIVE_TAB, 66, 66, 66);
     const_color!(HOVERED_TAB, 52, 52, 52);
@@ -501,6 +535,7 @@ mod dark {
                 border_radius: 5.0,
                 border_width: 0.0,
                 border_color: Color::TRANSPARENT,
+                text_color: None,
             }
         }
 
@@ -602,6 +637,7 @@ mod dark {
         fn active(&self) -> pick_list::Style {
             pick_list::Style {
                 text_color: ACTIVE_TEXT,
+                placeholder_color: ACTIVE_TEXT,
                 background: PICK_LIST_BACKGROUND.into(),
                 border_radius: 5.0,
                 border_width: 0.0,
@@ -637,6 +673,7 @@ mod dark {
                 dot_color: ACTIVE,
                 border_width: 0.0,
                 border_color: Color::TRANSPARENT,
+                text_color: None,
             }
         }
 

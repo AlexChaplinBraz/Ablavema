@@ -4,8 +4,12 @@ use crate::{
     settings::{get_setting, save_settings, set_setting, CAN_CONNECT, FETCHING, TEXT_SIZE},
 };
 use iced::{
-    Align, Button, Column, Command, Container, Element, HorizontalAlignment, Length, ProgressBar,
-    Row, Text,
+    alignment::Horizontal,
+    pure::{
+        widget::{Button, Column, Container, Row, Text},
+        Element,
+    },
+    Alignment, Command, Length, ProgressBar,
 };
 use std::sync::atomic::Ordering;
 
@@ -31,55 +35,35 @@ impl Package {
             ),
             PackageMessage::InstallationProgress(progress) => match progress {
                 Progress::Started => {
-                    self.state = PackageState::Downloading {
-                        progress: 0.0,
-                        cancel_button: Default::default(),
-                    };
+                    self.state = PackageState::Downloading { progress: 0.0 };
                     Command::none()
                 }
                 Progress::DownloadProgress(progress) => {
-                    if let PackageState::Downloading { cancel_button, .. } = self.state {
-                        self.state = PackageState::Downloading {
-                            progress,
-                            cancel_button,
-                        };
+                    if let PackageState::Downloading { .. } = self.state {
+                        self.state = PackageState::Downloading { progress };
                     }
                     Command::none()
                 }
                 Progress::FinishedDownloading => {
-                    self.state = PackageState::Extracting {
-                        progress: 0.0,
-                        cancel_button: Default::default(),
-                    };
+                    self.state = PackageState::Extracting { progress: 0.0 };
                     Command::none()
                 }
                 Progress::ExtractionProgress(progress) => {
-                    if let PackageState::Extracting { cancel_button, .. } = self.state {
-                        self.state = PackageState::Extracting {
-                            progress,
-                            cancel_button,
-                        };
+                    if let PackageState::Extracting { .. } = self.state {
+                        self.state = PackageState::Extracting { progress };
                     }
                     Command::none()
                 }
                 Progress::FinishedExtracting => Command::none(),
                 Progress::FinishedInstalling => {
-                    self.state = PackageState::Installed {
-                        open_button: Default::default(),
-                        open_file_button: Default::default(),
-                        set_default_button: Default::default(),
-                        remove_button: Default::default(),
-                    };
+                    self.state = PackageState::Installed;
                     Command::perform(
                         Gui::pass_package(self.clone()),
                         GuiMessage::PackageInstalled,
                     )
                 }
-                Progress::Errored(error_message) => {
-                    self.state = PackageState::Errored {
-                        error_message,
-                        retry_button: Default::default(),
-                    };
+                Progress::Errored(message) => {
+                    self.state = PackageState::Errored { message };
                     Command::perform(Gui::pass_package(self.clone()), GuiMessage::CancelInstall)
                 }
             },
@@ -115,7 +99,7 @@ impl Package {
         }
     }
 
-    pub fn view(&mut self, file_exists: bool, is_odd: bool) -> Element<'_, PackageMessage> {
+    pub fn view(&self, file_exists: bool, is_odd: bool) -> Element<'_, PackageMessage> {
         let is_default_package = get_setting().default_package.is_some()
             && get_setting().default_package.clone().unwrap() == *self;
 
@@ -130,14 +114,11 @@ impl Package {
                     .width(Length::Fill),
             )
             .push(
-                Button::new(
-                    &mut self.bookmark_button,
-                    Text::new(if get_setting().bookmarks.contains(&self.name) {
-                        "[B]"
-                    } else {
-                        "[M]"
-                    }),
-                )
+                Button::new(Text::new(if get_setting().bookmarks.contains(&self.name) {
+                    "[B]"
+                } else {
+                    "[M]"
+                }))
                 .on_press(PackageMessage::Bookmark)
                 .style(get_setting().theme),
             );
@@ -145,7 +126,7 @@ impl Package {
         let details = Column::new()
             .push(
                 Row::new()
-                    .align_items(Align::End)
+                    .align_items(Alignment::End)
                     .push(Text::new("Date: ").size(TEXT_SIZE - 4))
                     .push(
                         Text::new(date_time)
@@ -158,7 +139,7 @@ impl Package {
                     .push(
                         Row::new()
                             .width(Length::Fill)
-                            .align_items(Align::End)
+                            .align_items(Alignment::End)
                             .push(Text::new("Version: ").size(TEXT_SIZE - 4))
                             .push(
                                 Text::new(self.version.to_string())
@@ -177,7 +158,7 @@ impl Package {
             )
             .push(
                 Row::new()
-                    .align_items(Align::End)
+                    .align_items(Alignment::End)
                     .push(Text::new("Build: ").size(TEXT_SIZE - 4))
                     .push(
                         Text::new(self.build_type.to_string())
@@ -185,13 +166,10 @@ impl Package {
                     ),
             );
 
-        let button = |label, package_message: Option<PackageMessage>, state| {
-            let button = Button::new(
-                state,
-                Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
-            )
-            .width(Length::Fill)
-            .style(get_setting().theme);
+        let button = |label, package_message: Option<PackageMessage>| {
+            let button = Button::new(Text::new(label).horizontal_alignment(Horizontal::Center))
+                .width(Length::Fill)
+                .style(get_setting().theme);
 
             match package_message {
                 Some(package_message) => button.on_press(package_message),
@@ -199,8 +177,8 @@ impl Package {
             }
         };
 
-        let controls: Element<'_, PackageMessage> = match &mut self.state {
-            PackageState::Fetched { install_button } => Row::new()
+        let controls: Element<'_, PackageMessage> = match &self.state {
+            PackageState::Fetched => Row::new()
                 .push(button(
                     "[#] Install",
                     if CAN_CONNECT.load(Ordering::Relaxed) && !FETCHING.load(Ordering::Relaxed) {
@@ -208,15 +186,11 @@ impl Package {
                     } else {
                         None
                     },
-                    install_button,
                 ))
                 .into(),
-            PackageState::Downloading {
-                progress,
-                cancel_button,
-            } => Row::new()
+            PackageState::Downloading { progress } => Row::new()
                 .spacing(10)
-                .align_items(Align::Center)
+                .align_items(Alignment::Center)
                 .push(Text::new(format!("Downloading... {:.2}%", progress)))
                 .push(
                     ProgressBar::new(0.0..=100.0, *progress)
@@ -224,15 +198,12 @@ impl Package {
                         .style(get_setting().theme),
                 )
                 .push(
-                    Button::new(cancel_button, Text::new("Cancel"))
+                    Button::new(Text::new("Cancel"))
                         .on_press(PackageMessage::Cancel)
                         .style(get_setting().theme),
                 )
                 .into(),
-            PackageState::Extracting {
-                progress,
-                cancel_button: _,
-            } => {
+            PackageState::Extracting { progress } => {
                 // TODO: Figure out why cancelling doesn't work for extraction.
                 // It does visually get cancelled, but the extraction keeps going in the
                 // background, ultimately getting installed. But since the package was supposedly
@@ -242,11 +213,11 @@ impl Package {
                 // as well, but no, that stops as intended when cancelled.
                 if cfg!(target_os = "linux") {
                     Row::new()
-                        .align_items(Align::Center)
+                        .align_items(Alignment::Center)
                         .push(
                             Text::new("Extracting...")
                                 .width(Length::Fill)
-                                .horizontal_alignment(HorizontalAlignment::Center),
+                                .horizontal_alignment(Horizontal::Center),
                         )
                         /* .push(
                             Button::new(cancel_button, Text::new("Cancel"))
@@ -257,7 +228,7 @@ impl Package {
                 } else {
                     Row::new()
                         .spacing(10)
-                        .align_items(Align::Center)
+                        .align_items(Alignment::Center)
                         .push(Text::new(format!("Extracting... {:.2}%", progress)))
                         .push(
                             ProgressBar::new(0.0..=100.0, *progress)
@@ -272,17 +243,9 @@ impl Package {
                         .into()
                 }
             }
-            PackageState::Installed {
-                open_button,
-                open_file_button,
-                set_default_button,
-                remove_button,
-            } => {
-                let button1 = Row::new().push(button(
-                    "[=] Open",
-                    Some(PackageMessage::OpenBlender),
-                    open_button,
-                ));
+            PackageState::Installed => {
+                let button1 =
+                    Row::new().push(button("[=] Open", Some(PackageMessage::OpenBlender)));
 
                 let button2 = button1.push(button(
                     "[+] Open file",
@@ -291,7 +254,6 @@ impl Package {
                     } else {
                         None
                     },
-                    open_file_button,
                 ));
 
                 let button3 = button2.push(button(
@@ -305,27 +267,21 @@ impl Package {
                     } else {
                         Some(PackageMessage::SetDefault)
                     },
-                    set_default_button,
                 ));
 
                 button3
                     .spacing(10)
-                    .push(button(
-                        "[X] Uninstall",
-                        Some(PackageMessage::Remove),
-                        remove_button,
-                    ))
+                    .push(button("[X] Uninstall", Some(PackageMessage::Remove)))
                     .into()
             }
             PackageState::Errored {
-                error_message,
-                retry_button,
+                message: error_message,
             } => Row::new()
                 .spacing(10)
-                .align_items(Align::Center)
+                .align_items(Alignment::Center)
                 .push(Text::new(format!("Error: {}.", error_message)).width(Length::Fill))
                 .push(
-                    Button::new(retry_button, Text::new("Retry"))
+                    Button::new(Text::new("Retry"))
                         // TODO: Disable if can't connect or fetching.
                         .on_press(PackageMessage::Install)
                         .style(get_setting().theme),

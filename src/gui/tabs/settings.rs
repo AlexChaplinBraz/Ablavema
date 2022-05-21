@@ -1,4 +1,4 @@
-use super::TabState;
+use super::Tab;
 use crate::{
     gui::{
         extra::{BuildTypeSettings, Choice, Location},
@@ -12,65 +12,31 @@ use crate::{
 use fs2::available_space;
 use fs_extra::dir;
 use iced::{
-    button, scrollable, Align, Button, Column, Container, Element, HorizontalAlignment, Length,
-    Radio, Row, Rule, Scrollable, Space, Text,
+    alignment::Horizontal,
+    pure::{
+        widget::{Button, Column, Container, Radio, Row, Scrollable, Text},
+        Element,
+    },
+    Alignment, Length, Rule, Space,
 };
 use std::sync::atomic::Ordering;
 
-#[derive(Debug, Default)]
-pub struct SettingsState {
-    pub plus_1_button: button::State,
-    pub plus_10_button: button::State,
-    pub plus_100_button: button::State,
-    pub minus_1_button: button::State,
-    pub minus_10_button: button::State,
-    pub minus_100_button: button::State,
-    pub change_databases_location_button: button::State,
-    pub reset_databases_location_button: button::State,
-    pub change_packages_location_button: button::State,
-    pub reset_packages_location_button: button::State,
-    pub change_cache_location_button: button::State,
-    pub reset_cache_location_button: button::State,
-    pub remove_all_dbs_button: button::State,
-    pub remove_daily_latest_db_button: button::State,
-    pub remove_daily_archive_db_button: button::State,
-    pub remove_experimental_latest_db_button: button::State,
-    pub remove_experimental_archive_db_button: button::State,
-    pub remove_patch_latest_db_button: button::State,
-    pub remove_patch_archive_db_button: button::State,
-    pub remove_stable_latest_db_button: button::State,
-    pub remove_stable_archive_db_button: button::State,
-    pub remove_lts_db_button: button::State,
-    pub remove_all_packages_button: button::State,
-    pub remove_daily_latest_packages_button: button::State,
-    pub remove_daily_archive_packages_button: button::State,
-    pub remove_experimental_latest_packages_button: button::State,
-    pub remove_experimental_archive_packages_button: button::State,
-    pub remove_patch_latest_packages_button: button::State,
-    pub remove_patch_archive_packages_button: button::State,
-    pub remove_stable_latest_packages_button: button::State,
-    pub remove_stable_archive_packages_button: button::State,
-    pub remove_lts_packages_button: button::State,
-    pub remove_cache_button: button::State,
-    pub scroll: scrollable::State,
-}
-
-impl TabState {
-    pub fn settings_body(&mut self, releases: &Releases) -> Element<'_, GuiMessage> {
+impl Tab {
+    pub fn settings_body(releases: &Releases) -> Element<'_, GuiMessage> {
         let settings_block_intro = |title, description| {
             Column::new()
                 .spacing(10)
                 .push(
                     Text::new(title)
                         .width(Length::Fill)
-                        .horizontal_alignment(HorizontalAlignment::Center)
+                        .horizontal_alignment(Horizontal::Center)
                         .size(TEXT_SIZE * 3)
                         .color(get_setting().theme.highlight_text()),
                 )
                 .push(
                     Text::new(description)
                         .width(Length::Fill)
-                        .horizontal_alignment(HorizontalAlignment::Center),
+                        .horizontal_alignment(Horizontal::Center),
                 )
         };
 
@@ -79,7 +45,7 @@ impl TabState {
         macro_rules! choice_setting {
             ($title:expr, $description:expr, &$array:expr, $option:expr, $message:expr,) => {
                 Row::new()
-                    .align_items(Align::Center)
+                    .align_items(Alignment::Center)
                     .push(Space::with_width(Length::Units(10)))
                     .push(
                         Column::new()
@@ -114,29 +80,22 @@ impl TabState {
         // TODO: Change to a stepper when available.
         // A proper stepper would be better, but this will do for now.
         // At least it's much better than a slider.
-        let min_button = |label, amount, state| {
-            Button::new(
-                state,
-                Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
-            )
-            .on_press(GuiMessage::MinutesBetweenUpdatesChanged(amount))
-            .width(Length::Fill)
-            .style(get_setting().theme.tab_button())
+        let min_button = |label, amount| {
+            Button::new(Text::new(label).horizontal_alignment(Horizontal::Center))
+                .on_press(GuiMessage::MinutesBetweenUpdatesChanged(amount))
+                .width(Length::Fill)
+                .style(get_setting().theme.tab_button())
         };
 
-        let change_location_button = |label, location, state| {
-            Button::new(
-                state,
-                Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
-            )
-            .width(Length::Fill)
-            .style(get_setting().theme.tab_button())
-            .on_press(GuiMessage::ChangeLocation(location))
+        let change_location_button = |label, location| {
+            Button::new(Text::new(label).horizontal_alignment(Horizontal::Center))
+                .width(Length::Fill)
+                .style(get_setting().theme.tab_button())
+                .on_press(GuiMessage::ChangeLocation(location))
         };
 
-        let reset_location_button = |location, default, state| {
-            let button =
-                Button::new(state, Text::new("[R]")).style(get_setting().theme.tab_button());
+        let reset_location_button = |location, default| {
+            let button = Button::new(Text::new("[R]")).style(get_setting().theme.tab_button());
 
             if default {
                 button
@@ -145,13 +104,10 @@ impl TabState {
             }
         };
 
-        let remove_db_button = |label, build_type, exists, state| {
-            let button = Button::new(
-                state,
-                Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
-            )
-            .width(Length::Fill)
-            .style(get_setting().theme.tab_button());
+        let remove_db_button = |label, build_type, exists| {
+            let button = Button::new(Text::new(label).horizontal_alignment(Horizontal::Center))
+                .width(Length::Fill)
+                .style(get_setting().theme.tab_button());
 
             if exists {
                 Row::new().push(button.on_press(GuiMessage::RemoveDatabases(build_type)))
@@ -179,13 +135,10 @@ impl TabState {
             || stable_archive_db_exists
             || lts_db_exists;
 
-        let remove_packages_button = |label, build_type, exists, state| {
-            let button = Button::new(
-                state,
-                Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
-            )
-            .width(Length::Fill)
-            .style(get_setting().theme.tab_button());
+        let remove_packages_button = |label, build_type, exists| {
+            let button = Button::new(Text::new(label).horizontal_alignment(Horizontal::Center))
+                .width(Length::Fill)
+                .style(get_setting().theme.tab_button());
 
             if exists {
                 Row::new().push(button.on_press(GuiMessage::RemovePackages(build_type)))
@@ -297,25 +250,21 @@ Maximum is a day (1440 minutes).",
                 .push(Space::with_width(Length::Units(10)))
                 .push(
                     Column::new()
-                        .align_items(Align::Center)
+                        .align_items(Alignment::Center)
                         .width(Length::Units(150))
                         .spacing(3)
                         .push(
                             Row::new()
-                                .push(min_button("+1", 1, &mut self.settings.plus_1_button))
-                                .push(min_button("+10", 10, &mut self.settings.plus_10_button))
-                                .push(min_button("+100", 100, &mut self.settings.plus_100_button)),
+                                .push(min_button("+1", 1))
+                                .push(min_button("+10", 10))
+                                .push(min_button("+100", 100)),
                         )
                         .push(Text::new(get_setting().minutes_between_updates.to_string()))
                         .push(
                             Row::new()
-                                .push(min_button("-1", -1, &mut self.settings.minus_1_button))
-                                .push(min_button("-10", -10, &mut self.settings.minus_10_button))
-                                .push(min_button(
-                                    "-100",
-                                    -100,
-                                    &mut self.settings.minus_100_button,
-                                )),
+                                .push(min_button("-1", -1))
+                                .push(min_button("-10", -10))
+                                .push(min_button("-100", -100)),
                         ),
                 )
                 .push(Space::with_width(Length::Units(10)))
@@ -408,7 +357,7 @@ can be higher) when installing an update.",
         );
 
         let change_location = Row::new()
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .push(Space::with_width(Length::Units(10)))
             .push(
                 Column::new()
@@ -456,36 +405,27 @@ whatever its name is.",
                                         .push(change_location_button(
                                             "Databases",
                                             Location::Databases,
-                                            &mut self.settings.change_databases_location_button,
                                         ))
                                         .push(reset_location_button(
                                             Location::Databases,
                                             get_setting().databases_dir
                                                 == PROJECT_DIRS.config_dir(),
-                                            &mut self.settings.reset_databases_location_button,
                                         ))
                                         .push(Space::with_width(Length::Units(15)))
                                         .push(change_location_button(
                                             "Packages",
                                             Location::Packages,
-                                            &mut self.settings.change_packages_location_button,
                                         ))
                                         .push(reset_location_button(
                                             Location::Packages,
                                             get_setting().packages_dir
                                                 == PROJECT_DIRS.data_local_dir(),
-                                            &mut self.settings.reset_packages_location_button,
                                         ))
                                         .push(Space::with_width(Length::Units(15)))
-                                        .push(change_location_button(
-                                            "Cache",
-                                            Location::Cache,
-                                            &mut self.settings.change_cache_location_button,
-                                        ))
+                                        .push(change_location_button("Cache", Location::Cache))
                                         .push(reset_location_button(
                                             Location::Cache,
                                             get_setting().cache_dir == PROJECT_DIRS.cache_dir(),
-                                            &mut self.settings.reset_cache_location_button,
                                         )),
                                 ),
                         )
@@ -494,7 +434,7 @@ whatever its name is.",
             .push(Space::with_width(Length::Units(10)));
 
         let remove_databases = Row::new()
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .push(Space::with_width(Length::Units(10)))
             .push(
                 Column::new()
@@ -507,7 +447,7 @@ whatever its name is.",
                     )
                     .push(Text::new(
                         "\
-Keep in mind that any installed package that's no longer available will not reapear.",
+Keep in mind that any installed package that's no longer available will not reappear.",
                     ))
                     .push(
                         Column::new()
@@ -516,68 +456,58 @@ Keep in mind that any installed package that's no longer available will not reap
                                 "All",
                                 BuildTypeSettings::All,
                                 any_dbs_exist,
-                                &mut self.settings.remove_all_dbs_button,
                             ))
                             .push(remove_db_button(
                                 "Daily (latest)",
                                 BuildTypeSettings::DailyLatest,
                                 daily_latest_db_exists,
-                                &mut self.settings.remove_daily_latest_db_button,
                             ))
                             .push(remove_db_button(
                                 "Daily (archive)",
                                 BuildTypeSettings::DailyArchive,
                                 daily_archive_db_exists,
-                                &mut self.settings.remove_daily_archive_db_button,
                             ))
                             .push(remove_db_button(
                                 "Experimental (latest)",
                                 BuildTypeSettings::ExperimentalLatest,
                                 experimental_latest_db_exists,
-                                &mut self.settings.remove_experimental_latest_db_button,
                             ))
                             .push(remove_db_button(
                                 "Experimental (archive)",
                                 BuildTypeSettings::ExperimentalArchive,
                                 experimental_archive_db_exists,
-                                &mut self.settings.remove_experimental_archive_db_button,
                             ))
                             .push(remove_db_button(
                                 "Patch (latest)",
                                 BuildTypeSettings::PatchLatest,
                                 patch_latest_db_exists,
-                                &mut self.settings.remove_patch_latest_db_button,
                             ))
                             .push(remove_db_button(
                                 "Patch (archive)",
                                 BuildTypeSettings::PatchArchive,
                                 patch_archive_db_exists,
-                                &mut self.settings.remove_patch_archive_db_button,
                             ))
                             .push(remove_db_button(
                                 "Stable (latest)",
                                 BuildTypeSettings::StableLatest,
                                 stable_latest_db_exists,
-                                &mut self.settings.remove_stable_latest_db_button,
                             ))
                             .push(remove_db_button(
                                 "Stable (archive)",
                                 BuildTypeSettings::StableArchive,
                                 stable_archive_db_exists,
-                                &mut self.settings.remove_stable_archive_db_button,
                             ))
                             .push(remove_db_button(
                                 "Long-term Support",
                                 BuildTypeSettings::Lts,
                                 lts_db_exists,
-                                &mut self.settings.remove_lts_db_button,
                             )),
                     ),
             )
             .push(Space::with_width(Length::Units(10)));
 
         let remove_packages = Row::new()
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .push(Space::with_width(Length::Units(10)))
             .push(
                 Column::new()
@@ -611,68 +541,58 @@ Useful for getting rid of a large quantity of packages at the same time.",
                                 "All",
                                 BuildTypeSettings::All,
                                 any_packages_exist,
-                                &mut self.settings.remove_all_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Daily (latest)",
                                 BuildTypeSettings::DailyLatest,
                                 daily_latest_packages_exist,
-                                &mut self.settings.remove_daily_latest_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Daily (archive)",
                                 BuildTypeSettings::DailyArchive,
                                 daily_archive_packages_exist,
-                                &mut self.settings.remove_daily_archive_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Experimental (latest)",
                                 BuildTypeSettings::ExperimentalLatest,
                                 experimental_latest_packages_exist,
-                                &mut self.settings.remove_experimental_latest_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Experimental (archive)",
                                 BuildTypeSettings::ExperimentalArchive,
                                 experimental_archive_packages_exist,
-                                &mut self.settings.remove_experimental_archive_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Patch (latest)",
                                 BuildTypeSettings::PatchLatest,
                                 patch_latest_packages_exist,
-                                &mut self.settings.remove_patch_latest_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Patch (archive)",
                                 BuildTypeSettings::PatchArchive,
                                 patch_archive_packages_exist,
-                                &mut self.settings.remove_patch_archive_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Stable (latest)",
                                 BuildTypeSettings::StableLatest,
                                 stable_latest_packages_exist,
-                                &mut self.settings.remove_stable_latest_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Stable (archive)",
                                 BuildTypeSettings::StableArchive,
                                 stable_archive_packages_exist,
-                                &mut self.settings.remove_stable_archive_packages_button,
                             ))
                             .push(remove_packages_button(
                                 "Long-term Support",
                                 BuildTypeSettings::Lts,
                                 lts_packages_exist,
-                                &mut self.settings.remove_lts_packages_button,
                             )),
                     ),
             )
             .push(Space::with_width(Length::Units(10)));
 
         let remove_cache = Row::new()
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .push(Space::with_width(Length::Units(10)))
             .push(
                 Column::new()
@@ -705,9 +625,8 @@ cache isn't being automatically removed.",
                             // TODO: Disable button while installing.
                             // Also disable the buttons for the databases and stuff.
                             Button::new(
-                                &mut self.settings.remove_cache_button,
                                 Text::new("Remove all cache")
-                                    .horizontal_alignment(HorizontalAlignment::Center),
+                                    .horizontal_alignment(Horizontal::Center),
                             )
                             .on_press(GuiMessage::RemoveCache)
                             .width(Length::Fill)
@@ -722,7 +641,7 @@ cache isn't being automatically removed.",
             "\
 Update the launcher itself through the built-in system. This enables a hidden tab dedicated to \
 updating, which can also be used to read the release notes of every version. Keep in mind that \
-if Ablavema is installed through a package manager, the laucher should be updated through it.
+if Ablavema is installed through a package manager, the launcher should be updated through it.
 
 Though if made use of even if installed through a package manager, upon updating Ablavema the \
 executable would simply be replaced with the newer one, same as if done through the built-in \
@@ -733,51 +652,58 @@ to see if a bug was there before or whatnot.",
             GuiMessage::SelfUpdater,
         );
 
-        let items = [
-            iced::Element::from(checking_for_updates_block),
-            check_updates_at_launch.into(),
-            minutes_between_updates.into(),
-            check_daily_latest.into(),
-            check_experimental_latest.into(),
-            check_patch_latest.into(),
-            check_stable_latest.into(),
-            check_lts.into(),
-            others_block.into(),
-            bypass_launcher.into(),
-            modifier_key.into(),
-            use_latest_as_default.into(),
-            choose_theme.into(),
-            change_location.into(),
-            remove_databases.into(),
-            remove_packages.into(),
-            remove_cache.into(),
-            self_updater.into(),
-        ];
+        let settings = Column::new()
+            .padding(10)
+            .spacing(10)
+            .push(checking_for_updates_block)
+            .push(separator())
+            .push(check_updates_at_launch)
+            .push(separator())
+            .push(minutes_between_updates)
+            .push(separator())
+            .push(check_daily_latest)
+            .push(separator())
+            .push(check_experimental_latest)
+            .push(separator())
+            .push(check_patch_latest)
+            .push(separator())
+            .push(check_stable_latest)
+            .push(separator())
+            .push(check_lts)
+            .push(separator())
+            .push(others_block)
+            .push(separator())
+            .push(bypass_launcher)
+            .push(separator())
+            .push(modifier_key)
+            .push(separator())
+            .push(use_latest_as_default)
+            .push(separator())
+            .push(choose_theme)
+            .push(separator())
+            .push(change_location)
+            .push(separator())
+            .push(remove_databases)
+            .push(separator())
+            .push(remove_packages)
+            .push(separator())
+            .push(remove_cache)
+            .push(separator())
+            .push(self_updater);
 
-        let num_items = items.len();
-        let mut settings = Column::new().padding(10).spacing(10);
-        for (i, setting) in IntoIterator::into_iter(items).enumerate() {
-            settings = settings.push(setting);
-            if i + 1 < num_items {
-                settings = settings.push(separator());
-            }
-        }
-
-        Container::new(Scrollable::new(&mut self.settings.scroll).push(
-            if get_setting().self_updater {
-                settings.push(separator()).push(choice_setting!(
-                    "Check for Ablavema updates at launch",
-                    "\
+        Container::new(Scrollable::new(if get_setting().self_updater {
+            settings.push(separator()).push(choice_setting!(
+                "Check for Ablavema updates at launch",
+                "\
 This uses the same delay as the normal updates. Keep in mind that, at the moment, if you \
 downgrade you will be prompted to update Ablavema every time updates are checked.",
-                    &Choice::ALL,
-                    Some(choice(get_setting().check_self_updates_at_launch).unwrap()),
-                    GuiMessage::CheckSelfUpdatesAtLaunch,
-                ))
-            } else {
-                settings
-            },
-        ))
+                &Choice::ALL,
+                Some(choice(get_setting().check_self_updates_at_launch).unwrap()),
+                GuiMessage::CheckSelfUpdatesAtLaunch,
+            ))
+        } else {
+            settings
+        }))
         .height(Length::Fill)
         .width(Length::Fill)
         .style(get_setting().theme)

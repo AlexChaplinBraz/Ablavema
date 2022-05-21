@@ -1,4 +1,4 @@
-use super::TabState;
+use super::Tab;
 use crate::{
     gui::message::GuiMessage,
     settings::{get_setting, TEXT_SIZE},
@@ -6,8 +6,12 @@ use crate::{
 use chrono::{DateTime, Local};
 use derive_deref::{Deref, DerefMut};
 use iced::{
-    button, scrollable, Align, Button, Column, Container, Element, HorizontalAlignment, Length,
-    Row, Scrollable, Space, Text,
+    alignment::Horizontal,
+    pure::{
+        widget::{Button, Column, Container, Row, Scrollable, Text},
+        Element,
+    },
+    Alignment, Length, Space,
 };
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -33,14 +37,6 @@ pub struct RecentFile {
     pub path: PathBuf,
     pub last_opened_with: String,
     pub last_opened_on: DateTime<Local>,
-    #[serde(skip)]
-    pub open_with_last_button: button::State,
-    #[serde(skip)]
-    pub open_with_default_button: button::State,
-    #[serde(skip)]
-    pub select_button: button::State,
-    #[serde(skip)]
-    pub remove_button: button::State,
 }
 
 impl RecentFile {
@@ -50,14 +46,10 @@ impl RecentFile {
             path,
             last_opened_with,
             last_opened_on: Local::now(),
-            open_with_last_button: Default::default(),
-            open_with_default_button: Default::default(),
-            select_button: Default::default(),
-            remove_button: Default::default(),
         }
     }
 
-    pub fn view(&mut self, is_odd: bool) -> Element<'_, RecentFileMessage> {
+    pub fn view(&self, is_odd: bool) -> Element<'_, RecentFileMessage> {
         let name = Row::new().spacing(10).push(
             Text::new(&self.name)
                 .color(get_setting().theme.highlight_text())
@@ -82,7 +74,7 @@ impl RecentFile {
                 Row::new().push(
                     Row::new()
                         .width(Length::Fill)
-                        .align_items(Align::End)
+                        .align_items(Alignment::End)
                         .push(Text::new("Path: ").size(TEXT_SIZE - 4))
                         .push(
                             Text::new(self.path.to_str().unwrap().to_string())
@@ -92,7 +84,7 @@ impl RecentFile {
             )
             .push(
                 Row::new()
-                    .align_items(Align::End)
+                    .align_items(Alignment::End)
                     .push(Text::new("Last opened on: ").size(TEXT_SIZE - 4))
                     .push(
                         Text::new(date_time)
@@ -102,7 +94,7 @@ impl RecentFile {
             )
             .push(
                 Row::new()
-                    .align_items(Align::End)
+                    .align_items(Alignment::End)
                     .push(Text::new("Last opened with: ").size(TEXT_SIZE - 4))
                     .push(
                         Text::new(self.last_opened_with.clone())
@@ -110,13 +102,10 @@ impl RecentFile {
                     ),
             );
 
-        let button = |label, recent_file_message: Option<RecentFileMessage>, state| {
-            let button = Button::new(
-                state,
-                Text::new(label).horizontal_alignment(HorizontalAlignment::Center),
-            )
-            .width(Length::Fill)
-            .style(get_setting().theme);
+        let button = |label, recent_file_message: Option<RecentFileMessage>| {
+            let button = Button::new(Text::new(label).horizontal_alignment(Horizontal::Center))
+                .width(Length::Fill)
+                .style(get_setting().theme);
 
             match recent_file_message {
                 Some(recent_file_message) => button.on_press(recent_file_message),
@@ -130,7 +119,6 @@ impl RecentFile {
                 Some(RecentFileMessage::OpenWithLastBlender(
                     self.last_opened_with.clone(),
                 )),
-                &mut self.open_with_last_button,
             ));
 
             let button2 = button1.push(button(
@@ -140,22 +128,13 @@ impl RecentFile {
                 } else {
                     None
                 },
-                &mut self.open_with_default_button,
             ));
 
-            let button3 = button2.push(button(
-                "[S] Select",
-                Some(RecentFileMessage::Select),
-                &mut self.select_button,
-            ));
+            let button3 = button2.push(button("[S] Select", Some(RecentFileMessage::Select)));
 
             button3
                 .spacing(10)
-                .push(button(
-                    "[X] Remove entry",
-                    Some(RecentFileMessage::Remove),
-                    &mut self.remove_button,
-                ))
+                .push(button("[X] Remove entry", Some(RecentFileMessage::Remove)))
                 .into()
         };
 
@@ -178,22 +157,13 @@ impl RecentFile {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct RecentFilesState {
-    pub open_default_button: button::State,
-    pub open_default_with_file_button: button::State,
-    pub select_file_button: button::State,
-    pub scroll: scrollable::State,
-}
-
-impl<'a> TabState {
+impl<'a> Tab {
     pub fn recent_files_body(
-        &'a mut self,
         file_path: Option<String>,
-        recent_files: &'a mut [RecentFile],
-    ) -> Element<'_, GuiMessage> {
-        let button = |label, message: Option<GuiMessage>, state| {
-            let button = Button::new(state, Text::new(label)).style(get_setting().theme);
+        recent_files: &'a [RecentFile],
+    ) -> Element<'a, GuiMessage> {
+        let button = |label, message: Option<GuiMessage>| {
+            let button = Button::new(Text::new(label)).style(get_setting().theme);
 
             match message {
                 Some(message) => button.on_press(message),
@@ -208,7 +178,7 @@ impl<'a> TabState {
                 .push(
                     Row::new()
                         .spacing(10)
-                        .align_items(Align::Center)
+                        .align_items(Alignment::Center)
                         .push(button(
                             "[=]",
                             if get_setting().default_package.is_some() {
@@ -218,7 +188,6 @@ impl<'a> TabState {
                             } else {
                                 None
                             },
-                            &mut self.recent_files.open_default_button,
                         ))
                         .push(Text::new("Default package:"))
                         .push(
@@ -232,7 +201,7 @@ impl<'a> TabState {
                 .push(
                     Row::new()
                         .spacing(10)
-                        .align_items(Align::Center)
+                        .align_items(Alignment::Center)
                         .push(button(
                             "[+]",
                             if file_path.is_some() && get_setting().default_package.is_some() {
@@ -242,7 +211,6 @@ impl<'a> TabState {
                             } else {
                                 None
                             },
-                            &mut self.recent_files.open_default_with_file_button,
                         ))
                         .push(Text::new("File:"))
                         .push(
@@ -254,12 +222,9 @@ impl<'a> TabState {
                         )
                         .push(Space::with_width(Length::Fill))
                         .push(
-                            Button::new(
-                                &mut self.recent_files.select_file_button,
-                                Text::new("Select file"),
-                            )
-                            .on_press(GuiMessage::SelectFile)
-                            .style(get_setting().theme),
+                            Button::new(Text::new("Select file"))
+                                .on_press(GuiMessage::SelectFile)
+                                .style(get_setting().theme),
                         ),
                 ),
         )
@@ -271,7 +236,7 @@ impl<'a> TabState {
             let mut file_count: u16 = 0;
             let files = Container::new(
                 recent_files
-                    .iter_mut()
+                    .iter()
                     .fold(Column::new(), |column, recent_file| {
                         file_count += 1;
                         let path = recent_file.path.to_str().unwrap().to_string();
@@ -283,8 +248,6 @@ impl<'a> TabState {
                     .width(Length::Fill),
             );
 
-            let scrollable = Scrollable::new(&mut self.recent_files.scroll).push(files);
-
             if file_count == 0 {
                 Container::new(Text::new("No recent files").size(TEXT_SIZE * 2))
                     .height(Length::Fill)
@@ -294,10 +257,10 @@ impl<'a> TabState {
                     .style(get_setting().theme)
                     .into()
             } else {
-                Container::new(scrollable)
+                Container::new(Scrollable::new(files))
                     .height(Length::Fill)
                     .width(Length::Fill)
-                    .style(get_setting().theme)
+                    .style(get_setting().theme.normal_container())
                     .into()
             }
         };
@@ -306,7 +269,7 @@ impl<'a> TabState {
             .height(Length::Fill)
             .width(Length::Fill)
             .center_x()
-            .style(get_setting().theme)
+            .style(get_setting().theme.normal_container())
             .into()
     }
 }

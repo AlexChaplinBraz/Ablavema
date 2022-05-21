@@ -1,6 +1,5 @@
 use crate::settings::get_setting;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use iced::button;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Write, fs::remove_dir_all, mem};
 use timeago::{self, TimeUnit::Minutes};
@@ -17,8 +16,6 @@ pub struct Package {
     pub url: String,
     pub os: Os,
     pub changelog: Vec<Change>,
-    #[serde(skip)]
-    pub bookmark_button: button::State,
     #[serde(skip)]
     pub state: PackageState,
     #[serde(skip)]
@@ -71,7 +68,6 @@ impl Default for Package {
             url: String::default(),
             os: Os::Linux,
             changelog: Vec::default(),
-            bookmark_button: Default::default(),
             state: PackageState::default(),
             status: PackageStatus::default(),
             index: 0,
@@ -157,45 +153,16 @@ pub struct Change {
 
 #[derive(Clone, Debug)]
 pub enum PackageState {
-    Fetched {
-        install_button: button::State,
-    },
-    Downloading {
-        progress: f32,
-        cancel_button: button::State,
-    },
-    Extracting {
-        progress: f32,
-        cancel_button: button::State,
-    },
-    Installed {
-        open_button: button::State,
-        open_file_button: button::State,
-        set_default_button: button::State,
-        remove_button: button::State,
-    },
-    Errored {
-        error_message: String,
-        retry_button: button::State,
-    },
-}
-
-impl PackageState {
-    pub fn default_installed() -> Self {
-        PackageState::Installed {
-            open_button: Default::default(),
-            open_file_button: Default::default(),
-            set_default_button: Default::default(),
-            remove_button: Default::default(),
-        }
-    }
+    Fetched,
+    Downloading { progress: f32 },
+    Extracting { progress: f32 },
+    Installed,
+    Errored { message: String },
 }
 
 impl Default for PackageState {
     fn default() -> Self {
-        Self::Fetched {
-            install_button: button::State::new(),
-        }
+        Self::Fetched
     }
 }
 

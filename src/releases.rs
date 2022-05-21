@@ -361,7 +361,7 @@ pub trait ReleaseType:
                 package.state = PackageState::default();
             }
             if installed.contains(package) {
-                package.state = PackageState::default_installed();
+                package.state = PackageState::Installed;
             }
         }
     }

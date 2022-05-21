@@ -19,7 +19,7 @@ use crate::{
         get_setting, save_settings, set_setting, ModifierKey, FETCHING, INSTALLING, PROJECT_DIRS,
     },
 };
-use iced::{Clipboard, Command};
+use iced::Command;
 use native_dialog::{FileDialog, MessageDialog, MessageType};
 use self_update::update::Release;
 use std::{
@@ -131,11 +131,7 @@ pub enum GuiMessage {
 }
 
 impl Gui {
-    pub fn update_message(
-        &mut self,
-        message: GuiMessage,
-        _clipboard: &mut Clipboard,
-    ) -> Command<GuiMessage> {
+    pub fn update_message(&mut self, message: GuiMessage) -> Command<GuiMessage> {
         match message {
             GuiMessage::PackageMessage((index, package_message)) => {
                 match self.packages.get_mut(index) {
@@ -887,37 +883,37 @@ impl Gui {
                 Command::none()
             }
             GuiMessage::FetchSelfReleases => {
-                self.tab_state.self_updater.fetching = true;
+                self.state.fetching_releases = true;
                 Command::perform(Gui::fetch_self_releases(), GuiMessage::PopulateSelfReleases)
             }
             GuiMessage::PopulateSelfReleases(self_releases) => {
                 self.self_releases = self_releases;
                 if let Some(s_releases) = &self.self_releases {
-                    self.tab_state.self_updater.release_versions = s_releases
+                    self.state.release_versions = s_releases
                         .iter()
                         .map(|release| release.version.clone())
                         .collect();
                 }
-                self.tab_state.self_updater.fetching = false;
+                self.state.fetching_releases = false;
                 Command::none()
             }
             GuiMessage::PickListVersionSelected(version) => {
-                self.tab_state.self_updater.pick_list_selected = version;
+                self.state.pick_list_selected_releases = version;
                 Command::none()
             }
             GuiMessage::ChangeVersion => {
-                self.tab_state.self_updater.installing = true;
+                self.state.installing_release = true;
                 Command::perform(
                     Gui::change_self_version(
                         self.self_releases.clone().unwrap(),
-                        self.tab_state.self_updater.pick_list_selected.clone(),
+                        self.state.pick_list_selected_releases.clone(),
                     ),
                     GuiMessage::VersionChanged,
                 )
             }
             GuiMessage::VersionChanged(()) => {
-                self.tab_state.self_updater.installing = false;
-                self.tab_state.self_updater.installed = true;
+                self.state.installing_release = false;
+                self.state.installed_release = true;
                 Command::none()
             }
             GuiMessage::CheckConnection => {
