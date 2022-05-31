@@ -7,7 +7,7 @@ use crate::{
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use derive_deref::{Deref, DerefMut};
-use select::predicate::{Attr, Class, Name};
+use select::predicate::{Attr, Class, Name, Predicate};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use versions::Versioning;
@@ -44,6 +44,8 @@ impl ReleaseType for StableLatest {
                 .unwrap()
                 .strip_prefix(&url)
                 .unwrap()
+                .strip_prefix("release/")
+                .unwrap()
                 .split_once('/')
                 .unwrap();
 
@@ -69,14 +71,15 @@ impl ReleaseType for StableLatest {
 
             let date = {
                 let mut date = node
-                    .find(Class("dl-header-info-platform"))
+                    .find(Class("dl-build-details-popup"))
                     .next()
                     .unwrap()
                     .find(Name("small"))
-                    .next()
+                    .nth(0)
                     .unwrap()
                     .text();
                 let mut date = date.split_off(date.find("on").unwrap() + 3);
+                date.truncate(date.find(" ·").unwrap());
                 date.push_str("-00:00:00");
                 NaiveDateTime::parse_from_str(&date, "%B %d, %Y-%T").unwrap()
             };
