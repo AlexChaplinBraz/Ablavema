@@ -21,7 +21,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDateTime, Utc};
-use select::predicate::{And, Class, Name};
+use select::predicate::{And, Class, Name, Predicate};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fs::{remove_file, File},
@@ -578,11 +578,11 @@ impl BuilderBuild {
         };
 
         let builds_list = document
-            .find(And(Class("builds-list"), Class(platform)))
+            .find(And(Class("builds-list-container"), Class(platform)))
             .next()
             .unwrap();
 
-        for build_node in builds_list.find(Class("os")) {
+        for build_node in builds_list.find(Class("build-info")) {
             let url = build_node
                 .find(Name("a"))
                 .next()
@@ -609,7 +609,7 @@ impl BuilderBuild {
 
             let version = Versioning::new(
                 build_node
-                    .find(Class("name"))
+                    .find(Class("build-title"))
                     .next()
                     .unwrap()
                     .text()
@@ -619,9 +619,9 @@ impl BuilderBuild {
             )
             .unwrap();
 
-            let small_subtext = build_node.find(Name("small")).next().unwrap().text();
-            let parts: Vec<&str> = small_subtext.split_terminator(" - ").collect();
-            let date_string = format!("{}-{}", parts[0], Utc::today().year());
+            let date_without_year = build_node.find(Class("build-details").descendant(Name("li"))).nth(0).unwrap().text();
+            let build_id = build_node.find(Class("build-details").descendant(Name("li"))).nth(1).unwrap().text();
+            let date_string = format!("{}-{}", date_without_year, Utc::today().year());
             let date = NaiveDateTime::parse_from_str(&date_string, "%B %d, %T-%Y").unwrap();
 
             let package = Package {
@@ -629,7 +629,7 @@ impl BuilderBuild {
                 name,
                 build,
                 date,
-                commit: parts[2].to_string(),
+                commit: build_id,
                 url,
                 os,
                 ..Default::default()
