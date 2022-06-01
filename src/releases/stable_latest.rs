@@ -7,7 +7,7 @@ use crate::{
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use derive_deref::{Deref, DerefMut};
-use select::predicate::{Attr, Class, Name, Predicate};
+use select::predicate::{Attr, Class, Name};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use versions::Versioning;

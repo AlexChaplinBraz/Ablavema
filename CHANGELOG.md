@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Error on fetching experimental releases due to change in the structure of their web pages.
 - Typos.
 
 ## [0.4.1] - 2021-11-18: Never rush a release
