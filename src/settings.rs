@@ -159,7 +159,7 @@ impl Default for Settings {
             update_patch_latest: true,
             update_stable_latest: true,
             update_lts: true,
-            databases_dir: PROJECT_DIRS.config_dir().to_path_buf(),
+            databases_dir: PROJECT_DIRS.config_dir().join("databases"),
             packages_dir: PROJECT_DIRS.data_local_dir().to_path_buf(),
             cache_dir: PROJECT_DIRS.cache_dir().to_path_buf(),
             last_update_time: SystemTime::now()

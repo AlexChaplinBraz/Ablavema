@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - To `wgpu` renderer on Linux since it seems to be working now.
 - Default font so everything fits correctly on all platforms.
 - File format for the config file and databases. They are now plain text instead of binary.
+- Default location of the database files. Due to this, removing all databases from within the program
+  won't get rid of the old databases ending in `.bin` that were in the same directory as the config file.
 
 ### Fixed
 
