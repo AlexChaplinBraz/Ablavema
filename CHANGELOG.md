@@ -5,8 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
+## [0.4.2] - 2022-06-02: Make it snappy (or just work)
+<!--BEGIN=0.4.2-->
 ### Changed
 
 - To `wgpu` renderer on Linux since it seems to be working now.
@@ -20,10 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Error on fetching experimental releases due to change in the structure of their web pages.
+- Loading error `memory allocation of "many exabytes" failed`.
 - Lag on settings tab due to calculating disk space on the GUI thread.
 - Rare false negative on checking connection. Rewriting this part also improved the launch speed of the launcher.
 - Typos.
-
+<!--END=0.4.2-->
 ## [0.4.1] - 2021-11-18: Never rush a release
 <!--BEGIN=0.4.1-->
 ### Fixed
@@ -184,7 +185,8 @@ Noncomprehensive list of features available at launch.
 - CLI on Windows has no colour. Waiting for `clap` 3.0.0 to be released.
 - No macOS release.
 <!--END=0.1.0-->
-[Unreleased]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.4.1...HEAD
+[Unreleased]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.4.2...HEAD
+[0.4.2]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.4.1...0.4.2
 [0.4.1]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/AlexChaplinBraz/Ablavema/compare/0.2.1...0.3.0

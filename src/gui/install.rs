@@ -25,11 +25,7 @@ use tar::Archive;
 use xz2::read::XzDecoder;
 
 #[cfg(target_os = "windows")]
-use std::{
-    io::{Read, Write},
-    thread::sleep,
-    time::Duration,
-};
+use std::{io::Read, thread::sleep, time::Duration};
 #[cfg(target_os = "windows")]
 use zip::{read::ZipFile, ZipArchive};
 
