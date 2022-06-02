@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Error on fetching experimental releases due to change in the structure of their web pages.
 - Lag on settings tab due to calculating disk space on the GUI thread.
+- Rare false negative on checking connection. Rewriting this part also improved the launch speed of the launcher.
 - Typos.
 
 ## [0.4.1] - 2021-11-18: Never rush a release

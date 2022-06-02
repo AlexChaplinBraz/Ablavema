@@ -2,14 +2,10 @@ use crate::settings::{get_setting, CAN_CONNECT};
 use reqwest::{self, ClientBuilder};
 use select::document::Document;
 use std::{path::Path, process::Command, sync::atomic::Ordering, time::Duration};
+use tokio::{join, time::sleep};
 
 /// Check whether there's a working connection to the download servers.
 pub async fn check_connection() {
-    // TODO: Fix rare false negative.
-    // Seems to happen randomly, where one of the servers is momentarily unresponsive.
-    // Could be fixed by looping through the check once more if there was an error,
-    // since this just gets fixed if you retry manually right away.
-
     let urls = [
         "https://builder.blender.org/download/",
         "https://www.blender.org/download/",
@@ -22,15 +18,61 @@ pub async fn check_connection() {
         .build()
         .unwrap();
 
-    for url in urls.iter() {
-        match client.get(*url).send().await {
+    let (r0, r1, r2, r3) = join!(
+        client.get(&*urls[0]).send(),
+        client.get(&*urls[1]).send(),
+        client.get(&*urls[2]).send(),
+        client.get(&*urls[3]).send()
+    );
+
+    let mut failed_urls = Vec::new();
+
+    for result in [r0, r1, r2, r3] {
+        match result {
             Ok(response) => {
-                if response.status().is_client_error() || response.status().is_server_error() {
+                let url = response.url().to_string();
+
+                if response.status().is_client_error() {
+                    eprintln!("Client error connecting to '{}'.", url);
+                    failed_urls.push(url);
+                } else if response.status().is_server_error() {
+                    eprintln!("Server error connecting to '{}'.", url);
+                    failed_urls.push(url);
+                }
+            }
+            Err(e) => {
+                let url = e.url().unwrap().to_string();
+                eprintln!("Error connecting to '{}'.\nThe error was: {}", url, e);
+                failed_urls.push(url);
+            }
+        }
+    }
+
+    if failed_urls.is_empty() {
+        CAN_CONNECT.store(true, Ordering::Relaxed);
+        return;
+    } else if failed_urls.iter().count() == urls.iter().count() {
+        CAN_CONNECT.store(false, Ordering::Relaxed);
+        return;
+    }
+
+    sleep(Duration::from_secs(1)).await;
+
+    for url in failed_urls {
+        match client.get(&url).send().await {
+            Ok(response) => {
+                if response.status().is_client_error() {
+                    eprintln!("Client error connecting to '{}'.", url);
+                    CAN_CONNECT.store(false, Ordering::Relaxed);
+                    return;
+                } else if response.status().is_server_error() {
+                    eprintln!("Server error connecting to '{}'.", url);
                     CAN_CONNECT.store(false, Ordering::Relaxed);
                     return;
                 }
             }
-            Err(_) => {
+            Err(e) => {
+                eprintln!("Error connecting to '{}'.\nThe error was: {}", url, e);
                 CAN_CONNECT.store(false, Ordering::Relaxed);
                 return;
             }
