@@ -16,6 +16,7 @@ pub struct GuiState {
     pub pick_list_selected_releases: String,
     pub installing_release: bool,
     pub installed_release: bool,
+    pub disk_space: Option<DiskSpace>,
 }
 
 impl GuiState {
@@ -71,4 +72,12 @@ pub enum Location {
     Databases,
     Packages,
     Cache,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DiskSpace {
+    pub cache_size: f32,
+    pub cache_available: f32,
+    pub packages_size: f32,
+    pub packages_available: f32,
 }

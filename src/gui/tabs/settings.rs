@@ -1,7 +1,7 @@
 use super::Tab;
 use crate::{
     gui::{
-        extra::{BuildTypeSettings, Choice, Location},
+        extra::{BuildTypeSettings, Choice, DiskSpace, Location},
         message::GuiMessage,
         style::Theme,
     },
@@ -9,8 +9,6 @@ use crate::{
     releases::{ReleaseType, Releases},
     settings::{get_setting, ModifierKey, CONFIG_FILE_ENV, PORTABLE, PROJECT_DIRS, TEXT_SIZE},
 };
-use fs2::available_space;
-use fs_extra::dir;
 use iced::{
     alignment::Horizontal,
     pure::{
@@ -22,7 +20,10 @@ use iced::{
 use std::sync::atomic::Ordering;
 
 impl Tab {
-    pub fn settings_body(releases: &Releases) -> Element<'_, GuiMessage> {
+    pub fn settings_body(
+        releases: &Releases,
+        disk_space: Option<DiskSpace>,
+    ) -> Element<'_, GuiMessage> {
         let settings_block_intro = |title, description| {
             Column::new()
                 .spacing(10)
@@ -297,7 +298,7 @@ look for updates for itself.",
         );
 
         let others_block =
-            settings_block_intro("Miscelaneous", "A few miscellaneous but useful settings.");
+            settings_block_intro("Miscellaneous", "A few miscellaneous but useful settings.");
 
         let bypass_launcher = choice_setting!(
             "Bypass launcher",
@@ -504,17 +505,16 @@ Keep in mind that any installed package that's no longer available will not reap
                         "\
 Useful for getting rid of a large quantity of packages at the same time.",
                     ))
-                    // TODO: Fix slowdowns due to calculating packages' size.
                     .push(Text::new(format!(
                         "Space used by packages: {:.2} GB\nAvailable space: {:.2} GB",
-                        dir::get_size(&get_setting().packages_dir).unwrap() as f64
-                            / 1024.0
-                            / 1024.0
-                            / 1024.0,
-                        available_space(&get_setting().packages_dir).unwrap() as f64
-                            / 1024.0
-                            / 1024.0
-                            / 1024.0
+                        match disk_space {
+                            Some(space) => space.packages_size,
+                            None => 0.0,
+                        },
+                        match disk_space {
+                            Some(space) => space.packages_available,
+                            None => 0.0,
+                        }
                     )))
                     .push(
                         Column::new()
@@ -590,17 +590,16 @@ Useful for getting rid of a large quantity of packages at the same time.",
 Useful for getting rid of the accumulated cache (mainly downloaded packages) since at the moment \
 cache isn't being automatically removed.",
                     ))
-                    // TODO: Fix slowdowns due to calculating cache size.
                     .push(Text::new(format!(
                         "Space used by cache: {:.2} GB\nAvailable space: {:.2} GB",
-                        dir::get_size(&get_setting().cache_dir).unwrap() as f64
-                            / 1024.0
-                            / 1024.0
-                            / 1024.0,
-                        available_space(&get_setting().cache_dir).unwrap() as f64
-                            / 1024.0
-                            / 1024.0
-                            / 1024.0
+                        match disk_space {
+                            Some(space) => space.cache_size,
+                            None => 0.0,
+                        },
+                        match disk_space {
+                            Some(space) => space.cache_available,
+                            None => 0.0,
+                        }
                     )))
                     .push(
                         Row::new().push(

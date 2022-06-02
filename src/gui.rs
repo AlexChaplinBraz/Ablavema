@@ -9,7 +9,7 @@ pub mod style;
 pub mod tabs;
 use self::{
     controls::Controls,
-    extra::{GlobalTokio, GuiFlags, GuiState},
+    extra::{DiskSpace, GlobalTokio, GuiFlags, GuiState},
     install::Install,
     message::GuiMessage,
     tabs::recent_files::RecentFile,
@@ -27,6 +27,8 @@ use crate::{
     self_updater::SelfUpdater,
     settings::{get_setting, save_settings, set_setting, CAN_CONNECT},
 };
+use fs2::available_space;
+use fs_extra::dir;
 use iced::{
     alignment::Horizontal,
     pure::{
@@ -226,6 +228,27 @@ impl Gui {
             .await
             .unwrap();
     }
+
+    async fn calculate_disk_space() -> DiskSpace {
+        DiskSpace {
+            cache_size: dir::get_size(&get_setting().cache_dir).unwrap() as f32
+                / 1024.0
+                / 1024.0
+                / 1024.0,
+            cache_available: available_space(&get_setting().cache_dir).unwrap() as f32
+                / 1024.0
+                / 1024.0
+                / 1024.0,
+            packages_size: dir::get_size(&get_setting().packages_dir).unwrap() as f32
+                / 1024.0
+                / 1024.0
+                / 1024.0,
+            packages_available: available_space(&get_setting().packages_dir).unwrap() as f32
+                / 1024.0
+                / 1024.0
+                / 1024.0,
+        }
+    }
 }
 
 impl Application for Gui {
@@ -268,7 +291,7 @@ impl Application for Gui {
                 controls: Controls::default(),
                 self_releases,
             },
-            Command::none(),
+            Command::perform(Gui::calculate_disk_space(), GuiMessage::CalculateDiskSpace),
         )
     }
 
@@ -349,7 +372,7 @@ impl Application for Gui {
                 file_exists,
                 &self.controls,
             ),
-            Tab::Settings => Tab::settings_body(&self.releases),
+            Tab::Settings => Tab::settings_body(&self.releases, self.state.disk_space),
             Tab::SelfUpdater => Tab::self_updater_body(&self.state, &self.self_releases),
             Tab::About => Tab::about_body(),
         };

@@ -1,5 +1,5 @@
 use super::{
-    extra::{BuildTypeSettings, Choice, Location},
+    extra::{BuildTypeSettings, Choice, DiskSpace, Location},
     package::PackageMessage,
     sort_by::SortBy,
     style::Theme,
@@ -103,6 +103,7 @@ pub enum GuiMessage {
     FilterLtsChanged(bool),
     SortingChanged(SortBy),
     TabChanged(Tab),
+    CalculateDiskSpace(DiskSpace),
     BypassLauncher(Choice),
     ModifierKey(ModifierKey),
     UseLatestAsDefault(Choice),
@@ -640,6 +641,14 @@ impl Gui {
             GuiMessage::TabChanged(tab) => {
                 set_setting().tab = tab;
                 save_settings();
+                if tab == Tab::Settings {
+                    Command::perform(Gui::calculate_disk_space(), GuiMessage::CalculateDiskSpace)
+                } else {
+                    Command::none()
+                }
+            }
+            GuiMessage::CalculateDiskSpace(disk_space) => {
+                self.state.disk_space = Some(disk_space);
                 Command::none()
             }
             GuiMessage::BypassLauncher(choice) => {
@@ -851,12 +860,12 @@ impl Gui {
                     }
                 }
                 self.sync();
-                Command::none()
+                Command::perform(Gui::calculate_disk_space(), GuiMessage::CalculateDiskSpace)
             }
             GuiMessage::RemoveCache => {
                 remove_dir_all(&get_setting().cache_dir).unwrap();
                 create_dir_all(&get_setting().cache_dir).unwrap();
-                Command::none()
+                Command::perform(Gui::calculate_disk_space(), GuiMessage::CalculateDiskSpace)
             }
             GuiMessage::SelfUpdater(choice) => {
                 match choice {
