@@ -23,7 +23,6 @@ strip = "symbols"
 
 [dependencies]
 async-trait = "0.1"
-bincode = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "3", features = ["cargo"] }
 derive_deref = "1"
@@ -38,6 +37,7 @@ lazy_static = "1"
 native-dialog = "0.6"
 regex = "1"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
+ron = "0.7"
 select = "0.5"
 serde = { version = "1", features = ["derive"] }
 timeago = "0.3"

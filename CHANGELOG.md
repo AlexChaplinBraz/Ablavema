@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - To `wgpu` renderer on Linux since it seems to be working now.
 - Default font so everything fits correctly on all platforms.
+- File format for the config file and databases. They are now plain text instead of binary.
 
 ### Fixed
 

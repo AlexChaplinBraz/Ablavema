@@ -12,11 +12,16 @@ use device_query::Keycode;
 use directories_next::ProjectDirs;
 use lazy_static::{initialize, lazy_static};
 use regex::Regex;
+use ron::{
+    from_str,
+    ser::{to_string_pretty, PrettyConfig},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     env::current_exe,
     env::var,
-    fs::{create_dir_all, File},
+    fs::{create_dir_all, read_to_string, File},
+    io::Write,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -41,7 +46,7 @@ pub fn set_setting() -> RwLockWriteGuard<'static, Settings> {
     SETTINGS.write().unwrap()
 }
 
-const CONFIG_NAME: &str = "config.bin";
+const CONFIG_NAME: &str = "config.ron";
 pub const CONFIG_FILE_ENV: &str = "ABLAVEMA_CONFIG_FILE";
 pub static PORTABLE: AtomicBool = AtomicBool::new(false);
 pub static CAN_CONNECT: AtomicBool = AtomicBool::new(true);
@@ -75,6 +80,7 @@ lazy_static! {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct Settings {
     pub recent_files: RecentFiles,
     pub bookmarks: Bookmarks,
@@ -103,22 +109,15 @@ pub struct Settings {
 
 impl Settings {
     fn init() -> Self {
-        let mut settings = if !CONFIG_PATH.exists() {
-            let default = Settings::default();
-            let conf_file = File::create(&*CONFIG_PATH).unwrap();
-            bincode::serialize_into(conf_file, &default).unwrap();
-            default
-        } else {
-            let conf_file = File::open(&*CONFIG_PATH).unwrap();
-            let settings: Settings = bincode::deserialize_from(conf_file).unwrap_or_else(|_| {
-                // This is in case the Settings struct changed,
-                // which would just initialise the settings with defaults.
-                let default = Settings::default();
-                let conf_file = File::create(&*CONFIG_PATH).unwrap();
-                bincode::serialize_into(conf_file, &default).unwrap();
-                default
-            });
-            settings
+        let mut settings: Settings = match read_to_string(&*CONFIG_PATH) {
+            Ok(text) => match from_str(&text) {
+                Ok(settings) => settings,
+                Err(e) => {
+                    eprintln!("Error reading config file: {}.\nUsing default settings.", e);
+                    Settings::default()
+                }
+            },
+            Err(_) => Settings::default(),
         };
 
         if PORTABLE.load(Ordering::Relaxed) {
@@ -135,8 +134,9 @@ impl Settings {
     }
 
     fn save(&self) {
-        let conf_file = File::create(&*CONFIG_PATH).unwrap();
-        bincode::serialize_into(conf_file, self).unwrap();
+        let mut config_file = File::create(&*CONFIG_PATH).unwrap();
+        let settings = to_string_pretty(&self, PrettyConfig::new()).unwrap();
+        config_file.write_all(settings.as_bytes()).unwrap();
     }
 }
 
@@ -217,21 +217,21 @@ impl Bookmarks {
         }
     }
 
-    pub fn clean(&mut self, pakcages: &[Package]) {
-        let mut indeces = Vec::new();
+    pub fn clean(&mut self, packages: &[Package]) {
+        let mut indexes = Vec::new();
 
         for bookmark in self.iter() {
-            if !pakcages.iter().any(|package| &package.name == bookmark) {
+            if !packages.iter().any(|package| &package.name == bookmark) {
                 if let Some(index) = self
                     .iter()
                     .position(|old_bookmark| old_bookmark == bookmark)
                 {
-                    indeces.push(index);
+                    indexes.push(index);
                 }
             }
         }
 
-        for (removed, index) in indeces.iter().enumerate() {
+        for (removed, index) in indexes.iter().enumerate() {
             self.remove(index - removed);
         }
     }

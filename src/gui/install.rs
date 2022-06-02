@@ -4,9 +4,11 @@ use iced_futures::{
     futures::stream::{unfold, BoxStream},
     subscription,
 };
+use ron::ser::{to_string_pretty, PrettyConfig};
 use std::{
     fs::{create_dir_all, rename, File},
     hash::{Hash, Hasher},
+    io::Write,
     path::PathBuf,
 };
 use tokio::fs::{remove_dir_all, remove_file};
@@ -424,9 +426,13 @@ where
                         // Actually, I tried it but that crate fails to move links.
                         unwrap_or_return!(index, rename(extracted_path, &package_path));
 
-                        package_path.push("package_info.bin");
-                        let file = unwrap_or_return!(index, File::create(&package_path));
-                        unwrap_or_return!(index, bincode::serialize_into(file, &package));
+                        package_path.push("package_info.ron");
+                        let mut file = unwrap_or_return!(index, File::create(&package_path));
+                        let package_info = unwrap_or_return!(
+                            index,
+                            to_string_pretty(&package, PrettyConfig::new())
+                        );
+                        unwrap_or_return!(index, file.write_all(package_info.as_bytes()));
 
                         Some((
                             (index, Progress::FinishedInstalling),

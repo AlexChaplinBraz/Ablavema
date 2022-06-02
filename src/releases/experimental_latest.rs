@@ -15,6 +15,6 @@ impl ReleaseType for ExperimentalLatest {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("experimental_latest.bin")
+        get_setting().databases_dir.join("experimental_latest.ron")
     }
 }

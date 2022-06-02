@@ -15,6 +15,6 @@ impl ReleaseType for PatchArchive {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("patch_archive.bin")
+        get_setting().databases_dir.join("patch_archive.ron")
     }
 }

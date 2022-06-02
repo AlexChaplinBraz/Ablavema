@@ -15,6 +15,6 @@ impl ReleaseType for DailyArchive {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("daily_archive.bin")
+        get_setting().databases_dir.join("daily_archive.ron")
     }
 }

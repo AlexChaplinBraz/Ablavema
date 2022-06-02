@@ -110,6 +110,6 @@ impl ReleaseType for StableLatest {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("stable_latest.bin")
+        get_setting().databases_dir.join("stable_latest.ron")
     }
 }

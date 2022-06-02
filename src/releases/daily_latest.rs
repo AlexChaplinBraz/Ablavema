@@ -15,6 +15,6 @@ impl ReleaseType for DailyLatest {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("daily_latest.bin")
+        get_setting().databases_dir.join("daily_latest.ron")
     }
 }

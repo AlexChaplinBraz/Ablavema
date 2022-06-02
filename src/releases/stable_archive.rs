@@ -52,7 +52,7 @@ impl ReleaseType for StableArchive {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("stable_archive.bin")
+        get_setting().databases_dir.join("stable_archive.ron")
     }
 }
 

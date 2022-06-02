@@ -15,6 +15,6 @@ impl ReleaseType for PatchLatest {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("patch_latest.bin")
+        get_setting().databases_dir.join("patch_latest.ron")
     }
 }

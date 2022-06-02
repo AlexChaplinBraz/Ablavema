@@ -159,6 +159,6 @@ impl ReleaseType for Lts {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("lts.bin")
+        get_setting().databases_dir.join("lts.ron")
     }
 }

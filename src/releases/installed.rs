@@ -3,7 +3,8 @@ use crate::{
     settings::{get_setting, save_settings, set_setting},
 };
 use derive_deref::{Deref, DerefMut};
-use std::fs::{read_dir, remove_dir_all, File};
+use ron::from_str;
+use std::fs::{read_dir, read_to_string, remove_dir_all};
 
 #[derive(Debug, Default, Deref, DerefMut)]
 pub struct Installed(Vec<Package>);
@@ -15,16 +16,19 @@ impl Installed {
         for entry in read_dir(&get_setting().packages_dir).unwrap() {
             let dir = entry.unwrap();
             let mut package_info = dir.path();
-            package_info.push("package_info.bin");
+            package_info.push("package_info.ron");
 
             if package_info.exists() {
-                let file = File::open(&package_info).unwrap();
-                match bincode::deserialize_from(file) {
-                    Ok(package) => {
-                        self.push(package);
-                    }
-                    Err(_) => {
-                        remove_dir_all(package_info.parent().unwrap()).unwrap();
+                if let Ok(package_string) = read_to_string(&package_info) {
+                    match from_str(&package_string) {
+                        Ok(package) => self.push(package),
+                        Err(e) => {
+                            eprintln!(
+                                "Error reading package info file: {}.\nRemoving installed package.",
+                                e
+                            );
+                            remove_dir_all(package_info.parent().unwrap()).unwrap();
+                        }
                     }
                 }
             }

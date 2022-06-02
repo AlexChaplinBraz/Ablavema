@@ -15,6 +15,6 @@ impl ReleaseType for ExperimentalArchive {
     }
 
     fn get_db_path(&self) -> PathBuf {
-        get_setting().databases_dir.join("experimental_archive.bin")
+        get_setting().databases_dir.join("experimental_archive.ron")
     }
 }

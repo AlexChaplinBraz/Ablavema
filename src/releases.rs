@@ -21,10 +21,15 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDateTime, Utc};
+use ron::{
+    from_str,
+    ser::{to_string_pretty, PrettyConfig},
+};
 use select::predicate::{And, Class, Name, Predicate};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    fs::{remove_file, File},
+    fs::{read_to_string, remove_file, File},
+    io::Write,
     iter, mem, ops,
     path::PathBuf,
     sync::atomic::Ordering,
@@ -508,24 +513,20 @@ pub trait ReleaseType:
     fn get_db_path(&self) -> PathBuf;
 
     fn save(&self) {
-        let file = File::create(self.get_db_path()).unwrap();
-        bincode::serialize_into(file, self).unwrap();
+        let mut file = File::create(self.get_db_path()).unwrap();
+        let settings = to_string_pretty(&self, PrettyConfig::new()).unwrap();
+        file.write_all(settings.as_bytes()).unwrap();
     }
 
     fn load(&mut self) {
-        if let Ok(file) = File::open(self.get_db_path()) {
-            match bincode::deserialize_from(file) {
-                Ok(bin) => {
-                    *self = bin;
-                }
-                Err(e) => {
-                    // TODO: Consider moving to a diferent serialiser.
-                    // Since even after Package was modified bincode may just error with:
-                    // memory allocation of 7809lotsofbytes6536 bytes failed
-                    // abort (core dumped)
-                    eprintln!("Failed to load database with: {}.", e);
-                    self.remove_db();
-                }
+        if let Ok(db) = read_to_string(self.get_db_path()) {
+            match from_str(&db) {
+                Ok(self_db) => *self = self_db,
+                Err(e) => eprintln!(
+                    "Error reading database file `{}` with error:\n{}",
+                    self.get_db_path().file_name().unwrap().to_str().unwrap(),
+                    e
+                ),
             }
         }
     }
@@ -619,8 +620,16 @@ impl BuilderBuild {
             )
             .unwrap();
 
-            let date_without_year = build_node.find(Class("build-details").descendant(Name("li"))).nth(0).unwrap().text();
-            let build_id = build_node.find(Class("build-details").descendant(Name("li"))).nth(1).unwrap().text();
+            let date_without_year = build_node
+                .find(Class("build-details").descendant(Name("li")))
+                .nth(0)
+                .unwrap()
+                .text();
+            let build_id = build_node
+                .find(Class("build-details").descendant(Name("li")))
+                .nth(1)
+                .unwrap()
+                .text();
             let date_string = format!("{}-{}", date_without_year, Utc::today().year());
             let date = NaiveDateTime::parse_from_str(&date_string, "%B %d, %T-%Y").unwrap();
 
