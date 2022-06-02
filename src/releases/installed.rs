@@ -4,7 +4,7 @@ use crate::{
 };
 use derive_deref::{Deref, DerefMut};
 use ron::from_str;
-use std::fs::{read_dir, read_to_string, remove_dir_all};
+use std::fs::{create_dir_all, read_dir, read_to_string, remove_dir_all};
 
 #[derive(Debug, Default, Deref, DerefMut)]
 pub struct Installed(Vec<Package>);
@@ -65,9 +65,8 @@ impl Installed {
     }
 
     pub fn remove_all(&mut self) {
-        for package in self.iter() {
-            package.remove();
-        }
+        remove_dir_all(&get_setting().packages_dir).unwrap();
+        create_dir_all(&get_setting().packages_dir).unwrap();
     }
 
     pub fn remove_daily_latest(&mut self) {

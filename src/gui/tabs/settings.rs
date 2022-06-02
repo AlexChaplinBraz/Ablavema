@@ -125,15 +125,6 @@ impl Tab {
         let stable_latest_db_exists = releases.stable_latest.get_db_path().exists();
         let stable_archive_db_exists = releases.stable_archive.get_db_path().exists();
         let lts_db_exists = releases.lts.get_db_path().exists();
-        let any_dbs_exist = daily_latest_db_exists
-            || daily_archive_db_exists
-            || experimental_latest_db_exists
-            || experimental_archive_db_exists
-            || patch_latest_db_exists
-            || patch_archive_db_exists
-            || stable_latest_db_exists
-            || stable_archive_db_exists
-            || lts_db_exists;
 
         let remove_packages_button = |label, build_type, exists| {
             let button = Button::new(Text::new(label).horizontal_alignment(Horizontal::Center))
@@ -201,15 +192,6 @@ impl Tab {
             .filter(|package| package.build == Build::Lts)
             .count()
             > 0;
-        let any_packages_exist = daily_latest_packages_exist
-            || daily_archive_packages_exist
-            || experimental_latest_packages_exist
-            || experimental_archive_packages_exist
-            || patch_latest_packages_exist
-            || patch_archive_packages_exist
-            || stable_latest_packages_exist
-            || stable_archive_packages_exist
-            || lts_packages_exist;
 
         let checking_for_updates_block = settings_block_intro(
             "Checking for updates",
@@ -453,9 +435,9 @@ Keep in mind that any installed package that's no longer available will not reap
                         Column::new()
                             .spacing(20)
                             .push(remove_db_button(
-                                "All",
+                                "Remove whole directory",
                                 BuildTypeSettings::All,
-                                any_dbs_exist,
+                                true,
                             ))
                             .push(remove_db_button(
                                 "Daily (latest)",
@@ -525,11 +507,11 @@ Useful for getting rid of a large quantity of packages at the same time.",
                     // TODO: Fix slowdowns due to calculating packages' size.
                     .push(Text::new(format!(
                         "Space used by packages: {:.2} GB\nAvailable space: {:.2} GB",
-                        dir::get_size(get_setting().packages_dir.clone()).unwrap() as f64
+                        dir::get_size(&get_setting().packages_dir).unwrap() as f64
                             / 1024.0
                             / 1024.0
                             / 1024.0,
-                        available_space(get_setting().packages_dir.clone()).unwrap() as f64
+                        available_space(&get_setting().packages_dir).unwrap() as f64
                             / 1024.0
                             / 1024.0
                             / 1024.0
@@ -538,9 +520,9 @@ Useful for getting rid of a large quantity of packages at the same time.",
                         Column::new()
                             .spacing(20)
                             .push(remove_packages_button(
-                                "All",
+                                "Remove whole directory",
                                 BuildTypeSettings::All,
-                                any_packages_exist,
+                                true,
                             ))
                             .push(remove_packages_button(
                                 "Daily (latest)",
@@ -611,11 +593,11 @@ cache isn't being automatically removed.",
                     // TODO: Fix slowdowns due to calculating cache size.
                     .push(Text::new(format!(
                         "Space used by cache: {:.2} GB\nAvailable space: {:.2} GB",
-                        dir::get_size(get_setting().cache_dir.clone()).unwrap() as f64
+                        dir::get_size(&get_setting().cache_dir).unwrap() as f64
                             / 1024.0
                             / 1024.0
                             / 1024.0,
-                        available_space(get_setting().cache_dir.clone()).unwrap() as f64
+                        available_space(&get_setting().cache_dir).unwrap() as f64
                             / 1024.0
                             / 1024.0
                             / 1024.0

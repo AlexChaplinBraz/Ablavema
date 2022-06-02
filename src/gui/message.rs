@@ -783,15 +783,8 @@ impl Gui {
             GuiMessage::RemoveDatabases(build_type) => {
                 match build_type {
                     BuildTypeSettings::All => {
-                        self.releases.daily_latest.remove_db();
-                        self.releases.daily_archive.remove_db();
-                        self.releases.experimental_latest.remove_db();
-                        self.releases.experimental_archive.remove_db();
-                        self.releases.patch_latest.remove_db();
-                        self.releases.patch_archive.remove_db();
-                        self.releases.stable_latest.remove_db();
-                        self.releases.stable_archive.remove_db();
-                        self.releases.lts.remove_db();
+                        remove_dir_all(&get_setting().databases_dir).unwrap();
+                        create_dir_all(&get_setting().databases_dir).unwrap();
                     }
                     BuildTypeSettings::DailyLatest => {
                         self.releases.daily_latest.remove_db();
@@ -861,9 +854,8 @@ impl Gui {
                 Command::none()
             }
             GuiMessage::RemoveCache => {
-                remove_dir_all(get_setting().cache_dir.clone()).unwrap();
-                println!("All cache removed.");
-                create_dir_all(get_setting().cache_dir.clone()).unwrap();
+                remove_dir_all(&get_setting().cache_dir).unwrap();
+                create_dir_all(&get_setting().cache_dir).unwrap();
                 Command::none()
             }
             GuiMessage::SelfUpdater(choice) => {
