@@ -36,7 +36,7 @@ impl ReleaseType for StableLatest {
 
             let node = document.find(Attr("id", targ_os)).next().unwrap();
 
-            let (version_path, _) = node
+            let (version_path, file_name) = node
                 .find(Name("a"))
                 .next()
                 .unwrap()
@@ -56,17 +56,9 @@ impl ReleaseType for StableLatest {
             };
 
             let url = format!(
-                "https://ftp.nluug.nl/pub/graphics/blender/release/{}",
-                node.find(Name("a"))
-                    .next()
-                    .unwrap()
-                    .attr("href")
-                    .unwrap()
-                    .strip_prefix(&url)
-                    .unwrap()
-                    .strip_suffix('/')
-                    .unwrap()
-                    .replace(".msi", ".zip")
+                "https://ftp.nluug.nl/pub/graphics/blender/release/{}/{}",
+                version_path,
+                file_name.strip_suffix('/').unwrap()
             );
 
             let date = {
